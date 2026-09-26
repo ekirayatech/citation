@@ -1,0 +1,6 @@
+{
+  "name": "Colegio Ekirayá - Cita Master",
+  "description": "Plataforma académica y gestor bibliográfico del Colegio Ekirayá para formulación de citas, referencias, taller práctico y evaluación bajo normas APA 7, MLA 9, Chicago 17 e Icontec.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
