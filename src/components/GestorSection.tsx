@@ -194,7 +194,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
       return;
     }
     await exportBibliographyToPDF(displayedReferences);
-    showToast('Bibliografía exportada a PDF con sangría francesa');
+    showToast('Citas y referencias exportadas a PDF');
   };
 
   const { sourceType } = formData;
@@ -703,7 +703,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
               {sourceType !== 'website' ? (
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Código DOI (Si aplica)
+                    Código DOI (Identificador de Objeto Digital)
                   </label>
                   <input
                     type="text"

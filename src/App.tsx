@@ -43,7 +43,6 @@ export default function App() {
           return;
         }
       }
-      // Check legacy key from earlier HTML version
       const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
       if (legacy) {
         const parsedLegacy = JSON.parse(legacy);

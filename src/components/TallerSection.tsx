@@ -347,7 +347,6 @@ export const TallerSection: React.FC<TallerSectionProps> = ({
     }
     setNameError(false);
 
-    // Ensure exercises are validated for the report
     const exerciseItems: WorkshopExercisePDFItem[] = EXERCISES.map((ex) => {
       const val = exerciseAnswers[ex.id] || '';
       const check = val.trim() ? ex.validate(val) : null;

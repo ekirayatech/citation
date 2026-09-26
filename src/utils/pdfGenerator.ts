@@ -100,7 +100,7 @@ export async function exportWorkshopToPDF(params: {
   const headerCenterX = logoData ? 120 : 105;
   doc.setFont('Helvetica', 'bold');
   doc.setFontSize(13);
-  doc.setTextColor(109, 40, 217);
+  doc.setTextColor(6, 78, 59);
   doc.text('COLEGIO EKIRAYÁ EDUCACIÓN MONTESSORI', headerCenterX, 17, {
     align: 'center',
   });

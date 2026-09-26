@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import { BookOpen, ArrowRight, CheckCircle2, ExternalLink, Sparkles } from 'lucide-react';
+import {
+  BookOpen,
+  ArrowRight,
+  CheckCircle2,
+  ExternalLink,
+  Sparkles,
+  Link2,
+  FileText,
+  Users,
+  BookmarkCheck,
+} from 'lucide-react';
 import { CitationStyle, SourceType } from '../types/citation';
 
 interface TeoriaSectionProps {
@@ -105,8 +115,9 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
           </h2>
           <p className="text-violet-100/90 text-sm sm:text-base leading-relaxed max-w-2xl">
             Comprende la estructura rigurosa de una cita y una referencia bibliográfica según los
-            estándares internacionales (APA 7.ª, MLA 9.ª, Chicago 17.ª e Icontec), el uso ético de
-            herramientas de Inteligencia Artificial y pon a prueba tus conocimientos.
+            estándares internacionales (APA 7.ª, MLA 9.ª, Chicago 17.ª e Icontec), la función de
+            identificadores digitales como <strong>DOI, ISBN, ISSN y URL/URI</strong>, el uso ético
+            de la Inteligencia Artificial y pon a prueba tus conocimientos.
           </p>
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <button
@@ -139,8 +150,8 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
             Guía Teórica y Configuración de Referencias
           </h3>
           <p className="text-sm text-slate-600 mt-1">
-            Todo trabajo académico en el Colegio Ekirayá se fundamenta en el respeto intelectual y
-            la trazabilidad de las fuentes consultadas.
+            Todo trabajo académico en el Colegio Ekirayá se fundamenta en el respeto intelectual,
+            la honestidad investigativa y la trazabilidad de las fuentes consultadas.
           </p>
         </div>
 
@@ -153,16 +164,16 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
             En el <strong>Colegio Ekirayá Bilingüe</strong>, la <strong>probidad académica</strong>{' '}
             es un principio ético fundamental que promueve la honestidad personal, el rigor
             científico y la responsabilidad en el aprendizaje. Implica dar crédito oportuno y
-            explícito a las fuentes originales de información, ideas, imágenes, datos o códigos
-            utilizados en cualquier proyecto o ensayo.
+            explícito a las fuentes originales de información, ideas, imágenes, tablas, datos o
+            códigos utilizados en cualquier proyecto, presentación o ensayo.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
             <div className="bg-white p-4 rounded-lg border border-blue-100">
               <div className="text-sm font-semibold text-slate-900 mb-1">Derecho de Autor</div>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                Protección legal y moral que otorga a los creadores la propiedad sobre sus obras
-                intelectuales (libros, artículos, fotografías, software). Utilizar su trabajo sin
-                citarlo constituye una falta a la ética académica y plagio.
+                Protección jurídica y moral que otorga a los creadores el reconocimiento sobre sus
+                obras intelectuales (libros, artículos, fotografías, software). Presentar ideas
+                ajenas como propias sin citarlas constituye <strong>plagio académico</strong>.
               </p>
             </div>
             <div className="bg-white p-4 rounded-lg border border-blue-100">
@@ -170,19 +181,29 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
                 Uso Ético de la Inteligencia Artificial
               </div>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                Al emplear modelos generativos (como ChatGPT, Gemini o Claude) para estructurar
-                ideas o consultar conceptos, la probidad académica exige declarar su uso, indicar
-                el prompt empleado e incluir la cita y referencia correspondiente.
+                Al emplear modelos generativos (como ChatGPT, Gemini o Claude) para indagar
+                conceptos o estructurar ideas, la probidad exige declarar su uso, mencionar la
+                instrucción (<em>prompt</em>) e incluir su cita y referencia formal.
+              </p>
+            </div>
+            <div className="bg-white p-4 rounded-lg border border-blue-100">
+              <div className="text-sm font-semibold text-slate-900 mb-1">
+                ¿Cuándo NO es necesario citar?
+              </div>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                No requieren cita tus propias reflexiones originales, resultados de tus propios
+                experimentos escolares ni los hechos de <strong>conocimiento público general</strong>{' '}
+                (ej. "Bogotá es la capital de Colombia"). En caso de duda, cita siempre la fuente.
               </p>
             </div>
           </div>
         </section>
 
-        {/* RECUADRO 2: ¿QUÉ ES UNA CITA BIBLIOGRÁFICA? */}
-        <section className="p-5 sm:p-6 rounded-xl bg-[#F0FDF4] border border-[#DCFCE7] space-y-4">
+        {/* RECUADRO 2: ¿QUÉ ES UNA CITA BIBLIOGRÁFICA? + EXTENSIÓN */}
+        <section className="p-5 sm:p-6 rounded-xl bg-[#F0FDF4] border border-[#DCFCE7] space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <h4 className="text-base sm:text-lg font-semibold text-emerald-950">
-              ¿Qué es una Cita Bibliográfica?
+            <h4 className="text-base sm:text-lg font-semibold text-violet-950">
+              ¿Qué es una Cita Bibliográfica y cuáles son sus tipos?
             </h4>
             <span className="text-xs text-emerald-800 font-medium">
               Se inserta dentro del párrafo del texto
@@ -196,16 +217,17 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
             lector a la lista de referencias al final del trabajo.
           </p>
 
+          {/* Modalidades según el énfasis: Parentética vs Narrativa */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-white p-5 rounded-lg border border-emerald-200/80 flex flex-col justify-between space-y-3">
               <div>
                 <div className="text-xs font-semibold text-emerald-700 mb-1">
-                  Modalidad 1 · Énfasis en la idea
+                  Modalidad 1 · Énfasis en la idea o contenido
                 </div>
                 <h5 className="text-base font-semibold text-slate-900 mb-1.5">Cita Parentética</h5>
                 <p className="text-xs sm:text-sm text-slate-600">
                   Los datos del autor, año y página van entre paréntesis al final de la idea o frase
-                  citada, antes del punto final.
+                  citada, antes del punto final de la oración.
                 </p>
               </div>
               <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 font-mono text-xs sm:text-sm text-slate-800 leading-relaxed">
@@ -238,16 +260,88 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
             </div>
           </div>
 
-          {/* Nota pedagógica adicional sobre cita directa vs paráfrasis */}
-          <div className="bg-white/90 p-4 rounded-lg border border-emerald-200/60 text-xs sm:text-sm text-slate-700 flex flex-col sm:flex-row gap-4 justify-between">
-            <div>
-              <strong className="text-slate-900">Cita Textual (Literal):</strong> Copia exacta de
-              las palabras del autor. Lleva comillas si tiene menos de 40 palabras y{' '}
-              <strong>siempre exige número de página (p. o pp.)</strong>.
+          {/* Clasificación de las citas según su extensión y forma */}
+          <div className="space-y-3 pt-1">
+            <div className="flex items-center gap-2 text-xs font-semibold text-violet-950 uppercase tracking-wide">
+              <FileText className="w-4 h-4 text-violet-700" />
+              <span>Clasificación según la extensión y forma de citado (APA 7.ª)</span>
             </div>
-            <div className="sm:border-l sm:border-emerald-200 sm:pl-4">
-              <strong className="text-slate-900">Cita Parafraseada:</strong> Explicación de la idea
-              del autor con tus propias palabras. Exige autor y año, sin comillas.
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white p-4 rounded-lg border border-emerald-200/80 space-y-2">
+                <h6 className="text-sm font-semibold text-slate-900">
+                  1. Cita Textual Corta (&lt; 40 palabras)
+                </h6>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Reproduce palabra por palabra menos de 40 palabras. Se integra dentro del mismo
+                  párrafo encerrada entre <strong>comillas dobles (" ")</strong> e incluye siempre
+                  el número de página (<code>p.</code>) o párrafo (<code>párr.</code>).
+                </p>
+              </div>
+
+              <div className="bg-white p-4 rounded-lg border border-emerald-200/80 space-y-2">
+                <h6 className="text-sm font-semibold text-slate-900">
+                  2. Cita Textual en Bloque (≥ 40 palabras)
+                </h6>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Cuando el fragmento literal tiene 40 palabras o más, se escribe en un{' '}
+                  <strong>párrafo aparte con sangría izquierda de 1.27 cm</strong> en todo el
+                  bloque, <strong>sin comillas</strong>, y el punto final va antes del paréntesis.
+                </p>
+              </div>
+
+              <div className="bg-white p-4 rounded-lg border border-emerald-200/80 space-y-2">
+                <h6 className="text-sm font-semibold text-slate-900">
+                  3. Paráfrasis (Cita Indirecta)
+                </h6>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Consiste en explicar con tus propias palabras las ideas de un autor conservando su
+                  sentido original. <strong>No lleva comillas</strong>, pero exige obligatoriamente
+                  citar el apellido del autor y el año: <code>(Autor, Año)</code>.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Regla del número de autores y uso de et al. */}
+          <div className="bg-white p-4 sm:p-5 rounded-lg border border-emerald-200/80 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-violet-950">
+              <Users className="w-4 h-4 text-violet-700" />
+              <span>¿Cómo citar según la cantidad de autores? (Regla de "&amp;" y "et al.")</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+                <div className="font-semibold text-violet-950">Un solo autor</div>
+                <p className="text-slate-600">Se escribe el apellido del autor en todas las menciones:</p>
+                <div className="font-mono text-slate-800 pt-1">
+                  Parentética: (Montessori, 2019)
+                  <br />
+                  Narrativa: Montessori (2019)
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+                <div className="font-semibold text-violet-950">Dos autores</div>
+                <p className="text-slate-600">
+                  Se citan ambos apellidos siempre (con <strong>&amp;</strong> entre paréntesis y{' '}
+                  <strong>y</strong> fuera):
+                </p>
+                <div className="font-mono text-slate-800 pt-1">
+                  Parentética: (Gómez &amp; Silva, 2024)
+                  <br />
+                  Narrativa: Gómez y Silva (2024)
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+                <div className="font-semibold text-violet-950">Tres o más autores (et al.)</div>
+                <p className="text-slate-600">
+                  Desde la primera cita se escribe solo el primer apellido seguido de{' '}
+                  <strong>et al.</strong> ("y otros"):
+                </p>
+                <div className="font-mono text-slate-800 pt-1">
+                  Parentética: (Restrepo et al., 2025)
+                  <br />
+                  Narrativa: Restrepo et al. (2025)
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -267,7 +361,8 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
             cada fuente citada en el trabajo. Se ubica al final del documento bajo el título{' '}
             <strong>"Referencias"</strong> y proporciona todos los metadatos necesarios (autor,
             fecha, título y fuente o enlace) para que cualquier lector o docente pueda localizar y
-            verificar el recurso original.
+            verificar el recurso original. Toda cita en el texto debe tener su referencia al final,
+            y toda referencia debe haber sido citada en el texto.
           </p>
           <div className="bg-white p-5 rounded-lg border border-blue-100 space-y-2">
             <div className="text-xs font-semibold text-violet-700">
@@ -410,7 +505,7 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
                   activePart === 'where' ? 'text-sky-100' : 'text-slate-600'
                 }`}
               >
-                Editorial, nombre de la revista científica, DOI o dirección URL directa.
+                Editorial, nombre de la revista científica, código DOI o dirección URL directa.
               </p>
             </button>
           </div>
@@ -418,7 +513,7 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
           {/* Visualizador Anatómico en Vivo */}
           <div className="bg-white p-4 rounded-lg border border-violet-200">
             <div className="text-xs text-slate-500 mb-2 font-medium">
-              Anatomía de la referencia (pasa o haz clic en las tarjetas superiores):
+              Anatomía de la referencia (haz clic en las tarjetas superiores para resaltar):
             </div>
             <div className="font-mono text-xs sm:text-sm leading-relaxed hanging-indent">
               <span
@@ -462,7 +557,187 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
           </div>
         </section>
 
-        {/* SECCIÓN 5: GUÍAS DE NORMAS INTERNACIONALES (COMPARADOR INTERACTIVO DE FILE 1) */}
+        {/* SECCIÓN AMPLIADA: TABLA DE TÉRMINOS ACADÉMICOS E IDENTIFICADORES DIGITALES */}
+        <section className="p-5 sm:p-6 rounded-xl bg-[#F0F7FF] border border-[#DCEBFE] space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Link2 className="w-5 h-5 text-violet-700" />
+              <h4 className="text-base sm:text-lg font-semibold text-violet-950">
+                Tabla de Términos Académicos Esenciales e Identificadores Digitales
+              </h4>
+            </div>
+            <span className="text-xs text-violet-800 font-medium">
+              DOI · ISBN · ISSN · URL / URI · Abreviaturas
+            </span>
+          </div>
+
+          <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
+            En la investigación académica contemporánea, los libros, revistas y documentos en línea
+            cuentan con códigos estandarizados internacionalmente que garantizan su localización
+            exacta y evitan confusiones entre obras con títulos similares:
+          </p>
+
+          {/* Tabla estructurada de Identificadores de Recursos Digitales e Impresos */}
+          <div className="overflow-x-auto rounded-xl border border-blue-200 bg-white">
+            <table className="w-full text-left border-collapse text-xs sm:text-sm">
+              <thead>
+                <tr className="bg-violet-950 text-white">
+                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Término / Sigla</th>
+                  <th className="py-3 px-4 font-semibold">Significado Completo</th>
+                  <th className="py-3 px-4 font-semibold">
+                    Función en la Identificación de Recursos
+                  </th>
+                  <th className="py-3 px-4 font-semibold">Uso en la Referencia (APA 7.ª)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 text-slate-700">
+                <tr className="hover:bg-slate-50/80">
+                  <td className="py-3.5 px-4 font-mono font-bold text-violet-900 whitespace-nowrap">
+                    DOI
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span className="font-semibold text-slate-900">Digital Object Identifier</span>
+                    <br />
+                    <span className="text-xs text-slate-500">(Identificador de Objeto Digital)</span>
+                  </td>
+                  <td className="py-3.5 px-4 leading-relaxed">
+                    Código alfanumérico único y <strong>permanente</strong> asignado a artículos
+                    científicos, capítulos, ponencias y libros digitales. A diferencia de un enlace
+                    web normal, el DOI nunca caduca aunque el artículo cambie de servidor o revista.
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span className="block text-xs text-slate-600 mb-1">
+                      Se incluye siempre al final como enlace completo sin punto final:
+                    </span>
+                    <code className="font-mono text-xs text-violet-800 bg-violet-50 px-1.5 py-0.5 rounded">
+                      https://doi.org/10.1016/j.rdep.2024.03
+                    </code>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-slate-50/80">
+                  <td className="py-3.5 px-4 font-mono font-bold text-violet-900 whitespace-nowrap">
+                    URL / URI
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span className="font-semibold text-slate-900">
+                      Uniform Resource Locator / Identifier
+                    </span>
+                    <br />
+                    <span className="text-xs text-slate-500">
+                      (Localizador / Identificador Uniforme de Recursos)
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 leading-relaxed">
+                    La <strong>URI</strong> es el estándar general que identifica un recurso en la
+                    red, y la <strong>URL</strong> es la dirección web específica que indica dónde se
+                    encuentra alojada una página, informe o herramienta de IA en internet.
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span className="block text-xs text-slate-600 mb-1">
+                      Se coloca cuando el recurso no tiene DOI:
+                    </span>
+                    <code className="font-mono text-xs text-violet-800 bg-violet-50 px-1.5 py-0.5 rounded">
+                      https://www.unesco.org/es
+                    </code>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-slate-50/80">
+                  <td className="py-3.5 px-4 font-mono font-bold text-violet-900 whitespace-nowrap">
+                    ISBN
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span className="font-semibold text-slate-900">
+                      International Standard Book Number
+                    </span>
+                    <br />
+                    <span className="text-xs text-slate-500">
+                      (Número Estándar Internacional de Libros)
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 leading-relaxed">
+                    Código numérico comercial de 13 dígitos (antes 10) que identifica de manera
+                    exclusiva cada edición y formato (impreso, PDF, ePub) de un{' '}
+                    <strong>libro o monografía</strong> a nivel mundial.
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span className="block text-xs text-slate-600 mb-1">
+                      No se escribe en la referencia APA, pero permite importar automáticamente el
+                      libro en gestores:
+                    </span>
+                    <code className="font-mono text-xs text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
+                      ISBN: 978-968-24-3688-8
+                    </code>
+                  </td>
+                </tr>
+
+                <tr className="hover:bg-slate-50/80">
+                  <td className="py-3.5 px-4 font-mono font-bold text-violet-900 whitespace-nowrap">
+                    ISSN / e-ISSN
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span className="font-semibold text-slate-900">
+                      International Standard Serial Number
+                    </span>
+                    <br />
+                    <span className="text-xs text-slate-500">
+                      (Número Internacional Normalizado de Publicaciones Seriadas)
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 leading-relaxed">
+                    Código de 8 dígitos (dos grupos de cuatro separados por guion) que identifica{' '}
+                    <strong>revistas científicas, periódicos y publicaciones seriadas</strong> tanto
+                    impresas (ISSN) como electrónicas (e-ISSN).
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span className="block text-xs text-slate-600 mb-1">
+                      Valida que una revista sea académica o indexada (en APA se prioriza el DOI del
+                      artículo):
+                    </span>
+                    <code className="font-mono text-xs text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
+                      ISSN: 2027-8306
+                    </code>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Abreviaturas frecuentes en citación */}
+          <div className="bg-white p-5 rounded-xl border border-blue-100 space-y-3">
+            <div className="flex items-center gap-2">
+              <BookmarkCheck className="w-4 h-4 text-violet-700" />
+              <h5 className="text-sm sm:text-base font-semibold text-slate-900">
+                Abreviaturas Bibliográficas Frecuentes en Citas y Referencias
+              </h5>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                <strong className="font-mono text-violet-900 block mb-1">s. f. (sin fecha)</strong>
+                Se emplea entre paréntesis <code>(s. f.)</code> cuando la página web o documento no
+                registra año de publicación.
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                <strong className="font-mono text-violet-900 block mb-1">p. / pp. (páginas)</strong>
+                Se usa <code>p.</code> para una página única (<code>p. 45</code>) y{' '}
+                <code>pp.</code> para un rango de varias páginas (<code>pp. 45-58</code>).
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                <strong className="font-mono text-violet-900 block mb-1">párr. (párrafo)</strong>
+                En fuentes digitales sin paginación fija se indica el número de párrafo:{' '}
+                <code>(UNESCO, 2025, párr. 4)</code>.
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                <strong className="font-mono text-violet-900 block mb-1">et al. (y otros)</strong>
+                Locución latina usada al citar obras de 3 o más autores desde la primera mención:{' '}
+                <code>(Gómez et al., 2024)</code>.
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* SECCIÓN 5: GUÍAS DE NORMAS INTERNACIONALES (COMPARADOR INTERACTIVO) */}
         <section className="space-y-4 pt-2">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
             <div>
