@@ -13,6 +13,7 @@ import {
   User,
   ArrowUpDown,
   Pencil,
+  Quote,
 } from 'lucide-react';
 import {
   CitationFormData,
@@ -895,7 +896,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
           )}
 
           {/* Lista de referencias guardadas */}
-          <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+          <div className="space-y-3.5 max-h-[520px] overflow-y-auto pr-1">
             {displayedReferences.length === 0 ? (
               <div className="text-center py-12 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-2">
                 <p className="text-sm font-medium text-slate-600">
@@ -908,71 +909,148 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                 </p>
               </div>
             ) : (
-              displayedReferences.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-4 rounded-xl bg-slate-50 border border-slate-200 hover:border-violet-300 transition-colors space-y-2.5"
-                >
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <div className="flex items-center gap-1.5 font-medium text-violet-800">
-                      <span>{STYLE_LABELS[item.style]}</span>
-                      <span aria-hidden="true">·</span>
-                      <span className="text-slate-600">
-                        {SOURCE_TYPE_LABELS[item.sourceType].split(' (')[0]}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          copyText(
-                            item.referencePlain,
-                            item.id,
-                            'Referencia individual'
-                          )
-                        }
-                        className="p-1.5 text-slate-500 hover:text-violet-700 rounded-md hover:bg-white transition-colors"
-                        title="Copiar esta referencia"
-                      >
-                        {copiedField === item.id ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                      </button>
+              displayedReferences.map((item) => {
+                const isCiteCopied = copiedField === `${item.id}-cite`;
+                const isNarCopied = copiedField === `${item.id}-nar`;
+                const isRefCopied = copiedField === `${item.id}-ref`;
+
+                return (
+                  <article
+                    key={item.id}
+                    className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs hover:border-violet-300 hover:shadow-sm transition-all space-y-3"
+                  >
+                    {/* Encabezado de la tarjeta: Estilo, Tipo de Fuente y botón de edición opcional */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="font-semibold text-violet-900 bg-violet-50 border border-violet-200/80 px-2 py-0.5 rounded-md">
+                          {STYLE_LABELS[item.style]}
+                        </span>
+                        <span className="text-slate-400" aria-hidden="true">
+                          ·
+                        </span>
+                        <span className="font-medium text-slate-600">
+                          {SOURCE_TYPE_LABELS[item.sourceType].split(' (')[0]}
+                        </span>
+                      </div>
+
                       {item.formData && (
                         <button
                           type="button"
                           onClick={() => handleEditReference(item)}
-                          className="p-1.5 text-slate-500 hover:text-violet-700 rounded-md hover:bg-white transition-colors"
-                          title="Cargar en el formulario para editar"
+                          className="text-xs font-medium text-slate-500 hover:text-violet-700 flex items-center gap-1 px-2 py-1 rounded-md hover:bg-violet-50 transition-colors"
+                          title="Cargar datos en el formulario para editar"
                         >
-                          <Pencil className="w-3.5 h-3.5" />
+                          <Pencil className="w-3 h-3" />
+                          <span>Editar</span>
                         </button>
                       )}
+                    </div>
+
+                    {/* Cuerpo de la Referencia Bibliográfica */}
+                    <div
+                      className="font-mono text-xs text-slate-900 bg-slate-50/90 p-3.5 rounded-lg border border-slate-200/80 hanging-indent leading-relaxed select-all"
+                      dangerouslySetInnerHTML={{ __html: item.referenceHtml }}
+                    />
+
+                    {/* Vista previa de Cita en el Texto (Parentética y Narrativa) */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-lg bg-slate-50/60 border border-slate-100 text-[11px] text-slate-600 font-mono">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span>
+                          <strong className="font-sans font-semibold text-slate-700">
+                            Cita parentética:
+                          </strong>{' '}
+                          {item.parenthetical}
+                        </span>
+                        <span className="text-slate-300" aria-hidden="true">
+                          |
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copyText(
+                              item.narrative,
+                              `${item.id}-nar`,
+                              'Cita narrativa'
+                            )
+                          }
+                          className="hover:text-violet-800 transition-colors text-left"
+                          title="Clic para copiar cita narrativa"
+                        >
+                          <strong className="font-sans font-semibold text-slate-700">
+                            Narrativa:
+                          </strong>{' '}
+                          {isNarCopied ? '¡Copiada!' : item.narrative}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Botones de acción rápidos */}
+                    <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copyText(
+                              item.parenthetical,
+                              `${item.id}-cite`,
+                              'Cita en el texto'
+                            )
+                          }
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors flex items-center gap-1.5 ${
+                            isCiteCopied
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-violet-50 hover:text-violet-800 hover:border-violet-200'
+                          }`}
+                          title={`Copiar cita: ${item.parenthetical}`}
+                        >
+                          {isCiteCopied ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          ) : (
+                            <Quote className="w-3.5 h-3.5 text-violet-600" />
+                          )}
+                          <span>{isCiteCopied ? 'Cita copiada' : 'Copiar cita'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copyText(
+                              item.referencePlain,
+                              `${item.id}-ref`,
+                              'Referencia bibliográfica'
+                            )
+                          }
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors flex items-center gap-1.5 ${
+                            isRefCopied
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-violet-50 hover:text-violet-800 hover:border-violet-200'
+                          }`}
+                          title="Copiar referencia bibliográfica completa"
+                        >
+                          {isRefCopied ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5 text-violet-600" />
+                          )}
+                          <span>
+                            {isRefCopied ? 'Referencia copiada' : 'Copiar referencia'}
+                          </span>
+                        </button>
+                      </div>
+
                       <button
                         type="button"
                         onClick={() => onRemoveReference(item.id)}
-                        className="p-1.5 text-slate-500 hover:text-red-600 rounded-md hover:bg-white transition-colors"
-                        title="Eliminar referencia"
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-red-600 bg-white hover:bg-red-50 border border-slate-200 hover:border-red-200 transition-colors flex items-center gap-1.5 ml-auto"
+                        title="Eliminar referencia de la lista"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
+                        <span>Eliminar</span>
                       </button>
                     </div>
-                  </div>
-
-                  <div
-                    className="font-mono text-xs text-slate-900 bg-white p-3 rounded-lg border border-slate-200/80 hanging-indent leading-relaxed select-all"
-                    dangerouslySetInnerHTML={{ __html: item.referenceHtml }}
-                  />
-
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600 font-mono">
-                    <span>Parentética: {item.parenthetical}</span>
-                    <span aria-hidden="true">·</span>
-                    <span>Narrativa: {item.narrative}</span>
-                  </div>
-                </div>
-              ))
+                  </article>
+                );
+              })
             )}
           </div>
         </div>
