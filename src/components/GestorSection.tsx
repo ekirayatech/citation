@@ -29,6 +29,7 @@ import {
   STYLE_LABELS,
 } from '../utils/citationEngine';
 import { exportBibliographyToPDF } from '../utils/pdfGenerator';
+import { exportBibliographyToDocx } from '../utils/docxGenerator';
 
 interface GestorSectionProps {
   formData: CitationFormData;
@@ -196,6 +197,15 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
     }
     await exportBibliographyToPDF(displayedReferences);
     showToast('Citas y referencias exportadas a PDF');
+  };
+
+  const handleDownloadDocx = async () => {
+    if (displayedReferences.length === 0) {
+      showToast('La lista está vacía');
+      return;
+    }
+    await exportBibliographyToDocx(displayedReferences);
+    showToast('Archivo Word (.docx) con sangría francesa descargado');
   };
 
   const { sourceType } = formData;
@@ -1057,33 +1067,46 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
 
         {/* Barra de Exportación de Bibliografía */}
         <div className="pt-4 border-t border-slate-200 space-y-2.5">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <button
               type="button"
               onClick={handleCopyAllReferences}
               disabled={savedReferences.length === 0}
-              className="py-2 px-3 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+              className="py-2 px-2.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+              title="Copiar todas las referencias al portapapeles"
             >
-              <Copy className="w-3.5 h-3.5" />
-              Copiar Todas
+              <Copy className="w-3.5 h-3.5 shrink-0" />
+              <span>Copiar Todas</span>
             </button>
             <button
               type="button"
-              onClick={handleDownloadTxt}
+              onClick={handleDownloadDocx}
               disabled={savedReferences.length === 0}
-              className="py-2 px-3 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+              className="py-2 px-2.5 bg-blue-700 hover:bg-blue-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+              title="Exportar bibliografía en formato Microsoft Word (.docx) con sangría francesa"
             >
-              <Download className="w-3.5 h-3.5" />
-              Descargar (.txt)
+              <FileText className="w-3.5 h-3.5 shrink-0" />
+              <span>Word (.docx)</span>
             </button>
             <button
               type="button"
               onClick={handleDownloadPdf}
               disabled={savedReferences.length === 0}
-              className="py-2 px-3 bg-violet-700 hover:bg-violet-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+              className="py-2 px-2.5 bg-violet-700 hover:bg-violet-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+              title="Exportar reporte en formato PDF con sangría francesa"
             >
-              <FileText className="w-3.5 h-3.5" />
-              Exportar PDF
+              <FileText className="w-3.5 h-3.5 shrink-0" />
+              <span>Exportar PDF</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadTxt}
+              disabled={savedReferences.length === 0}
+              className="py-2 px-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold rounded-xl transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+              title="Descargar archivo de texto plano (.txt)"
+            >
+              <Download className="w-3.5 h-3.5 shrink-0" />
+              <span>Texto (.txt)</span>
             </button>
           </div>
 
