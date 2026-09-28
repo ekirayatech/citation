@@ -18,9 +18,16 @@
 }
 
 .hanging-indent {
-  padding-left: 2.25rem;
-  text-indent: -2.25rem;
+  padding-left: 1.5rem;
+  text-indent: -1.5rem;
   word-break: break-word;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 640px) {
+  .hanging-indent {
+    padding-left: 2.25rem;
+    text-indent: -2.25rem;
+  }
 }
 

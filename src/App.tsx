@@ -128,83 +128,96 @@ export default function App() {
     <div className="min-h-screen flex flex-col bg-[#F8FAFC] text-[#0F172A]">
       {/* Top Navigation Bar following the 3-Zone Contract */}
       <header className="sticky top-0 z-40 bg-[#4C1D95] text-white border-b border-violet-800 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 lg:py-0 lg:h-16 flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 lg:gap-4">
           {/* Zone 1: Brand Title */}
-          <button
-            type="button"
-            onClick={() => handleSwitchTab('teoria')}
-            className="flex items-center gap-3 text-left focus:outline-none group shrink-0"
-          >
-            {!logoFailed ? (
-              <img
-                src="https://colegioekiraya.edu.co/wp-content/uploads/2024/09/LOGO-CEM-COLOR-02.png"
-                alt="Logo Colegio Ekirayá"
-                referrerPolicy="no-referrer"
-                onError={() => setLogoFailed(true)}
-                className="h-10 w-auto object-contain bg-white px-2 py-1 rounded-lg shadow-xs"
-              />
-            ) : (
-              <div className="h-10 w-10 rounded-lg bg-white text-violet-900 flex items-center justify-center font-bold text-sm shadow-xs">
-                CE
-              </div>
-            )}
-            <span className="font-display text-lg sm:text-xl font-semibold tracking-tight text-white whitespace-nowrap">
-              Colegio Ekirayá · Cita Master
-            </span>
-          </button>
-
-          {/* Zone 2: Navigation Links */}
-          <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto py-1">
+          <div className="flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={() => handleSwitchTab('teoria')}
-              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                activeTab === 'teoria'
-                  ? 'bg-white text-violet-950 font-semibold shadow-xs'
-                  : 'text-violet-100 hover:bg-violet-800/70 hover:text-white'
-              }`}
+              className="flex items-center gap-2.5 sm:gap-3 text-left focus:outline-none group min-w-0"
             >
-              <BookOpen className="w-4 h-4" />
-              Guía Teórica
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSwitchTab('taller')}
-              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                activeTab === 'taller'
-                  ? 'bg-white text-violet-950 font-semibold shadow-xs'
-                  : 'text-violet-100 hover:bg-violet-800/70 hover:text-white'
-              }`}
-            >
-              <ClipboardList className="w-4 h-4" />
-              Ejercicios y Test
+              {!logoFailed ? (
+                <img
+                  src="https://colegioekiraya.edu.co/wp-content/uploads/2024/09/LOGO-CEM-COLOR-02.png"
+                  alt="Logo Colegio Ekirayá"
+                  referrerPolicy="no-referrer"
+                  onError={() => setLogoFailed(true)}
+                  className="h-9 sm:h-10 w-auto object-contain bg-white px-2 py-1 rounded-lg shadow-xs shrink-0"
+                />
+              ) : (
+                <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-white text-violet-900 flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
+                  CE
+                </div>
+              )}
+              <span className="font-display text-base sm:text-xl font-semibold tracking-tight text-white truncate">
+                Colegio Ekirayá · Cita Master
+              </span>
             </button>
 
             <button
               type="button"
               onClick={() => handleSwitchTab('gestor')}
-              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                activeTab === 'gestor'
+              className="lg:hidden px-2.5 py-1.5 text-xs font-semibold bg-violet-950/70 hover:bg-violet-950 text-violet-100 border border-violet-600/50 rounded-lg transition-colors whitespace-nowrap shrink-0"
+            >
+              + Cita
+            </button>
+          </div>
+
+          {/* Zone 2: Navigation Links (Responsive 2x2 grid on mobile, row on sm+) */}
+          <nav
+            aria-label="Navegación principal"
+            className="grid grid-cols-2 sm:flex sm:flex-wrap lg:flex-nowrap items-center gap-1.5 sm:gap-2 w-full lg:w-auto"
+          >
+            <button
+              type="button"
+              onClick={() => handleSwitchTab('teoria')}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center sm:justify-start gap-1.5 whitespace-nowrap ${
+                activeTab === 'teoria'
                   ? 'bg-white text-violet-950 font-semibold shadow-xs'
-                  : 'text-violet-100 hover:bg-violet-800/70 hover:text-white'
+                  : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
               }`}
             >
-              <Sparkles className="w-4 h-4" />
-              Gestor ({savedReferences.length})
+              <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              <span className="truncate">Guía Teórica</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSwitchTab('taller')}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center sm:justify-start gap-1.5 whitespace-nowrap ${
+                activeTab === 'taller'
+                  ? 'bg-white text-violet-950 font-semibold shadow-xs'
+                  : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
+              }`}
+            >
+              <ClipboardList className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              <span className="truncate">Ejercicios y Test</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSwitchTab('gestor')}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center sm:justify-start gap-1.5 whitespace-nowrap ${
+                activeTab === 'gestor'
+                  ? 'bg-white text-violet-950 font-semibold shadow-xs'
+                  : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              <span className="truncate">Gestor ({savedReferences.length})</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleSwitchTab('universitarios')}
-              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center sm:justify-start gap-1.5 whitespace-nowrap ${
                 activeTab === 'universitarios'
                   ? 'bg-white text-violet-950 font-semibold shadow-xs'
-                  : 'text-violet-100 hover:bg-violet-800/70 hover:text-white'
+                  : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
               }`}
             >
-              <GraduationCap className="w-4 h-4" />
-              Gestores Universitarios
+              <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              <span className="truncate">Universitarios</span>
             </button>
           </nav>
 
@@ -222,7 +235,7 @@ export default function App() {
       </header>
 
       {/* Main Content Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 overflow-x-hidden">
         {activeTab === 'teoria' && (
           <TeoriaSection
             onNavigateToGestor={handleNavigateToGestor}
@@ -254,7 +267,7 @@ export default function App() {
 
       {/* Quiet Institutional Footer */}
       <footer className="bg-white border-t border-slate-200 py-5 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left text-xs text-slate-500">
           <p className="font-medium text-slate-700">
             Colegio Ekirayá Educación Montessori · Cita Master — Gestor Bibliográfico y Portal Académico
           </p>
@@ -267,7 +280,7 @@ export default function App() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium shadow-lg flex items-center gap-2 border border-slate-700"
+          className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-5 sm:bottom-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium shadow-lg flex items-center justify-center sm:justify-start gap-2 border border-slate-700"
         >
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>

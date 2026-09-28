@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   BookOpen,
   ArrowRight,
@@ -9,6 +9,10 @@ import {
   FileText,
   Users,
   BookmarkCheck,
+  ChevronLeft,
+  ChevronRight,
+  Presentation,
+  LayoutList,
 } from 'lucide-react';
 import { CitationStyle, SourceType } from '../types/citation';
 
@@ -17,12 +21,72 @@ interface TeoriaSectionProps {
   onNavigateToTaller: () => void;
 }
 
+const SLIDE_METADATA = [
+  {
+    index: 0,
+    badge: 'Diapositiva 1 de 5 · Ética e Integridad',
+    shortTitle: '1. Probidad Académica',
+    title: 'Probidad Académica y Respeto por los Derechos de Autor',
+  },
+  {
+    index: 1,
+    badge: 'Diapositiva 2 de 5 · Citas en el Texto',
+    shortTitle: '2. ¿Qué es una Cita?',
+    title: '¿Qué es una Cita Bibliográfica y cuáles son sus tipos?',
+  },
+  {
+    index: 2,
+    badge: 'Diapositiva 3 de 5 · Extensión y Autores',
+    shortTitle: '3. Clasificación APA 7.ª',
+    title: 'Clasificación según la extensión y forma de citado (APA 7.ª)',
+  },
+  {
+    index: 3,
+    badge: 'Diapositiva 4 de 5 · Lista Final',
+    shortTitle: '4. ¿Qué es una Referencia?',
+    title: '¿Qué es una Referencia Bibliográfica?',
+  },
+  {
+    index: 4,
+    badge: 'Diapositiva 5 de 5 · Estructura Interactiva',
+    shortTitle: '5. Partes de la Referencia',
+    title: '¿De qué partes se compone una referencia bibliográfica?',
+  },
+];
+
 export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
   onNavigateToGestor,
   onNavigateToTaller,
 }) => {
   const [activePart, setActivePart] = useState<'all' | 'who' | 'when' | 'what' | 'where'>('all');
   const [selectedNormStyle, setSelectedNormStyle] = useState<CitationStyle>('apa7');
+  const [currentSlide, setCurrentSlide] = useState<number>(0);
+  const [viewMode, setViewMode] = useState<'slides' | 'list'>('slides');
+
+  const totalSlides = SLIDE_METADATA.length;
+
+  const handlePrevSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev === 0 ? totalSlides - 1 : prev - 1));
+  }, [totalSlides]);
+
+  const handleNextSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev === totalSlides - 1 ? 0 : prev + 1));
+  }, [totalSlides]);
+
+  useEffect(() => {
+    if (viewMode !== 'slides') return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (e.key === 'ArrowLeft') {
+        handlePrevSlide();
+      } else if (e.key === 'ArrowRight') {
+        handleNextSlide();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewMode, handlePrevSlide, handleNextSlide]);
 
   const normComparisonExamples: Record<
     CitationStyle,
@@ -141,421 +205,636 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
       </div>
 
       {/* Contenedor Principal de la Guía Teórica */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 space-y-8">
-        <div className="border-b border-slate-200 pb-5">
-          <div className="text-xs font-medium text-violet-700 mb-1">
-            01. Principios Institucionales y Ética Investigativa
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 md:p-8 space-y-8">
+        <div className="border-b border-slate-200 pb-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="text-xs font-medium text-violet-700 mb-1">
+              01. Principios Institucionales y Ética Investigativa
+            </div>
+            <h3 className="text-xl sm:text-2xl font-semibold text-slate-900">
+              Guía Teórica y Configuración de Referencias
+            </h3>
+            <p className="text-sm text-slate-600 mt-1">
+              Todo trabajo académico en el Colegio Ekirayá se fundamenta en el respeto intelectual,
+              la honestidad investigativa y la trazabilidad de las fuentes consultadas.
+            </p>
           </div>
-          <h3 className="text-xl sm:text-2xl font-semibold text-slate-900">
-            Guía Teórica y Configuración de Referencias
-          </h3>
-          <p className="text-sm text-slate-600 mt-1">
-            Todo trabajo académico en el Colegio Ekirayá se fundamenta en el respeto intelectual,
-            la honestidad investigativa y la trazabilidad de las fuentes consultadas.
-          </p>
+
+          {/* Selector de Modo: Diapositivas (Slide) vs Vista Completa */}
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200 self-start md:self-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => setViewMode('slides')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                viewMode === 'slides'
+                  ? 'bg-violet-700 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Presentation className="w-3.5 h-3.5" />
+              <span>Modo Slide (5)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-violet-700 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <LayoutList className="w-3.5 h-3.5" />
+              <span>Ver Todas</span>
+            </button>
+          </div>
         </div>
 
-        {/* RECUADRO 1: PROBIDAD ACADÉMICA */}
-        <section className="p-5 sm:p-6 rounded-xl bg-[#F0F7FF] border border-[#DCEBFE] space-y-4">
-          <h4 className="text-base sm:text-lg font-semibold text-violet-950">
-            Probidad Académica y Respeto por los Derechos de Autor
-          </h4>
-          <p className="text-sm text-slate-700 leading-relaxed">
-            En el <strong>Colegio Ekirayá Bilingüe</strong>, la <strong>probidad académica</strong>{' '}
-            es un principio ético fundamental que promueve la honestidad personal, el rigor
-            científico y la responsabilidad en el aprendizaje. Implica dar crédito oportuno y
-            explícito a las fuentes originales de información, ideas, imágenes, tablas, datos o
-            códigos utilizados en cualquier proyecto, presentación o ensayo.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-            <div className="bg-white p-4 rounded-lg border border-blue-100">
-              <div className="text-sm font-semibold text-slate-900 mb-1">Derecho de Autor</div>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                Protección jurídica y moral que otorga a los creadores el reconocimiento sobre sus
-                obras intelectuales (libros, artículos, fotografías, software). Presentar ideas
-                ajenas como propias sin citarlas constituye <strong>plagio académico</strong>.
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-lg border border-blue-100">
-              <div className="text-sm font-semibold text-slate-900 mb-1">
-                Uso Ético de la Inteligencia Artificial
-              </div>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                Al emplear modelos generativos (como ChatGPT, Gemini o Claude) para indagar
-                conceptos o estructurar ideas, la probidad exige declarar su uso, mencionar la
-                instrucción (<em>prompt</em>) e incluir su cita y referencia formal.
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-lg border border-blue-100">
-              <div className="text-sm font-semibold text-slate-900 mb-1">
-                ¿Cuándo NO es necesario citar?
-              </div>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                No requieren cita tus propias reflexiones originales, resultados de tus propios
-                experimentos escolares ni los hechos de <strong>conocimiento público general</strong>{' '}
-                (ej. "Bogotá es la capital de Colombia"). En caso de duda, cita siempre la fuente.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* RECUADRO 2: ¿QUÉ ES UNA CITA BIBLIOGRÁFICA? + EXTENSIÓN */}
-        <section className="p-5 sm:p-6 rounded-xl bg-[#F0FDF4] border border-[#DCFCE7] space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <h4 className="text-base sm:text-lg font-semibold text-violet-950">
-              ¿Qué es una Cita Bibliográfica y cuáles son sus tipos?
-            </h4>
-            <span className="text-xs text-emerald-800 font-medium">
-              Se inserta dentro del párrafo del texto
-            </span>
-          </div>
-          <p className="text-sm text-slate-700 leading-relaxed">
-            Una <strong>cita bibliográfica</strong> es una mención abreviada que se inserta{' '}
-            <strong>dentro del texto del documento</strong> cada vez que se utiliza una idea, frase
-            literal, dato estadístico o concepto proveniente de otro autor o fuente (incluyendo IA).
-            Su propósito es otorgar el crédito académico en el lugar exacto de uso y remitir al
-            lector a la lista de referencias al final del trabajo.
-          </p>
-
-          {/* Modalidades según el énfasis: Parentética vs Narrativa */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white p-5 rounded-lg border border-emerald-200/80 flex flex-col justify-between space-y-3">
-              <div>
-                <div className="text-xs font-semibold text-emerald-700 mb-1">
-                  Modalidad 1 · Énfasis en la idea o contenido
+        {/* PRESENTACIÓN INTERACTIVA TIPO SLIDE (5 SECCIONES FUNDAMENTALES) */}
+        <div className="space-y-4">
+          {viewMode === 'slides' && (
+            <div className="bg-slate-50 rounded-2xl border border-slate-200 p-3 sm:p-4 space-y-3">
+              {/* Barra Superior del Carrusel / Slide con Flechas de Retroceso y Avance */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-lg bg-violet-100 text-violet-900 font-semibold text-xs">
+                    {SLIDE_METADATA[currentSlide].badge}
+                  </span>
+                  <span className="hidden sm:inline text-xs text-slate-500">
+                    Usa las flechas para avanzar o retroceder
+                  </span>
                 </div>
-                <h5 className="text-base font-semibold text-slate-900 mb-1.5">Cita Parentética</h5>
-                <p className="text-xs sm:text-sm text-slate-600">
-                  Los datos del autor, año y página van entre paréntesis al final de la idea o frase
-                  citada, antes del punto final de la oración.
-                </p>
-              </div>
-              <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 font-mono text-xs sm:text-sm text-slate-800 leading-relaxed">
-                "La mente del niño absorbe el entorno activamente"{' '}
-                <span className="font-semibold text-emerald-800 bg-emerald-100/70 px-1 rounded">
-                  (Montessori, 2019, p. 45)
-                </span>
-                .
-              </div>
-            </div>
 
-            <div className="bg-white p-5 rounded-lg border border-emerald-200/80 flex flex-col justify-between space-y-3">
-              <div>
-                <div className="text-xs font-semibold text-emerald-700 mb-1">
-                  Modalidad 2 · Énfasis en el autor
-                </div>
-                <h5 className="text-base font-semibold text-slate-900 mb-1.5">Cita Narrativa</h5>
-                <p className="text-xs sm:text-sm text-slate-600">
-                  El apellido del autor se incorpora directamente en la redacción de la oración,
-                  seguido del año entre paréntesis.
-                </p>
-              </div>
-              <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 font-mono text-xs sm:text-sm text-slate-800 leading-relaxed">
-                Según{' '}
-                <span className="font-semibold text-emerald-800 bg-emerald-100/70 px-1 rounded">
-                  Montessori (2019, p. 45)
-                </span>
-                , la mente del niño absorbe el entorno activamente.
-              </div>
-            </div>
-          </div>
-
-          {/* Clasificación de las citas según su extensión y forma */}
-          <div className="space-y-3 pt-1">
-            <div className="flex items-center gap-2 text-xs font-semibold text-violet-950 uppercase tracking-wide">
-              <FileText className="w-4 h-4 text-violet-700" />
-              <span>Clasificación según la extensión y forma de citado (APA 7.ª)</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white p-4 rounded-lg border border-emerald-200/80 space-y-2">
-                <h6 className="text-sm font-semibold text-slate-900">
-                  1. Cita Textual Corta (&lt; 40 palabras)
-                </h6>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Reproduce palabra por palabra menos de 40 palabras. Se integra dentro del mismo
-                  párrafo encerrada entre <strong>comillas dobles (" ")</strong> e incluye siempre
-                  el número de página (<code>p.</code>) o párrafo (<code>párr.</code>).
-                </p>
-              </div>
-
-              <div className="bg-white p-4 rounded-lg border border-emerald-200/80 space-y-2">
-                <h6 className="text-sm font-semibold text-slate-900">
-                  2. Cita Textual en Bloque (≥ 40 palabras)
-                </h6>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Cuando el fragmento literal tiene 40 palabras o más, se escribe en un{' '}
-                  <strong>párrafo aparte con sangría izquierda de 1.27 cm</strong> en todo el
-                  bloque, <strong>sin comillas</strong>, y el punto final va antes del paréntesis.
-                </p>
-              </div>
-
-              <div className="bg-white p-4 rounded-lg border border-emerald-200/80 space-y-2">
-                <h6 className="text-sm font-semibold text-slate-900">
-                  3. Paráfrasis (Cita Indirecta)
-                </h6>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Consiste en explicar con tus propias palabras las ideas de un autor conservando su
-                  sentido original. <strong>No lleva comillas</strong>, pero exige obligatoriamente
-                  citar el apellido del autor y el año: <code>(Autor, Año)</code>.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Regla del número de autores y uso de et al. */}
-          <div className="bg-white p-4 sm:p-5 rounded-lg border border-emerald-200/80 space-y-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-violet-950">
-              <Users className="w-4 h-4 text-violet-700" />
-              <span>¿Cómo citar según la cantidad de autores? (Regla de "&amp;" y "et al.")</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
-                <div className="font-semibold text-violet-950">Un solo autor</div>
-                <p className="text-slate-600">Se escribe el apellido del autor en todas las menciones:</p>
-                <div className="font-mono text-slate-800 pt-1">
-                  Parentética: (Montessori, 2019)
-                  <br />
-                  Narrativa: Montessori (2019)
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    type="button"
+                    onClick={handlePrevSlide}
+                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-violet-50 text-slate-800 hover:text-violet-900 border border-slate-200 hover:border-violet-300 text-xs font-semibold transition-all flex items-center gap-1 shadow-2xs active:scale-95"
+                    aria-label="Diapositiva anterior"
+                    title="Retroceder a la diapositiva anterior"
+                  >
+                    <ChevronLeft className="w-4 h-4 text-violet-700" />
+                    <span>Anterior</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextSlide}
+                    className="px-3 py-1.5 rounded-xl bg-violet-700 hover:bg-violet-800 text-white border border-violet-700 text-xs font-semibold transition-all flex items-center gap-1 shadow-2xs active:scale-95"
+                    aria-label="Siguiente diapositiva"
+                    title="Avanzar a la siguiente diapositiva"
+                  >
+                    <span>Siguiente</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
-                <div className="font-semibold text-violet-950">Dos autores</div>
-                <p className="text-slate-600">
-                  Se citan ambos apellidos siempre (con <strong>&amp;</strong> entre paréntesis y{' '}
-                  <strong>y</strong> fuera):
-                </p>
-                <div className="font-mono text-slate-800 pt-1">
-                  Parentética: (Gómez &amp; Silva, 2024)
-                  <br />
-                  Narrativa: Gómez y Silva (2024)
-                </div>
-              </div>
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
-                <div className="font-semibold text-violet-950">Tres o más autores (et al.)</div>
-                <p className="text-slate-600">
-                  Desde la primera cita se escribe solo el primer apellido seguido de{' '}
-                  <strong>et al.</strong> ("y otros"):
-                </p>
-                <div className="font-mono text-slate-800 pt-1">
-                  Parentética: (Restrepo et al., 2025)
-                  <br />
-                  Narrativa: Restrepo et al. (2025)
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
 
-        {/* RECUADRO 3: ¿QUÉ ES UNA REFERENCIA BIBLIOGRÁFICA? */}
-        <section className="p-5 sm:p-6 rounded-xl bg-[#F0F7FF] border border-[#DCEBFE] space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <h4 className="text-base sm:text-lg font-semibold text-violet-950">
-              ¿Qué es una Referencia Bibliográfica?
-            </h4>
-            <span className="text-xs text-violet-800 font-medium">
-              Se ubica al final del documento en orden alfabético
-            </span>
-          </div>
-          <p className="text-sm text-slate-700 leading-relaxed">
-            Una <strong>referencia bibliográfica</strong> es la descripción completa y detallada de
-            cada fuente citada en el trabajo. Se ubica al final del documento bajo el título{' '}
-            <strong>"Referencias"</strong> y proporciona todos los metadatos necesarios (autor,
-            fecha, título y fuente o enlace) para que cualquier lector o docente pueda localizar y
-            verificar el recurso original. Toda cita en el texto debe tener su referencia al final,
-            y toda referencia debe haber sido citada en el texto.
-          </p>
-          <div className="bg-white p-5 rounded-lg border border-blue-100 space-y-2">
-            <div className="text-xs font-semibold text-violet-700">
-              Formato estándar con Sangría Francesa (APA 7.ª edición):
-            </div>
-            <p className="text-xs text-slate-600">
-              Se organiza alfabéticamente por el apellido del primer autor y se aplica{' '}
-              <strong>sangría francesa</strong> (la primera línea comienza en el margen izquierdo y
-              las líneas siguientes llevan sangría de 1.27 cm):
-            </p>
-            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 font-mono text-xs sm:text-sm text-slate-900 hanging-indent">
-              Montessori, M. (2019). <i>La mente absorbente del niño</i> (2.ª ed.). Editorial
-              Trillas. https://doi.org/10.xxxx/ejemplo-educativo
-            </div>
-          </div>
-        </section>
+              {/* Pestañas / Indicadores directos de las 5 Diapositivas */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 pt-1">
+                {SLIDE_METADATA.map((slide) => {
+                  const isActive = currentSlide === slide.index;
+                  return (
+                    <button
+                      key={slide.index}
+                      type="button"
+                      onClick={() => setCurrentSlide(slide.index)}
+                      className={`px-2.5 py-2 rounded-xl text-left text-xs font-medium transition-all border flex items-center justify-between gap-1.5 ${
+                        isActive
+                          ? 'bg-violet-900 text-white border-violet-900 shadow-xs font-semibold'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300 hover:text-slate-900'
+                      }`}
+                    >
+                      <span className="truncate">{slide.shortTitle}</span>
+                      <span
+                        className={`w-2 h-2 rounded-full shrink-0 ${
+                          isActive ? 'bg-violet-300' : 'bg-slate-200'
+                        }`}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
 
-        {/* RECUADRO 4: LAS 4 PARTES DE UNA REFERENCIA (INTERACTIVO) */}
-        <section className="p-5 sm:p-6 rounded-xl bg-[#FAF5FF] border border-[#F3E8FF] space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <h4 className="text-base sm:text-lg font-semibold text-violet-950">
-                ¿De qué partes se compone una referencia bibliográfica?
-              </h4>
-              <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-                Haz clic en cada una de las 4 preguntas fundamentales para explorar su función
-                dentro de la referencia:
-              </p>
+              {/* Barra de Progreso Visual */}
+              <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-violet-700 transition-all duration-300 rounded-full"
+                  style={{ width: `${((currentSlide + 1) / totalSlides) * 100}%` }}
+                />
+              </div>
             </div>
-            {activePart !== 'all' && (
-              <button
-                type="button"
-                onClick={() => setActivePart('all')}
-                className="text-xs font-medium text-violet-700 hover:text-violet-900 underline self-start sm:self-auto"
+          )}
+
+          {/* CONTENEDOR DE DIAPOSITIVAS */}
+          <div className="relative">
+            {/* SLIDE 1: PROBIDAD ACADÉMICA Y RESPETO POR LOS DERECHOS DE AUTOR */}
+            {(viewMode === 'list' || currentSlide === 0) && (
+              <section className="p-5 sm:p-6 rounded-xl bg-[#F0F7FF] border border-[#DCEBFE] space-y-4 transition-all">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <h4 className="text-base sm:text-lg font-semibold text-violet-950">
+                    Probidad Académica y Respeto por los Derechos de Autor
+                  </h4>
+                  <span className="text-xs text-violet-800 font-medium bg-white/80 px-2.5 py-1 rounded-md border border-blue-200/60 self-start sm:self-auto">
+                    Principio Ético Institucional · Colegio Ekirayá
+                  </span>
+                </div>
+                <p className="text-sm text-slate-700 leading-relaxed">
+                  En el <strong>Colegio Ekirayá Educación Montessori</strong>, la{' '}
+                  <strong>probidad académica</strong> es un principio ético fundamental que promueve
+                  la honestidad personal, el rigor científico y la responsabilidad en el aprendizaje.
+                  Implica dar crédito oportuno y explícito a las fuentes originales de información,
+                  ideas, imágenes, tablas, datos o códigos utilizados en cualquier proyecto,
+                  presentación o ensayo.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                  <div className="bg-white p-4 rounded-lg border border-blue-100">
+                    <div className="text-sm font-semibold text-slate-900 mb-1">Derecho de Autor</div>
+                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                      Protección jurídica y moral que otorga a los creadores el reconocimiento sobre
+                      sus obras intelectuales (libros, artículos, fotografías, software). Presentar
+                      ideas ajenas como propias sin citarlas constituye{' '}
+                      <strong>plagio académico</strong>.
+                    </p>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg border border-blue-100">
+                    <div className="text-sm font-semibold text-slate-900 mb-1">
+                      Uso Ético de la Inteligencia Artificial
+                    </div>
+                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                      Al emplear modelos generativos (como ChatGPT, Gemini o Claude) para indagar
+                      conceptos o estructurar ideas, la probidad exige declarar su uso, mencionar la
+                      instrucción (<em>prompt</em>) e incluir su cita y referencia formal.
+                    </p>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg border border-blue-100">
+                    <div className="text-sm font-semibold text-slate-900 mb-1">
+                      ¿Cuándo NO es necesario citar?
+                    </div>
+                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                      No requieren cita tus propias reflexiones originales, resultados de tus propios
+                      experimentos escolares ni los hechos de{' '}
+                      <strong>conocimiento público general</strong> (ej. &quot;Bogotá es la capital
+                      de Colombia&quot;). En caso de duda, cita siempre la fuente.
+                    </p>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* SLIDE 2: ¿QUÉ ES UNA CITA BIBLIOGRÁFICA Y CUÁLES SON SUS TIPOS? */}
+            {(viewMode === 'list' || currentSlide === 1) && (
+              <section
+                className={`p-5 sm:p-6 rounded-xl bg-[#F0FDF4] border border-[#DCFCE7] space-y-5 transition-all ${
+                  viewMode === 'list' ? 'mt-6' : ''
+                }`}
               >
-                Mostrar todas las partes
-              </button>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <h4 className="text-base sm:text-lg font-semibold text-violet-950">
+                    ¿Qué es una Cita Bibliográfica y cuáles son sus tipos?
+                  </h4>
+                  <span className="text-xs text-emerald-800 font-medium bg-white/80 px-2.5 py-1 rounded-md border border-emerald-200/80 self-start sm:self-auto">
+                    Se inserta dentro del párrafo del texto
+                  </span>
+                </div>
+                <p className="text-sm text-slate-700 leading-relaxed">
+                  Una <strong>cita bibliográfica</strong> es una mención abreviada que se inserta{' '}
+                  <strong>dentro del texto del documento</strong> cada vez que se utiliza una idea,
+                  frase literal, dato estadístico o concepto proveniente de otro autor o fuente
+                  (incluyendo IA). Su propósito es otorgar el crédito académico en el lugar exacto de
+                  uso y remitir al lector a la lista de referencias al final del trabajo.
+                </p>
+
+                {/* Modalidades según el énfasis: Parentética vs Narrativa */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white p-4 sm:p-5 rounded-lg border border-emerald-200/80 flex flex-col justify-between space-y-3">
+                    <div>
+                      <div className="text-xs font-semibold text-emerald-700 mb-1">
+                        Modalidad 1 · Énfasis en la idea o contenido
+                      </div>
+                      <h5 className="text-base font-semibold text-slate-900 mb-1.5">
+                        Cita Parentética
+                      </h5>
+                      <p className="text-xs sm:text-sm text-slate-600">
+                        Los datos del autor, año y página van entre paréntesis al final de la idea o
+                        frase citada, antes del punto final de la oración.
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 font-mono text-xs sm:text-sm text-slate-800 leading-relaxed break-words">
+                      &quot;La mente del niño absorbe el entorno activamente&quot;{' '}
+                      <span className="font-semibold text-emerald-800 bg-emerald-100/70 px-1 rounded">
+                        (Montessori, 2019, p. 45)
+                      </span>
+                      .
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 sm:p-5 rounded-lg border border-emerald-200/80 flex flex-col justify-between space-y-3">
+                    <div>
+                      <div className="text-xs font-semibold text-emerald-700 mb-1">
+                        Modalidad 2 · Énfasis en el autor
+                      </div>
+                      <h5 className="text-base font-semibold text-slate-900 mb-1.5">
+                        Cita Narrativa
+                      </h5>
+                      <p className="text-xs sm:text-sm text-slate-600">
+                        El apellido del autor se incorpora directamente en la redacción de la
+                        oración, seguido del año entre paréntesis.
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 font-mono text-xs sm:text-sm text-slate-800 leading-relaxed break-words">
+                      Según{' '}
+                      <span className="font-semibold text-emerald-800 bg-emerald-100/70 px-1 rounded">
+                        Montessori (2019, p. 45)
+                      </span>
+                      , la mente del niño absorbe el entorno activamente.
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* SLIDE 3: CLASIFICACIÓN SEGÚN LA EXTENSIÓN Y FORMA DE CITADO (APA 7.ª) */}
+            {(viewMode === 'list' || currentSlide === 2) && (
+              <section
+                className={`p-5 sm:p-6 rounded-xl bg-[#F0FDF4] border border-[#DCFCE7] space-y-5 transition-all ${
+                  viewMode === 'list' ? 'mt-6' : ''
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-violet-700 shrink-0" />
+                    <h4 className="text-base sm:text-lg font-semibold text-violet-950">
+                      Clasificación según la extensión y forma de citado (APA 7.ª)
+                    </h4>
+                  </div>
+                  <span className="text-xs text-emerald-800 font-medium bg-white/80 px-2.5 py-1 rounded-md border border-emerald-200/80 self-start sm:self-auto">
+                    Citas directas, indirectas y número de autores
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white p-4 rounded-lg border border-emerald-200/80 space-y-2">
+                    <h6 className="text-sm font-semibold text-slate-900">
+                      1. Cita Textual Corta (&lt; 40 palabras)
+                    </h6>
+                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                      Reproduce palabra por palabra menos de 40 palabras. Se integra dentro del
+                      mismo párrafo encerrada entre <strong>comillas dobles (&quot; &quot;)</strong>{' '}
+                      e incluye siempre el número de página (<code>p.</code>) o párrafo (
+                      <code>párr.</code>).
+                    </p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-lg border border-emerald-200/80 space-y-2">
+                    <h6 className="text-sm font-semibold text-slate-900">
+                      2. Cita Textual en Bloque (≥ 40 palabras)
+                    </h6>
+                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                      Cuando el fragmento literal tiene 40 palabras o más, se escribe en un{' '}
+                      <strong>párrafo aparte con sangría izquierda de 1.27 cm</strong> en todo el
+                      bloque, <strong>sin comillas</strong>, y el punto final va antes del
+                      paréntesis.
+                    </p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-lg border border-emerald-200/80 space-y-2">
+                    <h6 className="text-sm font-semibold text-slate-900">
+                      3. Paráfrasis (Cita Indirecta)
+                    </h6>
+                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                      Consiste en explicar con tus propias palabras las ideas de un autor
+                      conservando su sentido original. <strong>No lleva comillas</strong>, pero
+                      exige obligatoriamente citar el apellido del autor y el año:{' '}
+                      <code>(Autor, Año)</code>.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Regla del número de autores y uso de et al. */}
+                <div className="bg-white p-4 sm:p-5 rounded-lg border border-emerald-200/80 space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-violet-950">
+                    <Users className="w-4 h-4 text-violet-700 shrink-0" />
+                    <span>
+                      ¿Cómo citar según la cantidad de autores? (Regla de &quot;&amp;&quot; y
+                      &quot;et al.&quot;)
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+                      <div className="font-semibold text-violet-950">Un solo autor</div>
+                      <p className="text-slate-600">
+                        Se escribe el apellido del autor en todas las menciones:
+                      </p>
+                      <div className="font-mono text-slate-800 pt-1 break-words">
+                        Parentética: (Montessori, 2019)
+                        <br />
+                        Narrativa: Montessori (2019)
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+                      <div className="font-semibold text-violet-950">Dos autores</div>
+                      <p className="text-slate-600">
+                        Se citan ambos apellidos siempre (con <strong>&amp;</strong> entre paréntesis
+                        y <strong>y</strong> fuera):
+                      </p>
+                      <div className="font-mono text-slate-800 pt-1 break-words">
+                        Parentética: (Gómez &amp; Silva, 2024)
+                        <br />
+                        Narrativa: Gómez y Silva (2024)
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+                      <div className="font-semibold text-violet-950">
+                        Tres o más autores (et al.)
+                      </div>
+                      <p className="text-slate-600">
+                        Desde la primera cita se escribe solo el primer apellido seguido de{' '}
+                        <strong>et al.</strong> (&quot;y otros&quot;):
+                      </p>
+                      <div className="font-mono text-slate-800 pt-1 break-words">
+                        Parentética: (Restrepo et al., 2025)
+                        <br />
+                        Narrativa: Restrepo et al. (2025)
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* SLIDE 4: ¿QUÉ ES UNA REFERENCIA BIBLIOGRÁFICA? */}
+            {(viewMode === 'list' || currentSlide === 3) && (
+              <section
+                className={`p-5 sm:p-6 rounded-xl bg-[#F0F7FF] border border-[#DCEBFE] space-y-4 transition-all ${
+                  viewMode === 'list' ? 'mt-6' : ''
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <h4 className="text-base sm:text-lg font-semibold text-violet-950">
+                    ¿Qué es una Referencia Bibliográfica?
+                  </h4>
+                  <span className="text-xs text-violet-800 font-medium bg-white/80 px-2.5 py-1 rounded-md border border-blue-200/60 self-start sm:self-auto">
+                    Se ubica al final del documento en orden alfabético
+                  </span>
+                </div>
+                <p className="text-sm text-slate-700 leading-relaxed">
+                  Una <strong>referencia bibliográfica</strong> es la descripción completa y
+                  detallada de cada fuente citada en el trabajo. Se ubica al final del documento bajo
+                  el título <strong>&quot;Referencias&quot;</strong> y proporciona todos los
+                  metadatos necesarios (autor, fecha, título y fuente o enlace) para que cualquier
+                  lector o docente pueda localizar y verificar el recurso original. Toda cita en el
+                  texto debe tener su referencia al final, y toda referencia debe haber sido citada en
+                  el texto.
+                </p>
+                <div className="bg-white p-4 sm:p-5 rounded-lg border border-blue-100 space-y-2">
+                  <div className="text-xs font-semibold text-violet-700">
+                    Formato estándar con Sangría Francesa (APA 7.ª edición):
+                  </div>
+                  <p className="text-xs text-slate-600">
+                    Se organiza alfabéticamente por el apellido del primer autor y se aplica{' '}
+                    <strong>sangría francesa</strong> (la primera línea comienza en el margen
+                    izquierdo y las líneas siguientes llevan sangría de 1.27 cm):
+                  </p>
+                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 font-mono text-xs sm:text-sm text-slate-900 hanging-indent break-words">
+                    Montessori, M. (2019). <i>La mente absorbente del niño</i> (2.ª ed.). Editorial
+                    Trillas. https://doi.org/10.xxxx/ejemplo-educativo
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* SLIDE 5: ¿DE QUÉ PARTES SE COMPONE UNA REFERENCIA BIBLIOGRÁFICA? */}
+            {(viewMode === 'list' || currentSlide === 4) && (
+              <section
+                className={`p-5 sm:p-6 rounded-xl bg-[#FAF5FF] border border-[#F3E8FF] space-y-5 transition-all ${
+                  viewMode === 'list' ? 'mt-6' : ''
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-base sm:text-lg font-semibold text-violet-950">
+                      ¿De qué partes se compone una referencia bibliográfica?
+                    </h4>
+                    <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+                      Haz clic en cada una de las 4 preguntas fundamentales para explorar su función
+                      dentro de la referencia:
+                    </p>
+                  </div>
+                  {activePart !== 'all' && (
+                    <button
+                      type="button"
+                      onClick={() => setActivePart('all')}
+                      className="text-xs font-medium text-violet-700 hover:text-violet-900 underline self-start sm:self-auto"
+                    >
+                      Mostrar todas las partes
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setActivePart(activePart === 'who' ? 'all' : 'who')}
+                    className={`text-left p-4 rounded-lg border transition-all ${
+                      activePart === 'who'
+                        ? 'bg-violet-900 text-white border-violet-900 shadow-sm'
+                        : 'bg-white text-slate-900 border-violet-200 hover:border-violet-400'
+                    }`}
+                  >
+                    <div
+                      className={`text-xs font-semibold mb-1 ${
+                        activePart === 'who' ? 'text-violet-200' : 'text-violet-700'
+                      }`}
+                    >
+                      01. ¿Quién?
+                    </div>
+                    <div className="font-semibold text-sm mb-1">Autor o Creador</div>
+                    <p
+                      className={`text-xs leading-relaxed ${
+                        activePart === 'who' ? 'text-violet-100' : 'text-slate-600'
+                      }`}
+                    >
+                      Persona, grupo de investigadores, institución o empresa creadora (ej. OpenAI).
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActivePart(activePart === 'when' ? 'all' : 'when')}
+                    className={`text-left p-4 rounded-lg border transition-all ${
+                      activePart === 'when'
+                        ? 'bg-emerald-800 text-white border-emerald-800 shadow-sm'
+                        : 'bg-white text-slate-900 border-violet-200 hover:border-violet-400'
+                    }`}
+                  >
+                    <div
+                      className={`text-xs font-semibold mb-1 ${
+                        activePart === 'when' ? 'text-emerald-200' : 'text-emerald-700'
+                      }`}
+                    >
+                      02. ¿Cuándo?
+                    </div>
+                    <div className="font-semibold text-sm mb-1">Fecha de Publicación</div>
+                    <p
+                      className={`text-xs leading-relaxed ${
+                        activePart === 'when' ? 'text-emerald-100' : 'text-slate-600'
+                      }`}
+                    >
+                      Año entre paréntesis (2024) o &quot;s. f.&quot; (sin fecha) si no está
+                      disponible.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActivePart(activePart === 'what' ? 'all' : 'what')}
+                    className={`text-left p-4 rounded-lg border transition-all ${
+                      activePart === 'what'
+                        ? 'bg-amber-800 text-white border-amber-800 shadow-sm'
+                        : 'bg-white text-slate-900 border-violet-200 hover:border-violet-400'
+                    }`}
+                  >
+                    <div
+                      className={`text-xs font-semibold mb-1 ${
+                        activePart === 'what' ? 'text-amber-200' : 'text-amber-700'
+                      }`}
+                    >
+                      03. ¿Qué?
+                    </div>
+                    <div className="font-semibold text-sm mb-1">Título del Recurso</div>
+                    <p
+                      className={`text-xs leading-relaxed ${
+                        activePart === 'what' ? 'text-amber-100' : 'text-slate-600'
+                      }`}
+                    >
+                      Nombre de la obra en cursiva o del artículo, más descripción entre corchetes si
+                      aplica.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActivePart(activePart === 'where' ? 'all' : 'where')}
+                    className={`text-left p-4 rounded-lg border transition-all ${
+                      activePart === 'where'
+                        ? 'bg-sky-900 text-white border-sky-900 shadow-sm'
+                        : 'bg-white text-slate-900 border-violet-200 hover:border-violet-400'
+                    }`}
+                  >
+                    <div
+                      className={`text-xs font-semibold mb-1 ${
+                        activePart === 'where' ? 'text-sky-200' : 'text-sky-700'
+                      }`}
+                    >
+                      04. ¿Dónde?
+                    </div>
+                    <div className="font-semibold text-sm mb-1">Fuente o Ubicación</div>
+                    <p
+                      className={`text-xs leading-relaxed ${
+                        activePart === 'where' ? 'text-sky-100' : 'text-slate-600'
+                      }`}
+                    >
+                      Editorial, nombre de la revista científica, código DOI o dirección URL directa.
+                    </p>
+                  </button>
+                </div>
+
+                {/* Visualizador Anatómico en Vivo */}
+                <div className="bg-white p-4 rounded-lg border border-violet-200">
+                  <div className="text-xs text-slate-500 mb-2 font-medium">
+                    Anatomía de la referencia (haz clic en las tarjetas superiores para resaltar):
+                  </div>
+                  <div className="font-mono text-xs sm:text-sm leading-relaxed hanging-indent break-words">
+                    <span
+                      className={`px-1.5 py-0.5 rounded transition-colors ${
+                        activePart === 'all' || activePart === 'who'
+                          ? 'bg-violet-100 text-violet-950 font-semibold'
+                          : 'text-slate-400'
+                      }`}
+                    >
+                      Gómez, R., &amp; Silva, M.
+                    </span>{' '}
+                    <span
+                      className={`px-1.5 py-0.5 rounded transition-colors ${
+                        activePart === 'all' || activePart === 'when'
+                          ? 'bg-emerald-100 text-emerald-950 font-semibold'
+                          : 'text-slate-400'
+                      }`}
+                    >
+                      (2024).
+                    </span>{' '}
+                    <span
+                      className={`px-1.5 py-0.5 rounded transition-colors ${
+                        activePart === 'all' || activePart === 'what'
+                          ? 'bg-amber-100 text-amber-950 font-semibold'
+                          : 'text-slate-400'
+                      }`}
+                    >
+                      Impacto de la inteligencia artificial en el aula escolar.
+                    </span>{' '}
+                    <span
+                      className={`px-1.5 py-0.5 rounded transition-colors ${
+                        activePart === 'all' || activePart === 'where'
+                          ? 'bg-sky-100 text-sky-950 font-semibold'
+                          : 'text-slate-400'
+                      }`}
+                    >
+                      <i>Revista Digital de Educación</i>, <i>12</i>(3), 45-58.
+                      https://doi.org/10.1016/j.rdep.2024.03
+                    </span>
+                  </div>
+                </div>
+              </section>
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <button
-              type="button"
-              onClick={() => setActivePart(activePart === 'who' ? 'all' : 'who')}
-              className={`text-left p-4 rounded-lg border transition-all ${
-                activePart === 'who'
-                  ? 'bg-violet-900 text-white border-violet-900 shadow-sm'
-                  : 'bg-white text-slate-900 border-violet-200 hover:border-violet-400'
-              }`}
-            >
-              <div
-                className={`text-xs font-semibold mb-1 ${
-                  activePart === 'who' ? 'text-violet-200' : 'text-violet-700'
-                }`}
+          {/* Barra Inferior de Navegación del Slide con Flechas y Puntos */}
+          {viewMode === 'slides' && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 px-1">
+              <button
+                type="button"
+                onClick={handlePrevSlide}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-violet-50 text-slate-800 hover:text-violet-900 border border-slate-200 hover:border-violet-300 text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2"
               >
-                01. ¿Quién?
-              </div>
-              <div className="font-semibold text-sm mb-1">Autor o Creador</div>
-              <p
-                className={`text-xs leading-relaxed ${
-                  activePart === 'who' ? 'text-violet-100' : 'text-slate-600'
-                }`}
-              >
-                Persona, grupo de investigadores, institución o empresa creadora (ej. OpenAI).
-              </p>
-            </button>
+                <ChevronLeft className="w-4 h-4 text-violet-700" />
+                <span>
+                  Anterior:{' '}
+                  {
+                    SLIDE_METADATA[(currentSlide - 1 + totalSlides) % totalSlides]
+                      .shortTitle
+                  }
+                </span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setActivePart(activePart === 'when' ? 'all' : 'when')}
-              className={`text-left p-4 rounded-lg border transition-all ${
-                activePart === 'when'
-                  ? 'bg-emerald-800 text-white border-emerald-800 shadow-sm'
-                  : 'bg-white text-slate-900 border-violet-200 hover:border-violet-400'
-              }`}
-            >
-              <div
-                className={`text-xs font-semibold mb-1 ${
-                  activePart === 'when' ? 'text-emerald-200' : 'text-emerald-700'
-                }`}
-              >
-                02. ¿Cuándo?
+              <div className="flex items-center gap-2" role="tablist" aria-label="Indicadores de diapositiva">
+                {SLIDE_METADATA.map((s) => (
+                  <button
+                    key={s.index}
+                    type="button"
+                    onClick={() => setCurrentSlide(s.index)}
+                    aria-label={`Ir a ${s.title}`}
+                    className={`h-2.5 rounded-full transition-all ${
+                      currentSlide === s.index
+                        ? 'w-8 bg-violet-700'
+                        : 'w-2.5 bg-slate-300 hover:bg-violet-400'
+                    }`}
+                  />
+                ))}
               </div>
-              <div className="font-semibold text-sm mb-1">Fecha de Publicación</div>
-              <p
-                className={`text-xs leading-relaxed ${
-                  activePart === 'when' ? 'text-emerald-100' : 'text-slate-600'
-                }`}
-              >
-                Año entre paréntesis (2024) o "s. f." (sin fecha) si no está disponible.
-              </p>
-            </button>
 
-            <button
-              type="button"
-              onClick={() => setActivePart(activePart === 'what' ? 'all' : 'what')}
-              className={`text-left p-4 rounded-lg border transition-all ${
-                activePart === 'what'
-                  ? 'bg-amber-800 text-white border-amber-800 shadow-sm'
-                  : 'bg-white text-slate-900 border-violet-200 hover:border-violet-400'
-              }`}
-            >
-              <div
-                className={`text-xs font-semibold mb-1 ${
-                  activePart === 'what' ? 'text-amber-200' : 'text-amber-700'
-                }`}
+              <button
+                type="button"
+                onClick={handleNextSlide}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-xs"
               >
-                03. ¿Qué?
-              </div>
-              <div className="font-semibold text-sm mb-1">Título del Recurso</div>
-              <p
-                className={`text-xs leading-relaxed ${
-                  activePart === 'what' ? 'text-amber-100' : 'text-slate-600'
-                }`}
-              >
-                Nombre de la obra en cursiva o del artículo, más descripción entre corchetes si
-                aplica.
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActivePart(activePart === 'where' ? 'all' : 'where')}
-              className={`text-left p-4 rounded-lg border transition-all ${
-                activePart === 'where'
-                  ? 'bg-sky-900 text-white border-sky-900 shadow-sm'
-                  : 'bg-white text-slate-900 border-violet-200 hover:border-violet-400'
-              }`}
-            >
-              <div
-                className={`text-xs font-semibold mb-1 ${
-                  activePart === 'where' ? 'text-sky-200' : 'text-sky-700'
-                }`}
-              >
-                04. ¿Dónde?
-              </div>
-              <div className="font-semibold text-sm mb-1">Fuente o Ubicación</div>
-              <p
-                className={`text-xs leading-relaxed ${
-                  activePart === 'where' ? 'text-sky-100' : 'text-slate-600'
-                }`}
-              >
-                Editorial, nombre de la revista científica, código DOI o dirección URL directa.
-              </p>
-            </button>
-          </div>
-
-          {/* Visualizador Anatómico en Vivo */}
-          <div className="bg-white p-4 rounded-lg border border-violet-200">
-            <div className="text-xs text-slate-500 mb-2 font-medium">
-              Anatomía de la referencia (haz clic en las tarjetas superiores para resaltar):
+                <span>
+                  Siguiente:{' '}
+                  {SLIDE_METADATA[(currentSlide + 1) % totalSlides].shortTitle}
+                </span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
-            <div className="font-mono text-xs sm:text-sm leading-relaxed hanging-indent">
-              <span
-                className={`px-1.5 py-0.5 rounded transition-colors ${
-                  activePart === 'all' || activePart === 'who'
-                    ? 'bg-violet-100 text-violet-950 font-semibold'
-                    : 'text-slate-400'
-                }`}
-              >
-                Gómez, R., &amp; Silva, M.
-              </span>{' '}
-              <span
-                className={`px-1.5 py-0.5 rounded transition-colors ${
-                  activePart === 'all' || activePart === 'when'
-                    ? 'bg-emerald-100 text-emerald-950 font-semibold'
-                    : 'text-slate-400'
-                }`}
-              >
-                (2024).
-              </span>{' '}
-              <span
-                className={`px-1.5 py-0.5 rounded transition-colors ${
-                  activePart === 'all' || activePart === 'what'
-                    ? 'bg-amber-100 text-amber-950 font-semibold'
-                    : 'text-slate-400'
-                }`}
-              >
-                Impacto de la inteligencia artificial en el aula escolar.
-              </span>{' '}
-              <span
-                className={`px-1.5 py-0.5 rounded transition-colors ${
-                  activePart === 'all' || activePart === 'where'
-                    ? 'bg-sky-100 text-sky-950 font-semibold'
-                    : 'text-slate-400'
-                }`}
-              >
-                <i>Revista Digital de Educación</i>, <i>12</i>(3), 45-58.
-                https://doi.org/10.1016/j.rdep.2024.03
-              </span>
-            </div>
-          </div>
-        </section>
+          )}
+        </div>
 
         {/* SECCIÓN AMPLIADA: TABLA DE TÉRMINOS ACADÉMICOS E IDENTIFICADORES DIGITALES */}
         <section className="p-5 sm:p-6 rounded-xl bg-[#F0F7FF] border border-[#DCEBFE] space-y-5">
