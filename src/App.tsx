@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { BookOpen, Sparkles, ClipboardList, GraduationCap, CheckCircle2 } from 'lucide-react';
+import {
+  BookOpen,
+  Sparkles,
+  ClipboardList,
+  GraduationCap,
+  CheckCircle2,
+  FileCheck2,
+} from 'lucide-react';
 import {
   CitationFormData,
   CitationStyle,
@@ -11,11 +18,12 @@ import {
   INITIAL_FORM_DATA,
 } from './utils/citationEngine';
 import { TeoriaSection } from './components/TeoriaSection';
+import { Apa2026Section } from './components/Apa2026Section';
 import { GestorSection } from './components/GestorSection';
 import { TallerSection } from './components/TallerSection';
 import { UniversitariosSection } from './components/UniversitariosSection';
 
-type ActiveTab = 'teoria' | 'taller' | 'gestor' | 'universitarios';
+type ActiveTab = 'teoria' | 'apa2026' | 'taller' | 'gestor' | 'universitarios';
 
 const STORAGE_KEY = 'ekiraya_citamaster_refs_v2';
 const LEGACY_STORAGE_KEY = 'ekiraya_manager_refs';
@@ -111,6 +119,19 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleLoadExampleInGestor = (
+    exampleData: Partial<CitationFormData>,
+    label: string
+  ) => {
+    setFormData({
+      ...INITIAL_FORM_DATA,
+      ...exampleData,
+    });
+    setActiveTab('gestor');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast(`Cargado en el Gestor: ${label}`);
+  };
+
   const handleAddReference = (ref: SavedReference) => {
     setSavedReferences((prev) => [ref, ...prev]);
   };
@@ -163,7 +184,7 @@ export default function App() {
             </button>
           </div>
 
-          {/* Zone 2: Navigation Links (Responsive 2x2 grid on mobile, row on sm+) */}
+          {/* Zone 2: Navigation Links (Responsive grid on mobile, row on sm+) */}
           <nav
             aria-label="Navegación principal"
             className="grid grid-cols-2 sm:flex sm:flex-wrap lg:flex-nowrap items-center gap-1.5 sm:gap-2 w-full lg:w-auto"
@@ -179,6 +200,19 @@ export default function App() {
             >
               <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
               <span className="truncate">Guía Teórica</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSwitchTab('apa2026')}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center sm:justify-start gap-1.5 whitespace-nowrap ${
+                activeTab === 'apa2026'
+                  ? 'bg-white text-violet-950 font-semibold shadow-xs'
+                  : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
+              }`}
+            >
+              <FileCheck2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              <span className="truncate">Normas APA 2026</span>
             </button>
 
             <button
@@ -210,7 +244,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => handleSwitchTab('universitarios')}
-              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center sm:justify-start gap-1.5 whitespace-nowrap ${
+              className={`col-span-2 sm:col-span-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center sm:justify-start gap-1.5 whitespace-nowrap ${
                 activeTab === 'universitarios'
                   ? 'bg-white text-violet-950 font-semibold shadow-xs'
                   : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
@@ -240,6 +274,13 @@ export default function App() {
           <TeoriaSection
             onNavigateToGestor={handleNavigateToGestor}
             onNavigateToTaller={() => handleSwitchTab('taller')}
+          />
+        )}
+
+        {activeTab === 'apa2026' && (
+          <Apa2026Section
+            onLoadExampleInGestor={handleLoadExampleInGestor}
+            showToast={showToast}
           />
         )}
 

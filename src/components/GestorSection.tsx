@@ -14,14 +14,26 @@ import {
   ArrowUpDown,
   Pencil,
   Quote,
+  BookOpen,
+  HelpCircle,
+  SlidersHorizontal,
 } from 'lucide-react';
 import {
+  AudiovisualSubtype,
+  AuthorMode,
+  BookSubtype,
   CitationFormData,
   CitationStyle,
+  LegalSubtype,
+  LocatorType,
+  NewspaperSubtype,
   SavedReference,
+  SocialMediaSubtype,
   SourceType,
+  ThesisSubtype,
 } from '../types/citation';
 import {
+  APA_DOCUMENT_EXAMPLES,
   EXAMPLE_PRESETS,
   generateCitationOutput,
   INITIAL_FORM_DATA,
@@ -54,6 +66,10 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
   const [sortAlphabetically, setSortAlphabetically] = useState<boolean>(true);
   const [confirmClear, setConfirmClear] = useState<boolean>(false);
   const [styleFilter, setStyleFilter] = useState<string>('all');
+  const [selectedDocExampleId, setSelectedDocExampleId] = useState<string>(
+    APA_DOCUMENT_EXAMPLES[0].id
+  );
+  const [showSpecialCases, setShowSpecialCases] = useState<boolean>(false);
 
   const generated = generateCitationOutput(formData);
 
@@ -62,6 +78,14 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
     value: CitationFormData[K]
   ) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleAuthorModeChange = (mode: AuthorMode) => {
+    setFormData((prev) => ({
+      ...prev,
+      authorMode: mode,
+      isInstitutionalAuthor: mode === 'institutional',
+    }));
   };
 
   const handleAuthorChange = (
@@ -99,7 +123,17 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
       style: prev.style,
       ...preset,
     }));
-    showToast(`Ejemplo de ${SOURCE_TYPE_LABELS[formData.sourceType]} cargado`);
+    showToast(`Ejemplo de ${SOURCE_TYPE_LABELS[formData.sourceType].split(' (')[0]} cargado`);
+  };
+
+  const loadOfficialDocumentExample = (exampleId: string) => {
+    const found = APA_DOCUMENT_EXAMPLES.find((e) => e.id === exampleId);
+    if (!found) return;
+    setFormData({
+      ...INITIAL_FORM_DATA,
+      ...found.formData,
+    });
+    showToast(`Cargado del Manual APA (${found.page}): ${found.title}`);
   };
 
   const resetForm = () => {
@@ -128,6 +162,12 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
   };
 
   const handleSaveToBibliography = () => {
+    if (!generated.requiresReferenceList) {
+      showToast(
+        'Las comunicaciones personales solo se citan en el texto y no van en la lista de referencias (APA pág. 21)'
+      );
+      return;
+    }
     const newRef: SavedReference = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       sourceType: formData.sourceType,
@@ -138,7 +178,10 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
       narrative: generated.narrative,
       sortKey: generated.sortKey,
       createdAt: new Date().toISOString(),
-      formData: { ...formData, authors: formData.authors.map((a) => ({ ...a })) },
+      formData: {
+        ...formData,
+        authors: formData.authors.map((a) => ({ ...a })),
+      },
     };
     onAddReference(newRef);
     showToast('Referencia guardada en tu lista bibliográfica');
@@ -209,15 +252,17 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
   };
 
   const { sourceType } = formData;
+  const currentAuthorMode: AuthorMode =
+    formData.authorMode || (formData.isInstitutionalAuthor ? 'institutional' : 'personal');
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-      {/* COLUMNA IZQUIERDA: FORMULARIO DINÁMICO Y PREVISUALIZACIÓN */}
-      <section className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
+      {/* COLUMNA IZQUIERDA: FORMULARIO DINÁMICO ROBUSTECIDO (PÁGS. 20–36) */}
+      <section className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
           <div>
             <div className="text-xs font-medium text-violet-700">
-              Generador Inteligente Multi-Norma
+              Generador Inteligente Multi-Norma · Robustecido con Manual APA (Págs. 20–36)
             </div>
             <h2 className="text-lg sm:text-xl font-semibold text-slate-900">
               Cita Master — Datos de la Fuente
@@ -243,14 +288,52 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
           </div>
         </div>
 
-        {/* Selectores Principales: Tipo de Fuente y Estilo Bibliográfico */}
+        {/* Barra Rápida: Catálogo de 23 Ejemplos Reales del Documento APA (Págs. 20 a 35) */}
+        <div className="p-3.5 rounded-xl bg-[#FAF5FF] border border-violet-200/90 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <label
+              htmlFor="docExampleSelect"
+              className="text-xs font-semibold text-violet-950 flex items-center gap-1.5"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-violet-700 shrink-0" />
+              <span>Plantillas y Ejemplos Reales del Manual APA (Págs. 20–35):</span>
+            </label>
+            <span className="text-[11px] font-medium text-violet-700">23 casos oficiales</span>
+          </div>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <select
+              id="docExampleSelect"
+              value={selectedDocExampleId}
+              onChange={(e) => {
+                setSelectedDocExampleId(e.target.value);
+                loadOfficialDocumentExample(e.target.value);
+              }}
+              className="flex-1 rounded-lg border border-violet-300 bg-white py-2 px-3 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
+            >
+              {APA_DOCUMENT_EXAMPLES.map((ex) => (
+                <option key={ex.id} value={ex.id}>
+                  [{ex.page}] {ex.categoryLabel} — {ex.title}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => loadOfficialDocumentExample(selectedDocExampleId)}
+              className="px-3 py-2 rounded-lg bg-violet-700 hover:bg-violet-800 text-white text-xs font-semibold transition-colors whitespace-nowrap"
+            >
+              Aplicar plantilla
+            </button>
+          </div>
+        </div>
+
+        {/* Selectores Principales: Tipo de Fuente (12 categorías) y Estilo Bibliográfico */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label
               htmlFor="sourceTypeSelect"
               className="block text-xs font-semibold text-slate-700 mb-1.5"
             >
-              Tipo de Fuente / Recurso
+              Tipo de Fuente / Recurso (12 Categorías)
             </label>
             <select
               id="sourceTypeSelect"
@@ -291,6 +374,254 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
             </select>
           </div>
         </div>
+
+        {/* SUBTIPOS ESPECÍFICOS SEGÚN LA CATEGORÍA (PÁGS. 25-35) */}
+        {sourceType === 'book' && (
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-slate-700">
+                Modalidad de Libro (Págs. 25–26):
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { id: 'authored' as BookSubtype, label: 'Libro con autor' },
+                  { id: 'edited' as BookSubtype, label: 'Libro con editor (Ed.)' },
+                  { id: 'electronic' as BookSubtype, label: 'Versión electrónica' },
+                  { id: 'translated' as BookSubtype, label: 'Libro con traducción' },
+                ].map((sub) => (
+                  <button
+                    key={sub.id}
+                    type="button"
+                    onClick={() => handleFieldChange('bookSubtype', sub.id)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      (formData.bookSubtype || 'authored') === sub.id
+                        ? 'bg-violet-800 text-white'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:border-violet-300'
+                    }`}
+                  >
+                    {sub.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {formData.bookSubtype === 'translated' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Nombre del Traductor (Trad.)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.translator || ''}
+                    onChange={(e) => handleFieldChange('translator', e.target.value)}
+                    placeholder="Ej. H. Weaver"
+                    className="w-full rounded-lg border border-slate-300 bg-white py-1.5 px-2.5 text-xs sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Año de Publicación Original (ej. 1966)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.originalYear || ''}
+                    onChange={(e) => handleFieldChange('originalYear', e.target.value)}
+                    placeholder="Ej. 1966 (genera cita 1966/1969)"
+                    className="w-full rounded-lg border border-slate-300 bg-white py-1.5 px-2.5 text-xs sm:text-sm"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {sourceType === 'newspaper' && (
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-slate-700">
+              Tipo de Publicación Periódica (Págs. 29–30):
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { id: 'newspaper_print' as NewspaperSubtype, label: 'Periódico impreso' },
+                { id: 'newspaper_online' as NewspaperSubtype, label: 'Periódico en línea' },
+                { id: 'magazine_print' as NewspaperSubtype, label: 'Revista (Magazine) impresa' },
+                { id: 'magazine_online' as NewspaperSubtype, label: 'Revista (Magazine) en línea' },
+              ].map((sub) => (
+                <button
+                  key={sub.id}
+                  type="button"
+                  onClick={() => handleFieldChange('newspaperSubtype', sub.id)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    (formData.newspaperSubtype || 'newspaper_online') === sub.id
+                      ? 'bg-violet-800 text-white'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:border-violet-300'
+                  }`}
+                >
+                  {sub.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {sourceType === 'thesis' && (
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Modalidad (Pág. 31)
+              </label>
+              <select
+                value={formData.thesisSubtype || 'online_archive'}
+                onChange={(e) =>
+                  handleFieldChange('thesisSubtype', e.target.value as ThesisSubtype)
+                }
+                className="w-full rounded-lg border border-slate-300 bg-white py-1.5 px-2.5 text-xs sm:text-sm"
+              >
+                <option value="online_archive">Publicada en línea (Archivo digital)</option>
+                <option value="database">Publicada en una base de datos en línea</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Nivel Académico
+              </label>
+              <select
+                value={formData.thesisLevel || 'Tesis de pregrado'}
+                onChange={(e) => handleFieldChange('thesisLevel', e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white py-1.5 px-2.5 text-xs sm:text-sm"
+              >
+                <option value="Tesis de pregrado">Tesis de pregrado</option>
+                <option value="Tesis de maestría">Tesis de maestría</option>
+                <option value="Tesis de doctorado">Tesis de doctorado</option>
+                <option value="Trabajo de grado">Trabajo de grado</option>
+              </select>
+            </div>
+            {formData.thesisSubtype === 'database' && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nombre de la Base de Datos
+                </label>
+                <input
+                  type="text"
+                  value={formData.databaseName || ''}
+                  onChange={(e) => handleFieldChange('databaseName', e.target.value)}
+                  placeholder="Ej. Dissertations & Theses A&I"
+                  className="w-full rounded-lg border border-slate-300 bg-white py-1.5 px-2.5 text-xs sm:text-sm"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {sourceType === 'audiovisual' && (
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-slate-700">
+                Formato Audiovisual (Págs. 32–33):
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { id: 'film' as AudiovisualSubtype, label: 'Película', role: 'Director' },
+                  {
+                    id: 'tv_series' as AudiovisualSubtype,
+                    label: 'Serie de TV',
+                    role: 'Productora',
+                  },
+                  { id: 'video' as AudiovisualSubtype, label: 'Video (YouTube)', role: '' },
+                  {
+                    id: 'webinar' as AudiovisualSubtype,
+                    label: 'Seminario web grabado',
+                    role: '',
+                  },
+                  { id: 'podcast' as AudiovisualSubtype, label: 'Podcast', role: '' },
+                ].map((sub) => (
+                  <button
+                    key={sub.id}
+                    type="button"
+                    onClick={() => {
+                      handleFieldChange('audiovisualSubtype', sub.id);
+                      if (sub.role) handleFieldChange('mediaRole', sub.role);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      (formData.audiovisualSubtype || 'video') === sub.id
+                        ? 'bg-violet-800 text-white'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:border-violet-300'
+                    }`}
+                  >
+                    {sub.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {sourceType === 'social_media' && (
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Red Social (Pág. 34)
+              </label>
+              <select
+                value={formData.socialSubtype || 'tweet'}
+                onChange={(e) =>
+                  handleFieldChange('socialSubtype', e.target.value as SocialMediaSubtype)
+                }
+                className="w-full rounded-lg border border-slate-300 bg-white py-1.5 px-2.5 text-xs sm:text-sm"
+              >
+                <option value="tweet">X / Twitter ([Tweet])</option>
+                <option value="facebook">Facebook ([Publicación])</option>
+                <option value="instagram">Instagram ([Fotografía])</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Usuario [@handle] (Para Twitter e Instagram)
+              </label>
+              <input
+                type="text"
+                value={formData.socialHandle || ''}
+                onChange={(e) => handleFieldChange('socialHandle', e.target.value)}
+                placeholder="Ej. @fundeu o @centrodescritura"
+                className="w-full rounded-lg border border-slate-300 bg-white py-1.5 px-2.5 text-xs sm:text-sm"
+              />
+            </div>
+          </div>
+        )}
+
+        {sourceType === 'legal' && (
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-slate-700">
+                Tipo de Referencia Jurídica / Legal (Págs. 34–35):
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { id: 'sentence' as LegalSubtype, label: '4.5.1 Sentencia Judicial' },
+                  { id: 'law' as LegalSubtype, label: '4.5.2 Ley de la República' },
+                  {
+                    id: 'treaty' as LegalSubtype,
+                    label: '4.5.3 Tratado o Convención Internacional',
+                  },
+                ].map((sub) => (
+                  <button
+                    key={sub.id}
+                    type="button"
+                    onClick={() => handleFieldChange('legalSubtype', sub.id)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      (formData.legalSubtype || 'sentence') === sub.id
+                        ? 'bg-violet-800 text-white'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:border-violet-300'
+                    }`}
+                  >
+                    {sub.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* CAMPOS DINÁMICOS SEGÚN EL TIPO DE FUENTE */}
         {sourceType === 'ai' ? (
@@ -388,58 +719,208 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
               </div>
             </div>
           </div>
+        ) : sourceType === 'legal' ? (
+          /* Formulario específico para Referencias Legales (Págs. 34-35) */
+          <div className="space-y-4 pt-1">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                {formData.legalSubtype === 'sentence'
+                  ? 'Título o Número de la Sentencia'
+                  : formData.legalSubtype === 'law'
+                  ? 'Nombre y Número de la Ley'
+                  : 'Nombre del Tratado o Convención Internacional'}
+              </label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => handleFieldChange('title', e.target.value)}
+                placeholder={
+                  formData.legalSubtype === 'sentence'
+                    ? 'Ej. Sentencia T-006/20'
+                    : formData.legalSubtype === 'law'
+                    ? 'Ej. Ley 1090 de 2006'
+                    : 'Ej. Pacto Internacional de Derechos Económicos, Sociales y Culturales'
+                }
+                className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Año de Expedición
+                </label>
+                <input
+                  type="text"
+                  value={formData.year}
+                  onChange={(e) => handleFieldChange('year', e.target.value)}
+                  placeholder="Ej. 2020 o 2006"
+                  className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Día y Mes Exacto
+                </label>
+                <input
+                  type="text"
+                  value={formData.exactDate || ''}
+                  onChange={(e) => handleFieldChange('exactDate', e.target.value)}
+                  placeholder="Ej. 17 de enero / 6 de septiembre"
+                  className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
+                />
+              </div>
+            </div>
+
+            {formData.legalSubtype !== 'treaty' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    {formData.legalSubtype === 'sentence'
+                      ? 'Corte o Tribunal que publica'
+                      : 'Entidad que promulga la ley (Fuente)'}
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.legalCourtOrBody || ''}
+                    onChange={(e) => handleFieldChange('legalCourtOrBody', e.target.value)}
+                    placeholder={
+                      formData.legalSubtype === 'sentence'
+                        ? 'Ej. Corte Constitucional'
+                        : 'Ej. Congreso de la República'
+                    }
+                    className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    {formData.legalSubtype === 'sentence'
+                      ? 'Magistrado Ponente (M.P.)'
+                      : 'Diario Oficial / Sección o Artículo'}
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.legalJudgeOrSection || ''}
+                    onChange={(e) => handleFieldChange('legalJudgeOrSection', e.target.value)}
+                    placeholder={
+                      formData.legalSubtype === 'sentence'
+                        ? 'Ej. Cristina Pardo, M.P.'
+                        : 'Ej. Diario Oficial No 46.383'
+                    }
+                    className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                URL Oficial (Relatoría, Secretaría del Senado, ONU, etc.)
+              </label>
+              <input
+                type="url"
+                value={formData.url}
+                onChange={(e) => handleFieldChange('url', e.target.value)}
+                placeholder="Ej. https://www.corteconstitucional.gov.co/..."
+                className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
+              />
+            </div>
+          </div>
         ) : (
           <div className="space-y-4 pt-1">
-            {/* Selector Persona vs Institución + Lista de Autores */}
+            {/* 1. ¿QUIÉN ES EL AUTOR? (Persona, Institución con Sigla, Sin Autor o Anónimo - Págs. 18, 20 y 23) */}
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-slate-700">
-                  1. ¿Quién es el Autor / Creador?
+                  1. ¿Quién es el Autor / Responsable? (Págs. 18, 20 y 23)
                 </span>
-                <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200">
+                <div className="flex flex-wrap items-center gap-1 bg-white p-1 rounded-lg border border-slate-200">
                   <button
                     type="button"
-                    onClick={() => handleFieldChange('isInstitutionalAuthor', false)}
-                    className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors ${
-                      !formData.isInstitutionalAuthor
+                    onClick={() => handleAuthorModeChange('personal')}
+                    className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors ${
+                      currentAuthorMode === 'personal'
                         ? 'bg-violet-900 text-white'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <User className="w-3 h-3" />
-                    Autor(es) Personal(es)
+                    Personal
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleFieldChange('isInstitutionalAuthor', true)}
-                    className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors ${
-                      formData.isInstitutionalAuthor
+                    onClick={() => handleAuthorModeChange('institutional')}
+                    className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors ${
+                      currentAuthorMode === 'institutional'
                         ? 'bg-violet-900 text-white'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <Building2 className="w-3 h-3" />
-                    Entidad / Institución
+                    Corporativo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAuthorModeChange('anonymous_title')}
+                    className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors ${
+                      currentAuthorMode === 'anonymous_title'
+                        ? 'bg-violet-900 text-white'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                    title="Pág. 20: Cuando la fuente no tiene autor, se citan las primeras palabras del título"
+                  >
+                    <HelpCircle className="w-3 h-3" />
+                    Sin autor (Título)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAuthorModeChange('anonymous_literal')}
+                    className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                      currentAuthorMode === 'anonymous_literal'
+                        ? 'bg-violet-900 text-white'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                    title="Pág. 20: Solo cuando la obra está firmada explícitamente como 'Anónimo'"
+                  >
+                    “Anónimo”
                   </button>
                 </div>
               </div>
 
-              {formData.isInstitutionalAuthor ? (
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Nombre de la Institución, Organización o Corporación
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.institutionalName}
-                    onChange={(e) =>
-                      handleFieldChange('institutionalName', e.target.value)
-                    }
-                    placeholder="Ej. UNESCO, Ministerio de Educación Nacional, OMS"
-                    className="w-full rounded-xl border border-slate-300 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
-                  />
+              {currentAuthorMode === 'institutional' && (
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                  <div className="sm:col-span-8">
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      Nombre Completo de la Organización o Entidad
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.institutionalName}
+                      onChange={(e) =>
+                        handleFieldChange('institutionalName', e.target.value)
+                      }
+                      placeholder="Ej. Organización Mundial de la Salud / Policía Nacional"
+                      className="w-full rounded-xl border border-slate-300 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
+                    />
+                  </div>
+                  <div className="sm:col-span-4">
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      Sigla Oficial (Opcional, pág. 18)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.institutionalAbbreviation || ''}
+                      onChange={(e) =>
+                        handleFieldChange('institutionalAbbreviation', e.target.value)
+                      }
+                      placeholder="Ej. OMS, ONU, PONAL"
+                      className="w-full rounded-xl border border-slate-300 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
+                    />
+                  </div>
                 </div>
-              ) : (
+              )}
+
+              {currentAuthorMode === 'personal' && (
                 <div className="space-y-2.5">
                   {formData.authors.map((author, index) => (
                     <div
@@ -448,7 +929,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                     >
                       <div className="sm:col-span-5">
                         <label className="block text-xs font-medium text-slate-600 mb-1">
-                          {index === 0 ? 'Nombre(s) del Autor' : `Nombre(s) Coautor ${index + 1}`}
+                          {index === 0 ? 'Nombre(s) o Iniciales' : `Nombre(s) Coautor ${index + 1}`}
                         </label>
                         <input
                           type="text"
@@ -456,14 +937,14 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                           onChange={(e) =>
                             handleAuthorChange(index, 'firstName', e.target.value)
                           }
-                          placeholder="Ej. Gabriel"
+                          placeholder="Ej. Luz Stella"
                           className="w-full rounded-xl border border-slate-300 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                         />
                       </div>
                       <div className="sm:col-span-6">
                         <label className="block text-xs font-medium text-slate-600 mb-1">
                           {index === 0
-                            ? 'Apellido(s) del Autor'
+                            ? 'Apellido(s) (con guion si aplica)'
                             : `Apellido(s) Coautor ${index + 1}`}
                         </label>
                         <input
@@ -472,7 +953,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                           onChange={(e) =>
                             handleAuthorChange(index, 'lastName', e.target.value)
                           }
-                          placeholder="Ej. García Márquez"
+                          placeholder="Ej. Ramírez Osorio o Hoyos-Hernández"
                           className="w-full rounded-xl border border-slate-300 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                         />
                       </div>
@@ -490,15 +971,56 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                       </div>
                     </div>
                   ))}
-                  <button
-                    type="button"
-                    onClick={addCoAuthor}
-                    className="text-xs font-semibold text-violet-700 hover:text-violet-900 flex items-center gap-1.5 pt-1"
-                  >
-                    <UserPlus className="w-3.5 h-3.5" />
-                    Añadir coautor (para obras con 2 o más autores)
-                  </button>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={addCoAuthor}
+                      className="text-xs font-semibold text-violet-700 hover:text-violet-900 flex items-center gap-1.5"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      Añadir coautor ({formData.authors.length} registrado
+                      {formData.authors.length > 1 ? 's' : ''})
+                    </button>
+
+                    {formData.authors.length > 1 && formData.style === 'apa7' && (
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span className="text-slate-500">Conector (pág. 36):</span>
+                        <button
+                          type="button"
+                          onClick={() => handleFieldChange('useSpanishAnd', true)}
+                          className={`px-2 py-0.5 rounded border text-[11px] font-medium ${
+                            formData.useSpanishAnd !== false
+                              ? 'bg-violet-100 text-violet-900 border-violet-300 font-semibold'
+                              : 'bg-white text-slate-600 border-slate-200'
+                          }`}
+                        >
+                          Español (“y”)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleFieldChange('useSpanishAnd', false)}
+                          className={`px-2 py-0.5 rounded border text-[11px] font-medium ${
+                            formData.useSpanishAnd === false
+                              ? 'bg-violet-100 text-violet-900 border-violet-300 font-semibold'
+                              : 'bg-white text-slate-600 border-slate-200'
+                          }`}
+                        >
+                          Inglés (“&amp;”)
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
+              )}
+
+              {(currentAuthorMode === 'anonymous_title' ||
+                currentAuthorMode === 'anonymous_literal') && (
+                <p className="text-xs text-violet-900 bg-violet-100/60 p-2.5 rounded-lg border border-violet-200">
+                  {currentAuthorMode === 'anonymous_title'
+                    ? 'Regla APA 7 (pág. 20 y 23): Cuando una obra no tiene autor, la referencia inicia directamente con el título y en la cita del texto se usan las primeras palabras del título.'
+                    : 'Regla APA 7 (pág. 20): Úsese únicamente cuando la fuente esté firmada explícitamente con la palabra “Anónimo”.'}
+                </p>
               )}
             </div>
 
@@ -507,38 +1029,38 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Título del Capítulo
+                    Título del Capítulo o Entrada
                   </label>
                   <input
                     type="text"
                     value={formData.chapterTitle}
                     onChange={(e) => handleFieldChange('chapterTitle', e.target.value)}
-                    placeholder="Ej. La fundación de Macondo y la memoria oral"
+                    placeholder="Ej. La literacidad entendida como práctica social"
                     className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                   />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Título del Libro / Obra Principal
+                      Título del Libro (En cursiva)
                     </label>
                     <input
                       type="text"
                       value={formData.bookTitle}
                       onChange={(e) => handleFieldChange('bookTitle', e.target.value)}
-                      placeholder="Ej. Antología literaria latinoamericana"
+                      placeholder="Ej. Escritura y sociedad. Nuevas perspectivas..."
                       className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Editor o Compilador del Libro (Opcional)
+                      Editor(es) del Libro (En A. Apellido, Ed. / Eds.)
                     </label>
                     <input
                       type="text"
                       value={formData.bookEditor}
                       onChange={(e) => handleFieldChange('bookEditor', e.target.value)}
-                      placeholder="Ej. E. Rodríguez"
+                      placeholder="Ej. V. Zavala, M. Niño-Murcia y P. Ames"
                       className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                     />
                   </div>
@@ -551,36 +1073,80 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                     ? 'Título del Libro'
                     : sourceType === 'article'
                     ? 'Título del Artículo Científico'
+                    : sourceType === 'newspaper'
+                    ? 'Título de la Noticia o Artículo de Prensa'
+                    : sourceType === 'report'
+                    ? 'Título del Informe Gubernamental o Técnico'
+                    : sourceType === 'conference'
+                    ? 'Título de la Ponencia o Conferencia'
+                    : sourceType === 'audiovisual'
+                    ? 'Título de la Película, Serie, Video, Webinar o Podcast'
+                    : sourceType === 'social_media'
+                    ? 'Contenido o Descripción de la Publicación (máx. 20 palabras)'
                     : sourceType === 'website'
-                    ? 'Título de la Página o Artículo Web'
-                    : 'Título del Trabajo de Grado o Tesis'}
+                    ? 'Título de la Página o Entrada Web'
+                    : 'Título de la Tesis o Trabajo de Grado'}
                 </label>
                 <input
                   type="text"
                   value={formData.title}
                   onChange={(e) => handleFieldChange('title', e.target.value)}
-                  placeholder={
-                    sourceType === 'book'
-                      ? 'Ej. La mente absorbente del niño'
-                      : sourceType === 'article'
-                      ? 'Ej. Impacto de la IA en la educación escolar'
-                      : sourceType === 'website'
-                      ? 'Ej. Guía para el uso de IA generativa en la educación'
-                      : 'Ej. Desarrollo del pensamiento crítico en educación media'
-                  }
+                  placeholder="Escribe el título completo respetando mayúsculas solo al inicio y en nombres propios"
                   className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                 />
               </div>
             )}
 
-            {/* Campos para Revista Científica o Sitio Web */}
-            {(sourceType === 'article' || sourceType === 'website') && (
+            {/* Campos específicos para Simposios / Conferencias (Pág. 31) */}
+            {sourceType === 'conference' && (
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                <div className={sourceType === 'article' ? 'sm:col-span-6' : 'sm:col-span-12'}>
+                <div className="sm:col-span-4">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Tipo de Contribución
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.conferenceType || ''}
+                    onChange={(e) => handleFieldChange('conferenceType', e.target.value)}
+                    placeholder="Ej. conferencia, ponencia"
+                    className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm"
+                  />
+                </div>
+                <div className="sm:col-span-8">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Título del Simposio o Congreso
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.conferenceName || ''}
+                    onChange={(e) => handleFieldChange('conferenceName', e.target.value)}
+                    placeholder="Ej. IV Simposio Internacional sobre Acoso Escolar"
+                    className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Campos para Revista Científica, Periódico o Sitio Web */}
+            {(sourceType === 'article' ||
+              sourceType === 'newspaper' ||
+              sourceType === 'website') && (
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                <div
+                  className={
+                    sourceType === 'article' ||
+                    (sourceType === 'newspaper' &&
+                      formData.newspaperSubtype?.startsWith('magazine'))
+                      ? 'sm:col-span-6'
+                      : 'sm:col-span-12'
+                  }
+                >
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     {sourceType === 'article'
-                      ? 'Nombre de la Revista Científica'
-                      : 'Nombre del Sitio Web / Portal'}
+                      ? 'Nombre de la Revista Científica (En cursiva)'
+                      : sourceType === 'newspaper'
+                      ? 'Nombre del Periódico o Revista (Ej. El País, Apuntes)'
+                      : 'Nombre del Sitio Web (Omitir si es igual al autor institucional, pág. 32)'}
                   </label>
                   <input
                     type="text"
@@ -588,13 +1154,17 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                     onChange={(e) => handleFieldChange('journalName', e.target.value)}
                     placeholder={
                       sourceType === 'article'
-                        ? 'Ej. Revista Digital de Educación'
-                        : 'Ej. Portal Educativo UNESCO'
+                        ? 'Ej. Revista Colombiana de Sociología'
+                        : sourceType === 'newspaper'
+                        ? 'Ej. El País'
+                        : 'Dejar vacío si el autor ya es la entidad dueña del sitio (ej. OMS)'
                     }
                     className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                   />
                 </div>
-                {sourceType === 'article' && (
+                {(sourceType === 'article' ||
+                  (sourceType === 'newspaper' &&
+                    formData.newspaperSubtype?.startsWith('magazine'))) && (
                   <>
                     <div className="sm:col-span-3">
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">
@@ -604,19 +1174,19 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                         type="text"
                         value={formData.volume}
                         onChange={(e) => handleFieldChange('volume', e.target.value)}
-                        placeholder="Ej. 12"
+                        placeholder="Ej. 39"
                         className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                       />
                     </div>
                     <div className="sm:col-span-3">
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        Número / Fascículo
+                        Número
                       </label>
                       <input
                         type="text"
                         value={formData.issue}
                         onChange={(e) => handleFieldChange('issue', e.target.value)}
-                        placeholder="Ej. 3"
+                        placeholder="Ej. 1"
                         className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                       />
                     </div>
@@ -625,25 +1195,54 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
               </div>
             )}
 
-            {/* Año, Edición y Páginas */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Año de Publicación
-                </label>
+            {/* Año, Fecha Exacta y Localizador de Cita (Página / Párrafo / Marca de Tiempo - Pág. 20) */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+              <div className="sm:col-span-4">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Año de Publicación
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleFieldChange('year', 's.f.')}
+                    className="text-[11px] font-semibold text-violet-700 hover:underline"
+                    title="Pág. 20: Usar s.f. cuando no se indica fecha de publicación"
+                  >
+                    Usar s.f.
+                  </button>
+                </div>
                 <input
                   type="text"
                   value={formData.year}
                   onChange={(e) => handleFieldChange('year', e.target.value)}
-                  placeholder="Ej. 2024 o s. f."
+                  placeholder="Ej. 2020 o s.f."
                   className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                 />
               </div>
 
-              {(sourceType === 'book' || sourceType === 'chapter') && (
-                <div>
+              {(sourceType === 'newspaper' ||
+                sourceType === 'conference' ||
+                sourceType === 'website' ||
+                sourceType === 'audiovisual' ||
+                sourceType === 'social_media') && (
+                <div className="sm:col-span-4">
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Edición (Opcional)
+                    Día y Mes (Pág. 36)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.exactDate || ''}
+                    onChange={(e) => handleFieldChange('exactDate', e.target.value)}
+                    placeholder="Ej. 2 de enero / 1 de abril"
+                    className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
+                  />
+                </div>
+              )}
+
+              {(sourceType === 'book' || sourceType === 'chapter') && (
+                <div className="sm:col-span-3">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Edición (Pág. 25)
                   </label>
                   <input
                     type="text"
@@ -655,101 +1254,202 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                 </div>
               )}
 
-              {sourceType !== 'website' && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Página(s) (p. / pp.)
+              <div className="sm:col-span-5">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Localizador en Cita (Pág. 20)
                   </label>
-                  <input
-                    type="text"
-                    value={formData.pages}
-                    onChange={(e) => handleFieldChange('pages', e.target.value)}
-                    placeholder="Ej. 45 o 45-58"
-                    className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
-                  />
+                  <select
+                    aria-label="Tipo de localizador"
+                    value={formData.locatorType || 'page'}
+                    onChange={(e) =>
+                      handleFieldChange('locatorType', e.target.value as LocatorType)
+                    }
+                    className="text-[11px] font-semibold text-violet-800 bg-violet-50 border border-violet-200 rounded px-1.5 py-0.5"
+                  >
+                    <option value="page">Página (p. / pp.)</option>
+                    <option value="paragraph">Párrafo (párr.)</option>
+                    <option value="timestamp">Tiempo (mm:ss)</option>
+                    <option value="section">Sección</option>
+                  </select>
                 </div>
-              )}
+                <input
+                  type="text"
+                  value={formData.pages}
+                  onChange={(e) => handleFieldChange('pages', e.target.value)}
+                  placeholder={
+                    formData.locatorType === 'paragraph'
+                      ? 'Ej. 4 (genera párr. 4)'
+                      : formData.locatorType === 'timestamp'
+                      ? 'Ej. 25:36'
+                      : 'Ej. 111 o 109-139'
+                  }
+                  className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
+                />
+              </div>
             </div>
 
-            {/* Editorial y Lugar (para libros, capítulos y tesis) */}
+            {/* Editorial, Productora, Institución o Número de Informe */}
             {(sourceType === 'book' ||
               sourceType === 'chapter' ||
-              sourceType === 'thesis') && (
+              sourceType === 'thesis' ||
+              sourceType === 'audiovisual' ||
+              sourceType === 'report' ||
+              sourceType === 'conference') && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     {sourceType === 'thesis'
-                      ? 'Universidad o Institución Académica'
+                      ? 'Universidad o Institución que otorga el título'
+                      : sourceType === 'audiovisual'
+                      ? 'Compañía Productora, Canal o Plataforma (Ej. Atresmedia, CBC, YouTube)'
+                      : sourceType === 'report'
+                      ? 'Número de la Publicación (Opcional)'
                       : 'Editorial'}
                   </label>
                   <input
                     type="text"
-                    value={formData.publisher}
-                    onChange={(e) => handleFieldChange('publisher', e.target.value)}
+                    value={
+                      sourceType === 'report'
+                        ? formData.reportNumber || ''
+                        : formData.publisher
+                    }
+                    onChange={(e) =>
+                      handleFieldChange(
+                        sourceType === 'report' ? 'reportNumber' : 'publisher',
+                        e.target.value
+                      )
+                    }
                     placeholder={
                       sourceType === 'thesis'
-                        ? 'Ej. Universidad Nacional de Colombia'
-                        : 'Ej. Editorial Trillas'
+                        ? 'Ej. Universidad Complutense de Madrid'
+                        : sourceType === 'audiovisual'
+                        ? 'Ej. Atresmedia Cine / CBC / YouTube'
+                        : sourceType === 'report'
+                        ? 'Ej. Publicación No. 14'
+                        : 'Ej. Sello Editorial Javeriano'
                     }
                     className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Lugar de Publicación (Ciudad, País)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.place}
-                    onChange={(e) => handleFieldChange('place', e.target.value)}
-                    placeholder="Ej. Bogotá, Colombia"
-                    className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
-                  />
-                </div>
+
+                {(sourceType === 'conference' ||
+                  formData.style !== 'apa7' ||
+                  sourceType === 'book') && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      {sourceType === 'conference'
+                        ? 'Ciudad y País del Simposio (Obligatorio en APA 7, pág. 31)'
+                        : 'Ciudad / Lugar (Omitido en libros APA 7, pág. 25)'}
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.place}
+                      onChange={(e) => handleFieldChange('place', e.target.value)}
+                      placeholder="Ej. Medellín, Colombia"
+                      className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
-            {/* DOI, Fecha de Consulta y URL */}
+            {/* DOI y URL (Pág. 32: sin "Recuperado de" ni "DOI:") */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {sourceType !== 'website' ? (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Código DOI (Identificador de Objeto Digital)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.doi}
-                    onChange={(e) => handleFieldChange('doi', e.target.value)}
-                    placeholder="Ej. 10.1016/j.edu.2024.01"
-                    className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
-                  />
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Fecha de Consulta (Web)
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.accessDate}
-                    onChange={(e) => handleFieldChange('accessDate', e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
-                  />
-                </div>
-              )}
-
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  URL o Enlace Directo
+                  Enlace DOI (Se formatea como https://doi.org/...)
+                </label>
+                <input
+                  type="text"
+                  value={formData.doi}
+                  onChange={(e) => handleFieldChange('doi', e.target.value)}
+                  placeholder="Ej. 10.1590/s0104-12902019180586"
+                  className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  URL Directa (Sin “Recuperado de”, pág. 32)
                 </label>
                 <input
                   type="url"
                   value={formData.url}
                   onChange={(e) => handleFieldChange('url', e.target.value)}
-                  placeholder="Ej. https://www.ejemplo.com"
+                  placeholder="Ej. https://www.who.int/es/..."
                   className="w-full rounded-xl border border-slate-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                 />
               </div>
+            </div>
+
+            {/* PANEL DESPLEGABLE DE CASOS ESPECIALES DE CITACIÓN (PÁGS. 20 Y 21) */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowSpecialCases(!showSpecialCases)}
+                className="w-full px-4 py-2.5 text-left flex items-center justify-between text-xs font-semibold text-violet-950 hover:bg-slate-100 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-violet-700" />
+                  <span>
+                    Opciones de Citación Especial (Págs. 19–21: Cita de una cita, Reedición,
+                    Comunicación personal)
+                  </span>
+                </span>
+                <span className="text-violet-700">
+                  {showSpecialCases ? 'Ocultar ▲' : 'Configurar ▼'}
+                </span>
+              </button>
+
+              {showSpecialCases && (
+                <div className="p-4 pt-2 border-t border-slate-200 space-y-3 bg-white">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        3.4.9 Cita de una cita / Fuente secundaria (Pág. 21)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.secondarySourceAuthorYear || ''}
+                        onChange={(e) =>
+                          handleFieldChange('secondarySourceAuthorYear', e.target.value)
+                        }
+                        placeholder="Ej. Hawking, 2010 (genera: como se citó en Hawking, 2010)"
+                        className="w-full rounded-lg border border-slate-300 py-1.5 px-2.5 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        3.4.5 Año original por reedición o traducción (Pág. 19)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.originalYear || ''}
+                        onChange={(e) => handleFieldChange('originalYear', e.target.value)}
+                        placeholder="Ej. 1966 (genera: Piaget, 1966/2000)"
+                        className="w-full rounded-lg border border-slate-300 py-1.5 px-2.5 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <label className="flex items-center gap-2.5 text-xs text-slate-700 cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={!!formData.isPersonalCommunication}
+                      onChange={(e) =>
+                        handleFieldChange('isPersonalCommunication', e.target.checked)
+                      }
+                      className="rounded border-slate-300 text-violet-700 focus:ring-violet-600"
+                    />
+                    <span>
+                      <strong>3.5.2 Es una comunicación personal (Pág. 21):</strong> Entrevista
+                      personal, correo, clase no grabada o tradición oral (genera{' '}
+                      <code>M. González (comunicación personal, fecha)</code>; no requiere entrada
+                      en las referencias).
+                    </span>
+                  </label>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -765,12 +1465,19 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
             <button
               type="button"
               onClick={handleSaveToBibliography}
-              className="px-4 py-2 bg-violet-700 hover:bg-violet-800 text-white text-xs sm:text-sm font-semibold rounded-xl transition-colors flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+              disabled={!generated.requiresReferenceList}
+              className="px-4 py-2 bg-violet-700 hover:bg-violet-800 disabled:bg-slate-300 text-white text-xs sm:text-sm font-semibold rounded-xl transition-colors flex items-center gap-1.5 shadow-sm whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
               Guardar en mi Bibliografía
             </button>
           </div>
+
+          {generated.specialNote && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950">
+              {generated.specialNote}
+            </div>
+          )}
 
           {/* Cita Parentética y Cita Narrativa */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -794,9 +1501,20 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                   Copiar
                 </button>
               </div>
-              <div className="font-mono text-xs sm:text-sm text-slate-900 bg-white px-3 py-2 rounded-lg border border-slate-200 select-all">
+              <div
+                className={`font-mono text-xs sm:text-sm text-slate-900 bg-white px-3 py-2 rounded-lg border border-slate-200 select-all ${
+                  sourceType === 'legal' && formData.legalSubtype === 'sentence'
+                    ? 'italic'
+                    : ''
+                }`}
+              >
                 {generated.parenthetical}
               </div>
+              {generated.subsequentParenthetical && (
+                <div className="text-[11px] font-mono text-violet-800 pt-0.5">
+                  Siguientes citas: <strong>{generated.subsequentParenthetical}</strong>
+                </div>
+              )}
             </div>
 
             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
@@ -820,6 +1538,11 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
               <div className="font-mono text-xs sm:text-sm text-slate-900 bg-white px-3 py-2 rounded-lg border border-slate-200 select-all">
                 {generated.narrative}
               </div>
+              {generated.subsequentNarrative && (
+                <div className="text-[11px] font-mono text-violet-800 pt-0.5">
+                  Siguientes citas: <strong>{generated.subsequentNarrative}</strong>
+                </div>
+              )}
             </div>
           </div>
 
@@ -827,7 +1550,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
           <div className="p-4 rounded-xl bg-[#FAF5FF] border border-violet-200 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-violet-950">
-                Referencia Bibliográfica Final (con Sangría Francesa)
+                Referencia Bibliográfica Final (con Sangría Francesa de 1.27 cm)
               </span>
               <button
                 type="button"
@@ -856,8 +1579,8 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
         </div>
       </section>
 
-      {/* COLUMNA DERECHA: GESTOR DE BIBLIOGRAFÍA GUARDADA */}
-      <section className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-6 flex flex-col justify-between space-y-5">
+      {/* COLUMNA DERECHA: GESTOR DE BIBLIOGRAFÍA GUARDADA EN TARJETAS LIMPIAS */}
+      <section className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 flex flex-col justify-between space-y-5">
         <div className="space-y-4">
           <div className="flex items-center justify-between border-b border-slate-200 pb-4">
             <div>
@@ -905,17 +1628,16 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
             </div>
           )}
 
-          {/* Lista de referencias guardadas */}
-          <div className="space-y-3.5 max-h-[520px] overflow-y-auto pr-1">
+          {/* Lista de referencias guardadas en tarjetas limpias */}
+          <div className="space-y-3.5 max-h-[560px] overflow-y-auto pr-1">
             {displayedReferences.length === 0 ? (
               <div className="text-center py-12 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-2">
                 <p className="text-sm font-medium text-slate-600">
                   Aún no hay referencias en esta vista.
                 </p>
                 <p className="text-xs text-slate-500">
-                  Completa los datos a la izquierda y pulsa{' '}
-                  <strong>"Guardar en mi Bibliografía"</strong> para acumular y ordenar tus
-                  fuentes automáticamente.
+                  Completa los datos a la izquierda o selecciona una plantilla del Manual APA y
+                  pulsa <strong>&quot;Guardar en mi Bibliografía&quot;</strong>.
                 </p>
               </div>
             ) : (
@@ -929,17 +1651,17 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                     key={item.id}
                     className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs hover:border-violet-300 hover:shadow-sm transition-all space-y-3"
                   >
-                    {/* Encabezado de la tarjeta: Estilo, Tipo de Fuente y botón de edición opcional */}
+                    {/* Encabezado de la tarjeta: Estilo, Tipo de Fuente y botón de edición */}
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="font-semibold text-violet-900 bg-violet-50 border border-violet-200/80 px-2 py-0.5 rounded-md">
-                          {STYLE_LABELS[item.style]}
+                      <div className="flex items-center gap-2 text-xs min-w-0">
+                        <span className="font-semibold text-violet-900 bg-violet-50 border border-violet-200/80 px-2 py-0.5 rounded-md shrink-0">
+                          {STYLE_LABELS[item.style].split(' ·')[0]}
                         </span>
                         <span className="text-slate-400" aria-hidden="true">
                           ·
                         </span>
-                        <span className="font-medium text-slate-600">
-                          {SOURCE_TYPE_LABELS[item.sourceType].split(' (')[0]}
+                        <span className="font-medium text-slate-600 truncate">
+                          {(SOURCE_TYPE_LABELS[item.sourceType] || item.sourceType).split(' (')[0]}
                         </span>
                       </div>
 
@@ -947,7 +1669,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                         <button
                           type="button"
                           onClick={() => handleEditReference(item)}
-                          className="text-xs font-medium text-slate-500 hover:text-violet-700 flex items-center gap-1 px-2 py-1 rounded-md hover:bg-violet-50 transition-colors"
+                          className="text-xs font-medium text-slate-500 hover:text-violet-700 flex items-center gap-1 px-2 py-1 rounded-md hover:bg-violet-50 transition-colors shrink-0"
                           title="Cargar datos en el formulario para editar"
                         >
                           <Pencil className="w-3 h-3" />
