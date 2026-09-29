@@ -133,7 +133,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
       ...INITIAL_FORM_DATA,
       ...found.formData,
     });
-    showToast(`Cargado del Manual APA (${found.page}): ${found.title}`);
+    showToast(`Plantilla cargada: ${found.title}`);
   };
 
   const resetForm = () => {
@@ -164,7 +164,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
   const handleSaveToBibliography = () => {
     if (!generated.requiresReferenceList) {
       showToast(
-        'Las comunicaciones personales solo se citan en el texto y no van en la lista de referencias (APA pág. 21)'
+        'Las comunicaciones personales solo se citan en el texto y no van en la lista de referencias'
       );
       return;
     }
@@ -262,7 +262,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
           <div>
             <div className="text-xs font-medium text-violet-700">
-              Generador Inteligente Multi-Norma · Robustecido con Manual APA (Págs. 20–36)
+              Generador Inteligente Multi-Norma · Normas APA 7.ª Edición
             </div>
             <h2 className="text-lg sm:text-xl font-semibold text-slate-900">
               Cita Master — Datos de la Fuente
@@ -296,7 +296,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
               className="text-xs font-semibold text-violet-950 flex items-center gap-1.5"
             >
               <BookOpen className="w-3.5 h-3.5 text-violet-700 shrink-0" />
-              <span>Plantillas y Ejemplos Reales del Manual APA (Págs. 20–35):</span>
+              <span>Plantillas y Ejemplos Reales del Manual APA:</span>
             </label>
             <span className="text-[11px] font-medium text-violet-700">23 casos oficiales</span>
           </div>
@@ -312,7 +312,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
             >
               {APA_DOCUMENT_EXAMPLES.map((ex) => (
                 <option key={ex.id} value={ex.id}>
-                  [{ex.page}] {ex.categoryLabel} — {ex.title}
+                  {ex.categoryLabel} — {ex.title}
                 </option>
               ))}
             </select>
@@ -380,7 +380,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-700">
-                Modalidad de Libro (Págs. 25–26):
+                Modalidad de Libro:
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {[
@@ -439,7 +439,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
         {sourceType === 'newspaper' && (
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-semibold text-slate-700">
-              Tipo de Publicación Periódica (Págs. 29–30):
+              Tipo de Publicación Periódica:
             </span>
             <div className="flex flex-wrap gap-1.5">
               {[
@@ -469,7 +469,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Modalidad (Pág. 31)
+                Modalidad de Publicación
               </label>
               <select
                 value={formData.thesisSubtype || 'online_archive'}
@@ -518,7 +518,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-700">
-                Formato Audiovisual (Págs. 32–33):
+                Formato Audiovisual:
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {[
@@ -561,7 +561,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Red Social (Pág. 34)
+                Red Social
               </label>
               <select
                 value={formData.socialSubtype || 'tweet'}
@@ -594,7 +594,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-700">
-                Tipo de Referencia Jurídica / Legal (Págs. 34–35):
+                Tipo de Referencia Jurídica / Legal:
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {[
@@ -832,7 +832,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-slate-700">
-                  1. ¿Quién es el Autor / Responsable? (Págs. 18, 20 y 23)
+                  1. ¿Quién es el Autor / Responsable?
                 </span>
                 <div className="flex flex-wrap items-center gap-1 bg-white p-1 rounded-lg border border-slate-200">
                   <button
@@ -905,7 +905,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                   </div>
                   <div className="sm:col-span-4">
                     <label className="block text-xs font-medium text-slate-600 mb-1">
-                      Sigla Oficial (Opcional, pág. 18)
+                      Sigla Oficial (Opcional)
                     </label>
                     <input
                       type="text"
@@ -985,7 +985,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
 
                     {formData.authors.length > 1 && formData.style === 'apa7' && (
                       <div className="flex items-center gap-1.5 text-xs">
-                        <span className="text-slate-500">Conector (pág. 36):</span>
+                        <span className="text-slate-500">Conector:</span>
                         <button
                           type="button"
                           onClick={() => handleFieldChange('useSpanishAnd', true)}
@@ -1018,8 +1018,8 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                 currentAuthorMode === 'anonymous_literal') && (
                 <p className="text-xs text-violet-900 bg-violet-100/60 p-2.5 rounded-lg border border-violet-200">
                   {currentAuthorMode === 'anonymous_title'
-                    ? 'Regla APA 7 (pág. 20 y 23): Cuando una obra no tiene autor, la referencia inicia directamente con el título y en la cita del texto se usan las primeras palabras del título.'
-                    : 'Regla APA 7 (pág. 20): Úsese únicamente cuando la fuente esté firmada explícitamente con la palabra “Anónimo”.'}
+                    ? 'Regla APA 7: Cuando una obra no tiene autor, la referencia inicia directamente con el título y en la cita del texto se usan las primeras palabras del título.'
+                    : 'Regla APA 7: Úsese únicamente cuando la fuente esté firmada explícitamente con la palabra “Anónimo”.'}
                 </p>
               )}
             </div>
@@ -1146,7 +1146,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                       ? 'Nombre de la Revista Científica (En cursiva)'
                       : sourceType === 'newspaper'
                       ? 'Nombre del Periódico o Revista (Ej. El País, Apuntes)'
-                      : 'Nombre del Sitio Web (Omitir si es igual al autor institucional, pág. 32)'}
+                      : 'Nombre del Sitio Web (Omitir si es igual al autor institucional)'}
                   </label>
                   <input
                     type="text"
@@ -1227,7 +1227,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                 sourceType === 'social_media') && (
                 <div className="sm:col-span-4">
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Día y Mes (Pág. 36)
+                    Día y Mes
                   </label>
                   <input
                     type="text"
@@ -1242,7 +1242,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
               {(sourceType === 'book' || sourceType === 'chapter') && (
                 <div className="sm:col-span-3">
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Edición (Pág. 25)
+                    Edición
                   </label>
                   <input
                     type="text"
@@ -1257,7 +1257,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
               <div className="sm:col-span-5">
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-semibold text-slate-700">
-                    Localizador en Cita (Pág. 20)
+                    Localizador en Cita
                   </label>
                   <select
                     aria-label="Tipo de localizador"
@@ -1339,8 +1339,8 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       {sourceType === 'conference'
-                        ? 'Ciudad y País del Simposio (Obligatorio en APA 7, pág. 31)'
-                        : 'Ciudad / Lugar (Omitido en libros APA 7, pág. 25)'}
+                        ? 'Ciudad y País del Simposio (Obligatorio en APA 7)'
+                        : 'Ciudad / Lugar (Omitido en libros APA 7)'}
                     </label>
                     <input
                       type="text"
@@ -1370,7 +1370,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  URL Directa (Sin “Recuperado de”, pág. 32)
+                  URL Directa (Sin “Recuperado de”)
                 </label>
                 <input
                   type="url"
@@ -1392,8 +1392,8 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                 <span className="flex items-center gap-2">
                   <SlidersHorizontal className="w-3.5 h-3.5 text-violet-700" />
                   <span>
-                    Opciones de Citación Especial (Págs. 19–21: Cita de una cita, Reedición,
-                    Comunicación personal)
+                    Opciones de Citación Especial (Cita de una cita, Reedición, Comunicación
+                    personal)
                   </span>
                 </span>
                 <span className="text-violet-700">
@@ -1406,7 +1406,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        3.4.9 Cita de una cita / Fuente secundaria (Pág. 21)
+                        3.4.9 Cita de una cita / Fuente secundaria
                       </label>
                       <input
                         type="text"
@@ -1420,7 +1420,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        3.4.5 Año original por reedición o traducción (Pág. 19)
+                        3.4.5 Año original por reedición o traducción
                       </label>
                       <input
                         type="text"
@@ -1442,7 +1442,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                       className="rounded border-slate-300 text-violet-700 focus:ring-violet-600"
                     />
                     <span>
-                      <strong>3.5.2 Es una comunicación personal (Pág. 21):</strong> Entrevista
+                      <strong>3.5.2 Es una comunicación personal:</strong> Entrevista
                       personal, correo, clase no grabada o tradición oral (genera{' '}
                       <code>M. González (comunicación personal, fecha)</code>; no requiere entrada
                       en las referencias).

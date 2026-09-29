@@ -274,15 +274,12 @@ export default function App() {
           <TeoriaSection
             onNavigateToGestor={handleNavigateToGestor}
             onNavigateToTaller={() => handleSwitchTab('taller')}
-          />
-        )}
-
-        {activeTab === 'apa2026' && (
-          <Apa2026Section
             onLoadExampleInGestor={handleLoadExampleInGestor}
             showToast={showToast}
           />
         )}
+
+        {activeTab === 'apa2026' && <Apa2026Section />}
 
         {activeTab === 'taller' && (
           <TallerSection

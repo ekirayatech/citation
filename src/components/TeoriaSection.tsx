@@ -13,13 +13,94 @@ import {
   ChevronRight,
   Presentation,
   LayoutList,
+  Copy,
+  Check,
+  AlertCircle,
 } from 'lucide-react';
-import { CitationStyle, SourceType } from '../types/citation';
+import { CitationFormData, CitationStyle, SourceType } from '../types/citation';
+import {
+  APA_DOCUMENT_EXAMPLES,
+  generateCitationOutput,
+  INITIAL_FORM_DATA,
+  OfficialDocumentExample,
+} from '../utils/citationEngine';
 
 interface TeoriaSectionProps {
   onNavigateToGestor: (presetType?: SourceType, presetStyle?: CitationStyle) => void;
   onNavigateToTaller: () => void;
+  onLoadExampleInGestor?: (exampleData: Partial<CitationFormData>, label: string) => void;
+  showToast?: (msg: string) => void;
 }
+
+const SPECIAL_CITATION_CASES = [
+  {
+    number: '3.4.1',
+    title: 'Cita de dos o más trabajos en el mismo paréntesis',
+    rule: 'Para incluir los autores de varias obras dentro de un paréntesis, se deben ordenar alfabéticamente de acuerdo al orden de aparición en la lista de referencias y se utiliza el punto y coma (;) para separar las citas.',
+    exampleNar: 'Diversos estudios recientes coinciden en este fenómeno...',
+    examplePar:
+      'El cyberbullying es una nueva forma de acoso escolar (Cardozo, 2020; Chocarro y Garaigordobil, 2019; Gastesi y Salceda, 2019).',
+  },
+  {
+    number: '3.4.2',
+    title: 'Varios trabajos de un autor con igual fecha de publicación',
+    rule: 'Para citar varias obras de un mismo autor en la misma fecha, se agregan letras minúsculas al año (a, b, c...) en el orden de aparición de las obras en el texto.',
+    exampleNar: 'Douglas (2019a) plantea que... Esta definición es compartida por Douglas (2019b)...',
+    examplePar: '(Douglas, 2019a, 2019b)',
+  },
+  {
+    number: '3.4.3',
+    title: 'Cita del mismo autor con diferente año',
+    rule: 'Si son citas de un mismo autor pero con un año diferente, se indica el apellido del autor y entre paréntesis los años correspondientes (del menos reciente al más reciente) separados por un punto y coma (;).',
+    exampleNar: 'Jodelet (1984; 1986)',
+    examplePar: '(Jodelet, 1984; 1986)',
+  },
+  {
+    number: '3.4.4',
+    title: 'Citas con diferentes autores que comparten el mismo apellido',
+    rule: 'Cuando en el texto se van a citar seguidamente dos o más autores que comparten el mismo apellido, se incluye la inicial del nombre de cada autor para lograr diferenciarlos.',
+    exampleNar: 'S. Freud (1921) y A. Freud (1960)',
+    examplePar: '(S. Freud, 1921; A. Freud, 1960)',
+  },
+  {
+    number: '3.4.5',
+    title: 'Citas de fuentes con distintas fechas, por reedición o traducción',
+    rule: 'En libros que han pasado por procesos de reimpresión, reedición o traducción, en las citas se incluyen las dos fechas (año original / año de traducción o reedición) separadas con una barra oblicua (/).',
+    exampleNar: 'Piaget (1966/2000)',
+    examplePar: '(Piaget, 1966/2000)',
+  },
+  {
+    number: '3.4.6',
+    title: 'Citas de publicaciones sin autor',
+    rule: 'Se citan las primeras palabras del título de la obra y el año de publicación. Si es un artículo, capítulo de libro o página web, las palabras del título van entre comillas dobles. Si está firmada “Anónimo”, se utiliza este término.',
+    exampleNar: 'En el “Informe Anual” (2013) se destaca que...',
+    examplePar:
+      'Se evidencia que ha aumentado la defensa de los niños (“Informe Anual”, 2013). | (Anónimo, 2020).',
+  },
+  {
+    number: '3.4.7',
+    title: 'Cita de publicaciones sin fecha',
+    rule: 'Si en el material a citar no se indica el año o fecha de publicación, es necesario que se incluya s.f. que indica “sin fecha”.',
+    exampleNar:
+      'Pulido (s.f.) afirma que el conocimiento concreto de la tarea garantiza una buena solución.',
+    examplePar: '(Pulido, s.f.)',
+  },
+  {
+    number: '3.4.8',
+    title: 'Cita textual de material sin paginación o audiovisual',
+    rule: 'Cuando no hay número de página, se incluye el número de párrafo con la abreviatura párr. (o el encabezado/sección). En obras audiovisuales se incluye una marca de tiempo.',
+    exampleNar: 'Basu y Jones (2007) proponen este enfoque (párr. 4).',
+    examplePar:
+      '“Se sugiere un nuevo marco para considerar la naturaleza” (Basu y Jones, 2007, párr. 4). | Audiovisual: (Walley-Beckett, 2017, 25:36)',
+  },
+  {
+    number: '3.4.9',
+    title: 'Cita de una cita (Fuente secundaria)',
+    rule: 'Se usa cuando se tiene acceso a una fuente a través de otra. Se recomienda hacer el menor uso posible de este tipo de citas mientras se pueda acceder al material original.',
+    exampleNar: 'Penrose (como se citó en Hawking, 2010) plantea que las matemáticas...',
+    examplePar: '(Penrose, como se citó en Hawking, 2010)',
+  },
+];
 
 const SLIDE_METADATA = [
   {
@@ -57,11 +138,36 @@ const SLIDE_METADATA = [
 export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
   onNavigateToGestor,
   onNavigateToTaller,
+  onLoadExampleInGestor,
+  showToast,
 }) => {
   const [activePart, setActivePart] = useState<'all' | 'who' | 'when' | 'what' | 'where'>('all');
   const [selectedNormStyle, setSelectedNormStyle] = useState<CitationStyle>('apa7');
   const [currentSlide, setCurrentSlide] = useState<number>(0);
   const [viewMode, setViewMode] = useState<'slides' | 'list'>('slides');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopy = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    setCopiedId(id);
+    if (showToast) showToast('Referencia copiada al portapapeles');
+    setTimeout(() => setCopiedId(null), 1800);
+  };
+
+  const filteredCatalog: OfficialDocumentExample[] = APA_DOCUMENT_EXAMPLES.filter((item) => {
+    if (categoryFilter === 'all') return true;
+    return item.formData.sourceType === categoryFilter;
+  });
 
   const totalSlides = SLIDE_METADATA.length;
 
@@ -1217,6 +1323,389 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
           </div>
         </section>
 
+        {/* SECCIÓN COMPLEMENTARIA 3: CITAS Y CASOS ESPECIALES DE CITACIÓN (APA 7.ª) */}
+        <section className="p-5 sm:p-6 rounded-xl bg-slate-50 border border-slate-200 space-y-6">
+          <div className="border-b border-slate-200 pb-4">
+            <div className="text-xs font-semibold text-violet-700 uppercase tracking-wider">
+              04. Profundización en Citas · Casos Especiales y Excepciones
+            </div>
+            <h4 className="text-lg sm:text-xl font-bold text-slate-900 mt-1">
+              3. Citas Textuales, Parafraseo, Desambiguación y Situaciones Especiales
+            </h4>
+            <p className="text-xs sm:text-sm text-slate-600 mt-1">
+              Ejemplos detallados del sistema Autor-Fecha para citas cortas, citas extensas en
+              bloque, obras con múltiples autores e igual año, las 9 situaciones especiales de
+              citación y los casos que no requieren referencia final.
+            </p>
+          </div>
+
+          {/* Ejemplos de Cita Corta, Cita Larga en Bloque y Desambiguación de Autores */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="p-4 sm:p-5 rounded-xl bg-white border border-slate-200 space-y-2.5">
+              <div className="text-xs font-bold text-violet-800 uppercase">
+                3.1.1 Cita Textual Corta (&lt; 40 palabras)
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Se integra en el párrafo y se pone entre <strong>comillas dobles</strong>, sin
+                cursiva. Se escribe punto al finalizar la oración que incluye la cita.
+              </p>
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 font-mono text-xs text-slate-800 space-y-1.5">
+                <div>
+                  <strong className="text-violet-900 font-sans">Narrativa:</strong> Según Kaplan y
+                  Szapu (2019), “Parece ser que cuando no se encuentran medios para tramitar el
+                  dolor social, las lesiones en la piel se convierten en una vía de escape” (p.
+                  111).
+                </div>
+                <div className="border-t border-slate-200 pt-1.5">
+                  <strong className="text-violet-900 font-sans">Parentética:</strong> “Parece ser
+                  que cuando no se encuentran medios para tramitar el dolor social, las lesiones en
+                  la piel se convierten en una vía de escape” (Kaplan y Szapu, 2019, p. 111).
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-5 rounded-xl bg-white border border-slate-200 space-y-2.5">
+              <div className="text-xs font-bold text-violet-800 uppercase">
+                3.1.2 Cita Textual Larga (Más de 40 palabras)
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Se escribe en párrafo aparte con <strong>sangría izquierda de 1.27 cm</strong> y
+                sin comillas. El <strong>punto se sitúa antes del paréntesis</strong>.
+              </p>
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 font-mono text-xs text-slate-800 space-y-1.5">
+                <div>Según Kaplan y Szapu (2019):</div>
+                <div className="pl-4 border-l-2 border-violet-400">
+                  Parece ser que cuando no se encuentran medios para tramitar el dolor social, las
+                  lesiones en la piel se convierten en una vía de escape. La sensación de alivio
+                  obtenida mediante los cortes parece reemplazar un dolor (social) por otro
+                  (físico), aunque sea por breves momentos. (p. 111)
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-5 rounded-xl bg-white border border-slate-200 space-y-2.5">
+              <div className="text-xs font-bold text-violet-800 uppercase">
+                3.3.3 Tres o más autores en fuentes diferentes con igual año
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Si el primer autor coincide en dos obras del mismo año con tres o más autores, se
+                cita hasta el apellido en que se diferencien antes de <code>et al.</code>:
+              </p>
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 font-mono text-xs text-slate-800 space-y-1.5">
+                <div>
+                  <span className="text-slate-500 font-sans">Obra 1:</span> Kapoor, Bloom,{' '}
+                  <strong className="text-violet-900">Montez</strong>, Warner y Hill (2017) →{' '}
+                  <span className="bg-violet-100/80 px-1 rounded font-semibold">
+                    Kapoor, Bloom, Montez et al. (2017)
+                  </span>
+                </div>
+                <div className="border-t border-slate-200 pt-1.5">
+                  <span className="text-slate-500 font-sans">Obra 2:</span> Kapoor, Bloom,{' '}
+                  <strong className="text-violet-900">Zucker</strong>, Tang et al. (2017) →{' '}
+                  <span className="bg-violet-100/80 px-1 rounded font-semibold">
+                    Kapoor, Bloom, Zucker et al. (2017)
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Las 9 Situaciones Especiales de Citación */}
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h5 className="text-base font-bold text-violet-950">
+                3.4 Otras Situaciones Especiales de Citación
+              </h5>
+              <span className="text-xs font-medium text-violet-800 bg-violet-100/70 px-2.5 py-1 rounded-lg border border-violet-200">
+                Casos soportados en el Gestor Cita Master
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {SPECIAL_CITATION_CASES.map((sc) => (
+                <div
+                  key={sc.number}
+                  className="p-4 rounded-xl bg-white border border-slate-200 hover:border-violet-300 transition-all flex flex-col justify-between space-y-3 shadow-2xs"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-violet-900 bg-violet-50 px-2 py-0.5 rounded border border-violet-200">
+                        {sc.number}
+                      </span>
+                    </div>
+                    <h6 className="text-sm font-bold text-slate-900">{sc.title}</h6>
+                    <p className="text-xs text-slate-600 leading-relaxed">{sc.rule}</p>
+                  </div>
+
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 font-mono text-[11px] text-slate-800 space-y-1">
+                    <div>
+                      <strong className="font-sans text-violet-800">Narrativa:</strong>{' '}
+                      {sc.exampleNar}
+                    </div>
+                    <div>
+                      <strong className="font-sans text-emerald-800">Parentética:</strong>{' '}
+                      {sc.examplePar}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 3.5 Citas que NO requieren referencia */}
+          <div className="p-5 rounded-xl bg-amber-50/80 border border-amber-200 space-y-3">
+            <div className="flex items-center gap-2 text-amber-950">
+              <AlertCircle className="w-5 h-5 text-amber-700 shrink-0" />
+              <h5 className="text-base font-bold">
+                3.5 Citas que NO Requieren Referencia en el Listado Final
+              </h5>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white p-4 rounded-xl border border-amber-200 space-y-2">
+                <div className="text-xs font-bold text-amber-900">
+                  3.5.1 Cita textual del discurso de participantes en la investigación propia
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Cuando se retoman fragmentos del discurso de participantes de una investigación
+                  propia, se sigue el formato general en el texto con un seudónimo para garantizar
+                  la confidencialidad, sin incluir la referencia al final.
+                </p>
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 font-mono text-xs text-slate-800">
+                  • Al respecto, “Juan” planteó que esta experiencia “fue incómoda, pues los
+                  facilitadores del trabajo no tuvieron en cuenta las expectativas de la
+                  comunidad”.
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl border border-amber-200 space-y-2">
+                <div className="text-xs font-bold text-amber-900">
+                  3.5.2 Cita de comunicación personal
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Incluye entrevistas personales, llamadas, mensajes, correos, seminarios no
+                  grabados, discursos en vivo, cartas y tradición oral o de los pueblos indígenas no
+                  documentada. Se indica inicial del nombre, apellido y fecha exacta:
+                </p>
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 font-mono text-xs text-slate-800">
+                  • M. González (comunicación personal, 17 de mayo, 2020)...
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* SECCIÓN COMPLEMENTARIA 4: REFERENCIAS Y CATÁLOGO INTERACTIVO DE EJEMPLOS */}
+        <section className="p-5 sm:p-6 rounded-xl bg-[#F0F7FF] border border-[#DCEBFE] space-y-6">
+          <div className="border-b border-blue-200 pb-4">
+            <div className="text-xs font-semibold text-violet-700 uppercase tracking-wider">
+              05. Reglas de Referenciación y Modelos por Categoría
+            </div>
+            <h4 className="text-lg sm:text-xl font-bold text-slate-900 mt-1">
+              4. Catálogo de Referencias: Variación por Número de Autores y Ejemplos Oficiales
+            </h4>
+            <p className="text-xs sm:text-sm text-slate-600 mt-1">
+              Diferencia entre referencias y bibliografía, variación según la cantidad de autores y
+              los 23 modelos oficiales de libros, capítulos, artículos, periódicos, informes,
+              simposios, tesis, medios audiovisuales, redes sociales y referencias legales.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <div className="lg:col-span-5 p-5 rounded-xl bg-white border border-blue-200 space-y-3">
+              <h5 className="text-sm sm:text-base font-bold text-violet-950">
+                ¿Cuál es la diferencia entre Referencias y Bibliografía?
+              </h5>
+              <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                En la lista de <strong>Referencias</strong>, el autor incluye{' '}
+                <strong>solo aquellas fuentes que utilizó y citó de forma explícita</strong> en su
+                trabajo, mientras que en la <strong>Bibliografía</strong> puede integrar también
+                obras que sirvieron de fundamento general pero que no se citaron en el desarrollo
+                del escrito.
+              </p>
+              <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-xs text-slate-700 space-y-1">
+                <div className="font-semibold text-violet-900">En el Estilo APA:</div>
+                <div>
+                  ✓ Todos los autores citados en el texto deben estar en la lista de Referencias.
+                </div>
+                <div>
+                  ✓ Todas las fuentes incluidas en las Referencias deben haber sido citadas en el
+                  texto.
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-7 p-5 rounded-xl bg-white border border-blue-200 space-y-3">
+              <h5 className="text-sm sm:text-base font-bold text-violet-950">
+                4.2 Variación en la Referencia de acuerdo con el Número de Autores
+              </h5>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left border border-slate-200 rounded-lg overflow-hidden">
+                  <thead className="bg-violet-900 text-white">
+                    <tr>
+                      <th className="p-2.5 font-semibold">Número de autores</th>
+                      <th className="p-2.5 font-semibold">Formato en la Lista de Referencias</th>
+                      <th className="p-2.5 font-semibold">Ejemplo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    <tr>
+                      <td className="p-2.5 font-semibold text-violet-950">Un autor</td>
+                      <td className="p-2.5 text-slate-600">
+                        Se incluye el apellido del autor, seguido de la inicial del nombre.
+                      </td>
+                      <td className="p-2.5 font-mono text-slate-800">López-Gómez, V.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2.5 font-semibold text-violet-950">Dos a veinte autores</td>
+                      <td className="p-2.5 text-slate-600">
+                        Se mencionan todos los apellidos e iniciales. El último se une con “y” en
+                        español o con “&amp;” en fuentes en inglés.
+                      </td>
+                      <td className="p-2.5 font-mono text-slate-800">
+                        González, J., González, A. y Ramos, F.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-2.5 font-semibold text-violet-950">
+                        Más de veinte autores
+                      </td>
+                      <td className="p-2.5 text-slate-600">
+                        Se incluyen los <strong>primeros 19 autores</strong>, luego tres puntos
+                        suspensivos (<code>...</code>) y el último autor.
+                      </td>
+                      <td className="p-2.5 font-mono text-slate-800">
+                        Autor 1, A., ... Autor 25, Z.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-2.5 font-semibold text-violet-950">Sin autor</td>
+                      <td className="p-2.5 text-slate-600">
+                        Se inicia directamente con el título de la obra.
+                      </td>
+                      <td className="p-2.5 font-mono text-slate-800">
+                        <i>Informe anual de educación.</i> (2020).
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Catálogo Filtrable de los 23 Ejemplos de Referencias */}
+          <div className="space-y-4 pt-1">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h5 className="text-base font-bold text-violet-950">
+                4.3 a 4.5 Ejemplos de las Principales Referencias (Carga en 1 clic al Gestor)
+              </h5>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { id: 'all', label: 'Todos (23)' },
+                  { id: 'book', label: 'Libros' },
+                  { id: 'chapter', label: 'Capítulos' },
+                  { id: 'article', label: 'Artículos (Journal)' },
+                  { id: 'newspaper', label: 'Periódicos' },
+                  { id: 'report', label: 'Informes' },
+                  { id: 'conference', label: 'Simposios' },
+                  { id: 'thesis', label: 'Tesis' },
+                  { id: 'website', label: 'Web WWW' },
+                  { id: 'audiovisual', label: 'Audiovisual / Podcast' },
+                  { id: 'social_media', label: 'Redes Sociales' },
+                  { id: 'legal', label: 'Legales (Leyes/Sentencias)' },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setCategoryFilter(f.id)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      categoryFilter === f.id
+                        ? 'bg-violet-800 text-white font-semibold'
+                        : 'bg-white text-slate-700 border border-slate-200 hover:border-violet-300'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredCatalog.map((item) => {
+                const fullForm: CitationFormData = {
+                  ...INITIAL_FORM_DATA,
+                  ...item.formData,
+                };
+                const output = generateCitationOutput(fullForm);
+                const isCopied = copiedId === item.id;
+
+                return (
+                  <article
+                    key={item.id}
+                    className="p-4 sm:p-5 rounded-xl bg-white border border-slate-200 hover:border-violet-300 shadow-2xs flex flex-col justify-between space-y-3 transition-all"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span className="font-semibold text-violet-900 bg-violet-50 px-2.5 py-0.5 rounded-md border border-violet-200">
+                          {item.categoryLabel}
+                        </span>
+                      </div>
+                      <h6 className="text-sm font-bold text-slate-900">{item.title}</h6>
+                      <p className="text-xs text-slate-600">{item.description}</p>
+
+                      <div
+                        className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 font-mono text-xs text-slate-900 hanging-indent leading-relaxed select-all"
+                        dangerouslySetInnerHTML={{ __html: output.referenceHtml }}
+                      />
+
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-mono text-slate-600 px-1">
+                        <span>
+                          <strong className="font-sans text-slate-700">Cita parentética:</strong>{' '}
+                          {output.parenthetical}
+                        </span>
+                        <span>·</span>
+                        <span>
+                          <strong className="font-sans text-slate-700">Narrativa:</strong>{' '}
+                          {output.narrative}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(output.referencePlain, item.id)}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1.5 transition-colors"
+                      >
+                        {isCopied ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                        <span>{isCopied ? 'Copiada' : 'Copiar referencia'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onLoadExampleInGestor) {
+                            onLoadExampleInGestor(item.formData, item.title);
+                          } else {
+                            onNavigateToGestor(item.formData.sourceType, 'apa7');
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-violet-700 hover:bg-violet-800 text-white flex items-center gap-1.5 transition-colors"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Cargar en el Gestor</span>
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
         {/* RECUADRO 5: FUENTES CONSULTADAS Y REFERENCIAS DE APOYO */}
         <section className="p-5 sm:p-6 rounded-xl bg-[#FAF5FF] border border-[#F3E8FF] space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1252,6 +1741,18 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
                 className="text-violet-700 hover:underline inline-flex items-center gap-1 break-all"
               >
                 https://es.slideshare.net/leonelacarmen/la-probidad-acadmica
+                <ExternalLink className="w-3 h-3 shrink-0" />
+              </a>
+            </div>
+            <div className="hanging-indent">
+              Centro de Escritura Javeriano. (2020). <i>Normas APA, séptima edición</i>. Pontificia Universidad Javeriana, seccional Cali.{' '}
+              <a
+                href="https://www2.javerianacali.edu.co/centro-escritura/recursos/manual-de-normas-apa-septima-edicion"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-violet-700 hover:underline inline-flex items-center gap-1 break-all"
+              >
+                https://www2.javerianacali.edu.co/centro-escritura/recursos/manual-de-normas-apa-septima-edicion
                 <ExternalLink className="w-3 h-3 shrink-0" />
               </a>
             </div>

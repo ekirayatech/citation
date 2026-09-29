@@ -100,7 +100,7 @@ export async function exportWorkshopToPDF(params: {
   const headerCenterX = logoData ? 120 : 105;
   doc.setFont('Helvetica', 'bold');
   doc.setFontSize(13);
-  doc.setTextColor(6, 78, 59);
+  doc.setTextColor(76, 29, 149);
   doc.text('COLEGIO EKIRAYÁ EDUCACIÓN MONTESSORI', headerCenterX, 17, {
     align: 'center',
   });
@@ -232,7 +232,7 @@ export async function exportWorkshopToPDF(params: {
   doc.setFontSize(11);
   doc.setTextColor(109, 40, 217);
   const quizHeaderLines = doc.splitTextToSize(
-    `2. Parte 2: Test de Conocimientos — Calificación: ${quizScore} / 5.0 (${correctCount} de 5 aciertos)`,
+    `2. Parte 2: Test de Conocimientos — Calificación: ${quizScore} / 5.0 (${correctCount} de ${quizItems.length} aciertos)`,
     170
   );
   doc.text(quizHeaderLines, 20, y);

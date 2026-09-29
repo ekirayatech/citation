@@ -178,6 +178,143 @@ const EXERCISES: ExerciseItem[] = [
       };
     },
   },
+  {
+    id: 'ex6',
+    question:
+      '6. Escribe la cita parentética desde la primera mención para un artículo publicado en 2019 por seis autores: Hoyos-Hernández, Sanabria, Orcasita, Valenzuela, González y Osorio.',
+    placeholder: 'Ej. (Hoyos-Hernández et al., 2019)',
+    expectedExample: '(Hoyos-Hernández et al., 2019)',
+    validate: (val) => {
+      const clean = val.trim();
+      if (!clean) {
+        return { isCorrect: false, feedback: 'Escribe la cita parentética abreviada.' };
+      }
+      const hasFirstAuthor = /hoyos-hern[aá]ndez/i.test(clean);
+      const hasEtAl = /et\s+al\./i.test(clean);
+      const hasYear = /2019/.test(clean);
+      const hasParens = clean.startsWith('(') && clean.endsWith(')');
+      if (hasParens && hasFirstAuthor && hasEtAl && hasYear) {
+        return {
+          isCorrect: true,
+          feedback:
+            'Correcto: Cuando una obra tiene tres o más autores, desde la primera vez se cita el apellido del primer autor seguido de "et al." y el año.',
+        };
+      }
+      return {
+        isCorrect: false,
+        feedback:
+          'Recuerda usar el primer autor seguido de "et al." (con punto) y el año entre paréntesis: (Hoyos-Hernández et al., 2019).',
+      };
+    },
+  },
+  {
+    id: 'ex7',
+    question:
+      '7. Escribe en un solo paréntesis las citas de dos trabajos: Gastesi y Salceda (2019) y Cardozo (2020), aplicando el orden alfabético y la puntuación oficial APA.',
+    placeholder: 'Ej. (Cardozo, 2020; Gastesi y Salceda, 2019)',
+    expectedExample: '(Cardozo, 2020; Gastesi y Salceda, 2019)',
+    validate: (val) => {
+      const clean = val.trim();
+      if (!clean) {
+        return { isCorrect: false, feedback: 'Escribe las dos citas dentro de un paréntesis.' };
+      }
+      const hasOrderAndSemicolon =
+        /\(\s*cardozo\s*,\s*2020\s*;\s*gastesi\s+(y|&)\s+salceda\s*,\s*2019\s*\)/i.test(
+          clean
+        );
+      if (hasOrderAndSemicolon) {
+        return {
+          isCorrect: true,
+          feedback:
+            'Muy bien: Al agrupar dos o más trabajos en un mismo paréntesis se ordenan alfabéticamente y se separan con punto y coma (;).',
+        };
+      }
+      return {
+        isCorrect: false,
+        feedback:
+          'Deben ir en orden alfabético (Cardozo antes que Gastesi) y separadas por punto y coma: (Cardozo, 2020; Gastesi y Salceda, 2019).',
+      };
+    },
+  },
+  {
+    id: 'ex8',
+    question:
+      '8. Escribe la cita parentética para una publicación del autor "Pulido" en la que no se indica el año ni la fecha de publicación.',
+    placeholder: 'Ej. (Pulido, s.f.)',
+    expectedExample: '(Pulido, s.f.)',
+    validate: (val) => {
+      const clean = val.trim();
+      if (!clean) {
+        return { isCorrect: false, feedback: 'Ingresa la cita para publicación sin fecha.' };
+      }
+      const isValid = /\(\s*pulido\s*,\s*s\.\s*f\.\s*\)/i.test(clean);
+      if (isValid) {
+        return {
+          isCorrect: true,
+          feedback:
+            'Exacto: Cuando no se indica el año de publicación, se utiliza la abreviatura "s.f." (sin fecha).',
+        };
+      }
+      return {
+        isCorrect: false,
+        feedback: 'Usa la abreviatura "s.f." después del apellido: (Pulido, s.f.).',
+      };
+    },
+  },
+  {
+    id: 'ex9',
+    question:
+      '9. Escribe la cita parentética para un fragmento textual de "Basu y Jones" del año 2007 tomado de una página web sin paginación, en el párrafo 4.',
+    placeholder: 'Ej. (Basu y Jones, 2007, párr. 4)',
+    expectedExample: '(Basu y Jones, 2007, párr. 4)',
+    validate: (val) => {
+      const clean = val.trim();
+      if (!clean) {
+        return { isCorrect: false, feedback: 'Escribe la cita con número de párrafo.' };
+      }
+      const isValid =
+        /\(\s*basu\s+(y|&)\s+jones\s*,\s*2007\s*,\s*p[aá]rr\.\s*4\s*\)/i.test(clean);
+      if (isValid) {
+        return {
+          isCorrect: true,
+          feedback:
+            'Correcto: En material digital sin paginación fija se indica el número de párrafo con la abreviatura "párr. 4".',
+        };
+      }
+      return {
+        isCorrect: false,
+        feedback:
+          'Verifica el uso de la abreviatura "párr. 4": (Basu y Jones, 2007, párr. 4).',
+      };
+    },
+  },
+  {
+    id: 'ex10',
+    question:
+      '10. Escribe el paréntesis de una "cita de una cita" cuando mencionas a Penrose en el texto, pero leíste su idea dentro de un libro de Hawking publicado en 2010.',
+    placeholder: 'Ej. (como se citó en Hawking, 2010)',
+    expectedExample: '(como se citó en Hawking, 2010)',
+    validate: (val) => {
+      const clean = val.trim();
+      if (!clean) {
+        return { isCorrect: false, feedback: 'Escribe la cita de fuente secundaria.' };
+      }
+      const isValid =
+        /como\s+se\s+cit[oó]\s+en\s+hawking\s*,\s*2010/i.test(clean);
+      if (isValid) {
+        return {
+          isCorrect: true,
+          feedback:
+            'Excelente: En la cita de una cita se emplea la fórmula "(como se citó en Hawking, 2010)" y en las referencias solo se incluye la fuente secundaria consultada (Hawking).',
+        };
+      }
+      return {
+        isCorrect: false,
+        feedback:
+          'Utiliza la expresión oficial: (como se citó en Hawking, 2010).',
+      };
+    },
+  },
 ];
 
 interface QuizQuestion {
@@ -222,7 +359,7 @@ const QUIZ_QUESTIONS: QuizQuestion[] = [
     ],
     correctValue: 'A',
     explanation:
-      'Toda cita textual directa exige indicar el número de página (p. o pp.) o número de párrafo (párr.) de donde se tomó el fragmento literal.',
+      'Toda cita textual directa exige indicar el número de página (p. o pp.), número de párrafo (párr.) o marca de tiempo de donde se tomó el fragmento literal.',
   },
   {
     id: 'quiz3',
@@ -234,13 +371,13 @@ const QUIZ_QUESTIONS: QuizQuestion[] = [
       {
         value: 'B',
         label:
-          'Sangría francesa (primera línea al margen izquierdo y líneas siguientes con sangría).',
+          'Sangría francesa de 1.27 cm (primera línea al margen izquierdo y líneas siguientes con sangría).',
       },
       { value: 'C', label: 'Alineación a la derecha con viñetas.' },
     ],
     correctValue: 'B',
     explanation:
-      'La sangría francesa permite identificar visualmente y con rapidez el apellido de cada autor en la lista ordenada alfabéticamente.',
+      'La sangría francesa de 1.27 cm permite identificar visualmente y con rapidez el apellido de cada autor en la lista ordenada alfabéticamente.',
   },
   {
     id: 'quiz4',
@@ -276,6 +413,136 @@ const QUIZ_QUESTIONS: QuizQuestion[] = [
     explanation:
       'Omitir el crédito a las fuentes originales constituye plagio y contradice la probidad académica del Colegio Ekirayá.',
   },
+  {
+    id: 'quiz6',
+    number: 6,
+    question:
+      '¿Cuáles son las medidas y ajustes obligatorios para el formato general de un documento en Normas APA 7.ª edición?',
+    options: [
+      {
+        value: 'A',
+        label:
+          'Márgenes de 2,54 cm en los cuatro lados, interlineado doble (2.0), alineación a la izquierda sin justificar y sangría de 1.27 cm en la primera línea de cada párrafo.',
+      },
+      {
+        value: 'B',
+        label:
+          'Márgenes de 3 cm a la izquierda, interlineado sencillo (1.0) y texto completamente justificado sin sangría.',
+      },
+      {
+        value: 'C',
+        label:
+          'Numeración de página en el centro inferior y títulos escritos completamente en mayúscula sostenida.',
+      },
+    ],
+    correctValue: 'A',
+    explanation:
+      'APA 7 establece papel tamaño carta, márgenes uniformes de 2,54 cm, interlineado 2.0, alineación a la izquierda sin justificar y sangría de primera línea de 1.27 cm.',
+  },
+  {
+    id: 'quiz7',
+    number: 7,
+    question:
+      'En una cita textual larga (de 40 o más palabras), ¿cuál de las siguientes reglas de formato y puntuación se aplica?',
+    options: [
+      {
+        value: 'A',
+        label:
+          'Se encierra entre comillas dobles dentro del mismo párrafo y va en letra cursiva.',
+      },
+      {
+        value: 'B',
+        label:
+          'Se escribe en un bloque o párrafo aparte con sangría izquierda de 1.27 cm, sin comillas, y el punto final se ubica antes del paréntesis.',
+      },
+      {
+        value: 'C',
+        label:
+          'Se centra en la página con interlineado sencillo y sin mencionar el número de página.',
+      },
+    ],
+    correctValue: 'B',
+    explanation:
+      'Las citas de 40 palabras o más van en párrafo aparte con sangría de 1.27 cm, sin comillas ni cursiva, y el punto va antes del paréntesis de la página.',
+  },
+  {
+    id: 'quiz8',
+    number: 8,
+    question:
+      'Respecto a la presentación de Tablas y Figuras en APA 7.ª edición, ¿cuál criterio es verdadero?',
+    options: [
+      {
+        value: 'A',
+        label:
+          'Las tablas llevan bordes verticales y horizontales gruesos en todas las celdas y el título se coloca debajo de la tabla.',
+      },
+      {
+        value: 'B',
+        label:
+          'Llevan etiqueta en negrita (Tabla 1 / Figura 1), título descriptivo en cursiva en la parte superior, solo líneas horizontales en las tablas y nota al pie con la fuente.',
+      },
+      {
+        value: 'C',
+        label:
+          'No es necesario mencionarlas en el texto ni atribuir su autoría si fueron tomadas de internet.',
+      },
+    ],
+    correctValue: 'B',
+    explanation:
+      'Tanto las tablas como las figuras se encabezan con su etiqueta en negrita y su título en cursiva; además, en las tablas solo se marcan las líneas horizontales.',
+  },
+  {
+    id: 'quiz9',
+    number: 9,
+    question:
+      '¿Qué sucede en la lista de Referencias con las comunicaciones personales (entrevistas no grabadas, correos, tradición oral) y con las obras de más de 20 autores?',
+    options: [
+      {
+        value: 'A',
+        label:
+          'Las comunicaciones personales solo se citan en el texto (no van en las Referencias); y en obras de más de 20 autores se listan los primeros 19, puntos suspensivos (...) y el último autor.',
+      },
+      {
+        value: 'B',
+        label:
+          'Las comunicaciones personales van primero en la lista de Referencias, y en obras de más de 20 autores solo se escribe el primer autor.',
+      },
+      {
+        value: 'C',
+        label:
+          'Ninguna de las dos se puede citar dentro del texto académico.',
+      },
+    ],
+    correctValue: 'A',
+    explanation:
+      'Al no ser recuperables por el lector, las comunicaciones personales solo se citan en el texto; mientras que las fuentes con más de 20 autores incluyen los primeros 19 seguidos de "..." y el autor final.',
+  },
+  {
+    id: 'quiz10',
+    number: 10,
+    question:
+      'De acuerdo con las adaptaciones oficiales de las Normas APA al español, ¿cómo se escriben los conectores, las fechas y los números ordinales de edición?',
+    options: [
+      {
+        value: 'A',
+        label:
+          'Se usa siempre "and", fechas en inglés (2020, May 7) y edición como (2nd ed.).',
+      },
+      {
+        value: 'B',
+        label:
+          'Se emplea la conjunción “y” para unir al último autor en obras en español, fechas como (2020, 23 de noviembre) con mes en minúscula y ordinales con punto antes de la letra volada (3.ª ed.).',
+      },
+      {
+        value: 'C',
+        label:
+          'Todas las palabras del título de un libro deben llevar mayúscula inicial.',
+      },
+    ],
+    correctValue: 'B',
+    explanation:
+      'En español se usa “y” entre autores, mayúscula únicamente al inicio del título y en nombres propios, meses en minúscula y punto antes de la letra volada en los ordinales (3.ª ed.).',
+  },
 ];
 
 export const TallerSection: React.FC<TallerSectionProps> = ({
@@ -287,23 +554,11 @@ export const TallerSection: React.FC<TallerSectionProps> = ({
   const [studentGrade, setStudentGrade] = useState('');
   const [nameError, setNameError] = useState(false);
 
-  const [exerciseAnswers, setExerciseAnswers] = useState<Record<string, string>>({
-    ex1: '',
-    ex2: '',
-    ex3: '',
-    ex4: '',
-    ex5: '',
-  });
+  const [exerciseAnswers, setExerciseAnswers] = useState<Record<string, string>>({});
 
   const [exerciseValidation, setExerciseValidation] = useState<
     Record<string, { isCorrect: boolean; feedback: string } | null>
-  >({
-    ex1: null,
-    ex2: null,
-    ex3: null,
-    ex4: null,
-    ex5: null,
-  });
+  >({});
 
   const [showSolution, setShowSolution] = useState<Record<string, boolean>>({});
 
@@ -319,7 +574,7 @@ export const TallerSection: React.FC<TallerSectionProps> = ({
       if (res.isCorrect) correctTotal++;
     });
     setExerciseValidation(results);
-    showToast(`Taller verificado: ${correctTotal} de 5 ejercicios correctos`);
+    showToast(`Taller verificado: ${correctTotal} de ${EXERCISES.length} ejercicios correctos`);
   };
 
   const calculateQuizStats = () => {
@@ -394,14 +649,14 @@ export const TallerSection: React.FC<TallerSectionProps> = ({
       <div className="border-b border-slate-200 pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="text-xs font-medium text-violet-700 mb-1">
-            Evaluación Práctica y Formativa
+            Evaluación Práctica y Formativa · Guía Teórica y Normas APA 2026
           </div>
           <h2 className="text-xl sm:text-2xl font-semibold text-slate-900">
             Taller Interactivo y Test de Conocimientos
           </h2>
           <p className="text-sm text-slate-600 mt-1">
-            Resuelve los ejercicios de aplicación, verifica tus respuestas con retroalimentación
-            inmediata y exporta tu reporte en PDF.
+            Resuelve los 10 ejercicios prácticos de citación y referenciación, responde las 10
+            preguntas del test con retroalimentación inmediata y exporta tu reporte en PDF.
           </p>
         </div>
         <button
@@ -483,7 +738,9 @@ export const TallerSection: React.FC<TallerSectionProps> = ({
       <section className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
           <div>
-            <div className="text-xs font-medium text-violet-700">Parte 1 · Práctica Escrita</div>
+            <div className="text-xs font-medium text-violet-700">
+              Parte 1 · Práctica Escrita ({EXERCISES.length} ejercicios)
+            </div>
             <h3 className="text-lg font-semibold text-slate-900">
               Ejercicios Interactivos de Aplicación
             </h3>
@@ -494,7 +751,7 @@ export const TallerSection: React.FC<TallerSectionProps> = ({
             className="px-4 py-2 bg-violet-50 hover:bg-violet-100 text-violet-900 border border-violet-200 text-xs sm:text-sm font-semibold rounded-xl transition-colors flex items-center gap-1.5 self-start sm:self-auto whitespace-nowrap"
           >
             <ClipboardCheck className="w-4 h-4 text-violet-700" />
-            Verificar Taller (5 ejercicios)
+            Verificar Taller ({EXERCISES.length} ejercicios)
           </button>
         </div>
 
@@ -590,7 +847,7 @@ export const TallerSection: React.FC<TallerSectionProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
           <div>
             <div className="text-xs font-medium text-violet-700">
-              Parte 2 · Selección Múltiple
+              Parte 2 · Selección Múltiple ({QUIZ_QUESTIONS.length} preguntas)
             </div>
             <h3 className="text-lg font-semibold text-slate-900">
               Test de Conocimientos (Escala 0.0 a 5.0)
@@ -633,7 +890,7 @@ export const TallerSection: React.FC<TallerSectionProps> = ({
                 ? 'Desempeño Alto · Buen manejo de conceptos'
                 : numericScore >= 3.0
                 ? 'Desempeño Básico · Aprobado'
-                : 'Por mejorar · Repasa la Guía Teórica e intenta de nuevo'}
+                : 'Por mejorar · Repasa la Guía Teórica y Normas APA 2026'}
             </div>
           </div>
         )}
