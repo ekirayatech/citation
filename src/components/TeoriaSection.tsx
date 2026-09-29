@@ -646,6 +646,96 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* COMPARADOR INTERACTIVO DE GUÍAS DE NORMAS ACADÉMICAS */}
+                <div className="bg-white p-5 rounded-xl border border-blue-200 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                    <div>
+                      <div className="text-xs font-medium text-violet-700">
+                        Estándares Internacionales en Cita Master
+                      </div>
+                      <h5 className="text-base sm:text-lg font-bold text-slate-900">
+                        Comparador de Guías de Normas Académicas
+                      </h5>
+                    </div>
+                    <div className="flex flex-wrap gap-1 p-1 bg-slate-100 rounded-lg">
+                      {(['apa7', 'mla9', 'chicago17', 'icontec'] as CitationStyle[]).map((st) => (
+                        <button
+                          key={st}
+                          type="button"
+                          onClick={() => setSelectedNormStyle(st)}
+                          className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${
+                            selectedNormStyle === st
+                              ? 'bg-white text-violet-900 shadow-sm'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          {st === 'apa7'
+                            ? 'APA 7.ª'
+                            : st === 'mla9'
+                            ? 'MLA 9.ª'
+                            : st === 'chicago17'
+                            ? 'Chicago 17.ª'
+                            : 'Icontec'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 sm:p-5 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h6 className="text-sm sm:text-base font-semibold text-slate-900">
+                          {currentNorm.name}
+                        </h6>
+                        <p className="text-xs text-violet-700 font-medium">
+                          Campo de aplicación: {currentNorm.discipline}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onNavigateToGestor('book', selectedNormStyle)}
+                        className="text-xs font-semibold text-violet-700 hover:text-violet-900 flex items-center gap-1 self-start sm:self-auto"
+                      >
+                        Usar {currentNorm.name} en el Gestor
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                      {currentNorm.description}
+                    </p>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-2">
+                        <div className="text-xs font-semibold text-slate-500">
+                          Ejemplo de Cita y Referencia en {currentNorm.name}:
+                        </div>
+                        <div className="text-xs font-mono text-emerald-800 bg-emerald-50/70 px-2.5 py-1.5 rounded border border-emerald-200/60">
+                          Cita: {currentNorm.inTextExample}
+                        </div>
+                        <div
+                          className="text-xs font-mono text-slate-800 bg-slate-50 p-3 rounded border border-slate-200 hanging-indent"
+                          dangerouslySetInnerHTML={{ __html: currentNorm.referenceExampleHtml }}
+                        />
+                      </div>
+
+                      <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-2">
+                        <div className="text-xs font-semibold text-slate-500">
+                          Criterios clave de formato:
+                        </div>
+                        <ul className="space-y-1.5">
+                          {currentNorm.keyRules.map((rule, idx) => (
+                            <li key={idx} className="text-xs text-slate-700 flex items-start gap-2">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-violet-600 shrink-0 mt-0.5" />
+                              <span>{rule}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </section>
             )}
 
@@ -1689,95 +1779,8 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
         </div>
       </div>
 
-      {/* COMPARADOR DE GUÍAS DE NORMAS INTERNACIONALES Y REFERENCIAS DE APOYO */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 md:p-8 space-y-8">
-        {/* COMPARADOR INTERACTIVO DE NORMAS INTERNACIONALES */}
-        <section className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
-            <div>
-              <div className="text-xs font-medium text-violet-700">
-                Estándares Internacionales en Cita Master
-              </div>
-              <h4 className="text-lg font-semibold text-slate-900">
-                Comparador de Guías de Normas Académicas
-              </h4>
-            </div>
-            <div className="flex flex-wrap gap-1 p-1 bg-slate-100 rounded-lg">
-              {(['apa7', 'mla9', 'chicago17', 'icontec'] as CitationStyle[]).map((st) => (
-                <button
-                  key={st}
-                  type="button"
-                  onClick={() => setSelectedNormStyle(st)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${
-                    selectedNormStyle === st
-                      ? 'bg-white text-violet-900 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {st === 'apa7'
-                    ? 'APA 7.ª'
-                    : st === 'mla9'
-                    ? 'MLA 9.ª'
-                    : st === 'chicago17'
-                    ? 'Chicago 17.ª'
-                    : 'Icontec'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-slate-50 rounded-xl border border-slate-200 p-5 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <h5 className="text-base font-semibold text-slate-900">{currentNorm.name}</h5>
-                <p className="text-xs text-violet-700 font-medium">
-                  Campo de aplicación: {currentNorm.discipline}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => onNavigateToGestor('book', selectedNormStyle)}
-                className="text-xs font-semibold text-violet-700 hover:text-violet-900 flex items-center gap-1 self-start sm:self-auto"
-              >
-                Usar {currentNorm.name} en el Gestor
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <p className="text-sm text-slate-700 leading-relaxed">{currentNorm.description}</p>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-2">
-                <div className="text-xs font-semibold text-slate-500">
-                  Ejemplo de Cita y Referencia en {currentNorm.name}:
-                </div>
-                <div className="text-xs font-mono text-emerald-800 bg-emerald-50/70 px-2.5 py-1.5 rounded border border-emerald-200/60">
-                  Cita: {currentNorm.inTextExample}
-                </div>
-                <div
-                  className="text-xs font-mono text-slate-800 bg-slate-50 p-3 rounded border border-slate-200 hanging-indent"
-                  dangerouslySetInnerHTML={{ __html: currentNorm.referenceExampleHtml }}
-                />
-              </div>
-
-              <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-2">
-                <div className="text-xs font-semibold text-slate-500">
-                  Criterios clave de formato:
-                </div>
-                <ul className="space-y-1.5">
-                  {currentNorm.keyRules.map((rule, idx) => (
-                    <li key={idx} className="text-xs text-slate-700 flex items-start gap-2">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-violet-600 shrink-0 mt-0.5" />
-                      <span>{rule}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* FUENTES CONSULTADAS Y REFERENCIAS DE APOYO INSTITUCIONAL */}
+      {/* FUENTES CONSULTADAS Y REFERENCIAS DE APOYO INSTITUCIONAL */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 md:p-8">
         <section className="p-5 sm:p-6 rounded-xl bg-[#FAF5FF] border border-[#F3E8FF] space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
