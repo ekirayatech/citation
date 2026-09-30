@@ -6,6 +6,7 @@ import {
   GraduationCap,
   CheckCircle2,
   FileCheck2,
+  FolderGit2,
 } from 'lucide-react';
 import {
   CitationFormData,
@@ -22,8 +23,9 @@ import { Apa2026Section } from './components/Apa2026Section';
 import { GestorSection } from './components/GestorSection';
 import { TallerSection } from './components/TallerSection';
 import { UniversitariosSection } from './components/UniversitariosSection';
+import { RepositorioSection } from './components/RepositorioSection';
 
-type ActiveTab = 'teoria' | 'apa2026' | 'taller' | 'gestor' | 'universitarios';
+type ActiveTab = 'teoria' | 'apa2026' | 'gestor' | 'repositorio' | 'universitarios' | 'taller';
 
 const STORAGE_KEY = 'ekiraya_citamaster_refs_v2';
 const LEGACY_STORAGE_KEY = 'ekiraya_manager_refs';
@@ -230,6 +232,19 @@ export default function App() {
 
             <button
               type="button"
+              onClick={() => handleSwitchTab('repositorio')}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center sm:justify-start gap-1.5 whitespace-nowrap ${
+                activeTab === 'repositorio'
+                  ? 'bg-white text-violet-950 font-semibold shadow-xs'
+                  : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
+              }`}
+            >
+              <FolderGit2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              <span className="truncate">Repositorio</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => handleSwitchTab('universitarios')}
               className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center sm:justify-start gap-1.5 whitespace-nowrap ${
                 activeTab === 'universitarios'
@@ -244,7 +259,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => handleSwitchTab('taller')}
-              className={`col-span-2 sm:col-span-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center sm:justify-start gap-1.5 whitespace-nowrap ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center sm:justify-start gap-1.5 whitespace-nowrap ${
                 activeTab === 'taller'
                   ? 'bg-white text-violet-950 font-semibold shadow-xs'
                   : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
@@ -296,6 +311,13 @@ export default function App() {
             onAddReference={handleAddReference}
             onRemoveReference={handleRemoveReference}
             onClearReferences={handleClearReferences}
+            showToast={showToast}
+          />
+        )}
+
+        {activeTab === 'repositorio' && (
+          <RepositorioSection
+            onCiteMonographInGestor={handleLoadExampleInGestor}
             showToast={showToast}
           />
         )}
