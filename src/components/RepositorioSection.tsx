@@ -30,6 +30,7 @@ import {
   LogOut,
   Building2,
   Clock,
+  Upload,
 } from 'lucide-react';
 import { CitationFormData } from '../types/citation';
 
@@ -44,6 +45,10 @@ export interface MonographDocument {
   academicUnit: string;
   format: 'PDF' | 'Google Doc' | 'DOCX' | 'Archivo';
   driveUrl: string;
+  isSample?: boolean;
+  abstractText?: string;
+  methodologyText?: string;
+  referencesSample?: string[];
   rawRow?: Record<string, string>;
 }
 
@@ -54,6 +59,8 @@ export interface AuthorizedSchoolUser {
   correo: string;
   perfil: string;
   isAdmin: boolean;
+  createdInApp?: boolean;
+  syncedToSheet?: boolean;
 }
 
 interface ColumnMapping {
@@ -75,11 +82,27 @@ interface RepositorioSectionProps {
 const DRIVE_ROOT_FOLDER_ID = '1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC';
 const DRIVE_ROOT_FOLDER_URL = `https://drive.google.com/drive/folders/${DRIVE_ROOT_FOLDER_ID}`;
 
-const STORAGE_REPO_CONFIG_KEY = 'ekiraya_repo_unidades_academicas_v5';
-const STORAGE_AUTH_USER_KEY = 'ekiraya_repo_authorized_user_v5';
+const STORAGE_REPO_CONFIG_KEY = 'ekiraya_repo_unidades_academicas_v6';
+const LEGACY_CONFIG_KEYS = [
+  'ekiraya_repo_unidades_academicas_v6',
+  'ekiraya_repo_unidades_academicas_v5',
+  'ekiraya_repo_unidades_academicas_v4',
+  'ekiraya_repo_unidades_academicas_v3',
+  'ekiraya_repo_unidades_academicas_v2',
+  'ekiraya_repo_sync_config_v1',
+];
+
+const STORAGE_AUTH_USER_KEY = 'ekiraya_repo_authorized_user_v6';
+const LEGACY_AUTH_KEYS = [
+  'ekiraya_repo_authorized_user_v6',
+  'ekiraya_repo_authorized_user_v5',
+  'ekiraya_repo_authorized_user_v4',
+  'ekiraya_repo_authorized_user_v3',
+];
+
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
-// Administrador inicial para que puedas entrar al Panel Administrativo antes de conectar la hoja
+// Administrador inicial garantizado
 const DEFAULT_AUTHORIZED_USERS: AuthorizedSchoolUser[] = [
   {
     curso: 'Administración',
@@ -88,6 +111,79 @@ const DEFAULT_AUTHORIZED_USERS: AuthorizedSchoolUser[] = [
     correo: 'mebolanos@cem.edu.co',
     perfil: 'Administrador',
     isAdmin: true,
+    createdInApp: false,
+    syncedToSheet: true,
+  },
+];
+
+// 3 Monografías de Muestra con Vista Previa Académica Completa
+const SAMPLE_THREE_MONOGRAPHS: MonographDocument[] = [
+  {
+    id: 'sample-mono-1',
+    driveFileId: '',
+    fileName: 'Monografia_Bioindicadores_Humedales_Sabana_2026.pdf',
+    title:
+      'Evaluación de macroinvertebrados bentónicos como bioindicadores de calidad del agua en humedales altoandinos de la Sabana',
+    author: 'Mendoza Restrepo, Sofía',
+    academicYear: '2025-2026',
+    subject: 'Biología y Ecología',
+    academicUnit: 'Ciencias Naturales y Educación Ambiental',
+    format: 'PDF',
+    driveUrl: DRIVE_ROOT_FOLDER_URL,
+    isSample: true,
+    abstractText:
+      'Esta monografía de Grado 11° analiza la diversidad de familias de macroinvertebrados bentónicos en tres microcuencas altoandinas mediante el índice BMWP/Col, correlacionando los parámetros fisicoquímicos (oxígeno disuelto, pH y conductividad) con el estado de conservación ecológica.',
+    methodologyText:
+      'Muestreo cuantitativo con red Surber en temporadas seca y de lluvias, identificación taxonómica en estereoscopio e integración estadística del índice de Shannon-Wiener.',
+    referencesSample: [
+      'Roldán Pérez, G. (2016). Los macroinvertebrados como bioindicadores de la calidad del agua: cuatro décadas de desarrollo en Colombia y Latinoamérica. Revista de la Academia Colombiana de Ciencias Exactas, Físicas y Naturales, 40(155), 254–274.',
+      'Instituto de Investigación de Recursos Biológicos Alexander von Humboldt. (2024). Guía de ecosistemas acuáticos altoandinos de Cundinamarca.',
+    ],
+  },
+  {
+    id: 'sample-mono-2',
+    driveFileId: '',
+    fileName: 'Monografia_Memoria_Historica_Literatura_Colombiana_2026.pdf',
+    title:
+      'Narrativas de la memoria y reconstrucción del tejido social en la novela colombiana contemporánea',
+    author: 'Castellanos Uribe, Mateo',
+    academicYear: '2025-2026',
+    subject: 'Literatura y Lengua Castellana',
+    academicUnit: 'Humanidades y Lenguas',
+    academicYearCol: '2025-2026',
+    format: 'PDF',
+    driveUrl: DRIVE_ROOT_FOLDER_URL,
+    isSample: true,
+    abstractText:
+      'Investigación monográfica centrada en las estrategias simbólicas y polifónicas con las que la narrativa colombiana del siglo XXI representa el duelo colectivo, la memoria territorial y la resiliencia de las comunidades rurales.',
+    methodologyText:
+      'Análisis hermenéutico y comparativo de corpus literario contemporáneo mediante matrices de categorías narratológicas (espacio simbólico, voz testimonial y memoria intergeneracional).',
+    referencesSample: [
+      'Jelin, E. (2017). La lucha por el pasado: Cómo construimos la memoria social. Siglo XXI Editores.',
+      'Vásquez, J. G. (2021). Volver la vista atrás. Alfaguara.',
+    ],
+  } as MonographDocument,
+  {
+    id: 'sample-mono-3',
+    driveFileId: '',
+    fileName: 'Monografia_Modelado_Matematico_Energia_Solar_2026.pdf',
+    title:
+      'Modelado matemático de la eficiencia energética de paneles fotovoltaicos en entornos escolares de montaña',
+    author: 'Quintero Lozano, Samuel',
+    academicYear: '2025-2026',
+    subject: 'Física y Matemáticas',
+    academicUnit: 'Matemáticas, Física y Tecnología',
+    format: 'PDF',
+    driveUrl: DRIVE_ROOT_FOLDER_URL,
+    isSample: true,
+    abstractText:
+      'Desarrollo de un modelo matemático multivariable para estimar la potencia eléctrica efectiva generada por arreglos fotovoltaicos bajo condiciones de nubosidad variable y radiación difusa propias de la cordillera Oriental.',
+    methodologyText:
+      'Registro experimental de irradiancia solar y temperatura superficial cada 15 minutos durante 8 semanas, ajuste por regresión no lineal y validación frente al consumo energético escolar.',
+    referencesSample: [
+      'Duffie, J. A., & Beckman, W. A. (2020). Solar engineering of thermal processes, photovoltaics and wind (5.ª ed.). Wiley.',
+      'Unidad de Planeación Minero Energética. (2024). Atlas de radiación solar de Colombia.',
+    ],
   },
 ];
 
@@ -97,12 +193,12 @@ export const APPS_SCRIPT_CODE = `/**
  * Carpeta "Unidades académicas": 1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC
  *
  * Funcionalidades:
- * 1) Lee y sincroniza la carpeta 1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC en la pestaña "Repositorio"
- *    SIN sobrescribir los cambios manuales que hagas en Google Sheets.
+ * 1) Sincroniza la carpeta 1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC en la pestaña "Repositorio"
+ *    respetando cualquier cambio manual que hagas en Google Sheets.
  * 2) Programa un activador (Trigger) automático cada 24 horas.
- * 3) Permite crear usuarios desde Cita Master directamente en la pestaña "usuarios"
- *    (Curso | Sección | Nombre y Apellido | Correo institucional | Perfil).
- * 4) Entrega en tiempo real cualquier cambio manual hecho en Google Sheets.
+ * 3) Recibe usuarios creados desde Cita Master (vía GET o POST) y los escribe en la pestaña "usuarios"
+ *    (compatible con Curso | Sección | Nombre y Apellido | Correo institucional | Perfil
+ *     y con Nombres | Curso | Correo | Sección).
  */
 
 const ROOT_FOLDER_ID = '1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC';
@@ -119,9 +215,6 @@ function onOpen() {
     .addToUi();
 }
 
-/**
- * Configura el activador automático en Google Apps Script para que se ejecute cada 24 horas
- */
 function configurarTrigger24Horas() {
   const triggers = ScriptApp.getProjectTriggers();
   for (let i = 0; i < triggers.length; i++) {
@@ -135,16 +228,39 @@ function configurarTrigger24Horas() {
     .create();
 }
 
-/**
- * Obtiene o crea la pestaña "usuarios" con las columnas exactas:
- * Curso | Sección | Nombre y Apellido | Correo institucional | Perfil
- */
 function obtenerOCrearHojaUsuarios() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let userSheet =
-    ss.getSheetByName(USERS_SHEET_NAME) ||
-    ss.getSheetByName('Usuarios') ||
-    ss.getSheetByName('USUARIOS');
+  const all = ss.getSheets();
+  let userSheet = null;
+
+  for (let i = 0; i < all.length; i++) {
+    const cleanName = all[i].getName().trim().toLowerCase();
+    if (cleanName === 'usuarios' || cleanName === 'usuario') {
+      userSheet = all[i];
+      break;
+    }
+  }
+
+  if (!userSheet) {
+    for (let i = 0; i < all.length; i++) {
+      if (all[i].getLastRow() > 0) {
+        const row1 = all[i]
+          .getRange(1, 1, 1, Math.max(1, all[i].getLastColumn()))
+          .getDisplayValues()[0]
+          .join(' ')
+          .toLowerCase();
+        if (
+          row1.includes('correo') ||
+          row1.includes('email') ||
+          (row1.includes('curso') && row1.includes('sección')) ||
+          (row1.includes('curso') && row1.includes('seccion'))
+        ) {
+          userSheet = all[i];
+          break;
+        }
+      }
+    }
+  }
 
   const expectedUserHeaders = [
     'Curso',
@@ -153,20 +269,6 @@ function obtenerOCrearHojaUsuarios() {
     'Correo institucional',
     'Perfil'
   ];
-
-  // Buscar si alguna hoja existente ya tiene estas columnas
-  if (!userSheet) {
-    const all = ss.getSheets();
-    for (let i = 0; i < all.length; i++) {
-      if (all[i].getLastRow() > 0) {
-        const row1 = all[i].getRange(1, 1, 1, Math.max(1, all[i].getLastColumn())).getDisplayValues()[0].join(' ').toLowerCase();
-        if (row1.includes('correo institucional') || row1.includes('nombre y apellido')) {
-          userSheet = all[i];
-          break;
-        }
-      }
-    }
-  }
 
   if (!userSheet) {
     userSheet = ss.insertSheet(USERS_SHEET_NAME);
@@ -191,47 +293,40 @@ function inicializarHojaUsuarios() {
   obtenerOCrearHojaUsuarios();
 }
 
-/**
- * Agrega o actualiza un usuario en la hoja "usuarios" cuando se crea desde Cita Master
- */
 function agregarUsuarioEnSheet(params) {
   const userSheet = obtenerOCrearHojaUsuarios();
   const data = userSheet.getDataRange().getDisplayValues();
   const headers = data[0].map(function(h) { return String(h).trim(); });
 
-  const correoNuevo = String(params.correo || '').trim().toLowerCase();
+  const correoNuevo = String(params.correo || params.email || '').trim().toLowerCase();
   if (!correoNuevo) return;
 
-  let correoColIdx = headers.findIndex(function(h) { return /correo|email|mail/i.test(h); });
+  let correoColIdx = headers.findIndex(function(h) { return /correo|email|mail|cuenta/i.test(h); });
   if (correoColIdx < 0) correoColIdx = 3;
 
-  // Construir fila según el orden real de los títulos de columna en la hoja usuarios
   const nuevaFila = headers.map(function(h) {
     const k = h.toLowerCase();
-    if (k.includes('curso') || k.includes('grado')) return params.curso || '';
-    if (k.includes('sección') || k.includes('seccion')) return params.seccion || '';
-    if (k.includes('nombre')) return params.nombres || '';
-    if (k.includes('correo') || k.includes('email')) return correoNuevo;
-    if (k.includes('perfil') || k.includes('rol')) return params.perfil || 'Estudiante';
+    if (k.includes('curso') || k.includes('grado')) return params.curso || 'General';
+    if (k.includes('sección') || k.includes('seccion')) return params.seccion || 'General';
+    if (k.includes('nombre')) return params.nombres || params.nombre || '';
+    if (k.includes('correo') || k.includes('email') || k.includes('mail')) return correoNuevo;
+    if (k.includes('perfil') || k.includes('rol') || k.includes('admin')) return params.perfil || 'Estudiante';
     return '';
   });
 
-  // Si el correo ya existe en alguna fila, actualiza esa fila; si no, inserta una nueva
   for (let r = 1; r < data.length; r++) {
     const correoExistente = String(data[r][correoColIdx] || '').trim().toLowerCase();
     if (correoExistente === correoNuevo) {
       userSheet.getRange(r + 1, 1, 1, nuevaFila.length).setValues([nuevaFila]);
+      SpreadsheetApp.flush();
       return;
     }
   }
 
   userSheet.appendRow(nuevaFila);
+  SpreadsheetApp.flush();
 }
 
-/**
- * Recorre recursivamente la carpeta 1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC ("Unidades académicas").
- * Respeta todos los cambios manuales hechos en Google Sheets (solo agrega archivos nuevos que no estén por ID/URL).
- */
 function sincronizarUnidadesAcademicas() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(REPO_SHEET_NAME);
@@ -276,6 +371,7 @@ function sincronizarUnidadesAcademicas() {
   const rootFolder = DriveApp.getFolderById(ROOT_FOLDER_ID);
   recorrerCarpetasDrive(rootFolder, [], sheet, repoHeaders, existingKeys);
   obtenerOCrearHojaUsuarios();
+  SpreadsheetApp.flush();
 }
 
 function recorrerCarpetasDrive(folder, pathParts, sheet, headers, existingKeys) {
@@ -286,7 +382,6 @@ function recorrerCarpetasDrive(folder, pathParts, sheet, headers, existingKeys) 
     const fileUrl = file.getUrl();
     const fileName = file.getName();
 
-    // Si ya existe en Google Sheets, NO lo sobrescribe para conservar cambios manuales
     if (existingKeys.has(fileId) || existingKeys.has(fileUrl) || existingKeys.has(fileName)) continue;
 
     const cleanTitle = fileName
@@ -354,14 +449,7 @@ function leerHojaPorTitulos(sheet) {
   return { headers: rawHeaders, rows: rows };
 }
 
-/**
- * Endpoint Web App (GET/POST):
- * - Si recibe action=addUser, guarda el usuario en la pestaña "usuarios" de Google Sheets.
- * - Si recibe action=syncDrive (o si la hoja Repositorio está vacía), sincroniza la carpeta 1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC.
- * - Devuelve las filas actuales de "Repositorio" y "usuarios" respetando cualquier edición manual en Sheets.
- */
-function doGet(e) {
-  const params = (e && e.parameter) ? e.parameter : {};
+function procesarSolicitud(params) {
   const tokenParam = params.token || '';
   if (INSTITUTIONAL_TOKEN && tokenParam && tokenParam !== INSTITUTIONAL_TOKEN) {
     return ContentService.createTextOutput(JSON.stringify({ error: 'Token no válido' }))
@@ -373,6 +461,7 @@ function doGet(e) {
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let usersSheet = obtenerOCrearHojaUsuarios();
   let repoSheet = ss.getSheetByName(REPO_SHEET_NAME);
 
   if (params.action === 'syncDrive' || !repoSheet || repoSheet.getLastRow() <= 1) {
@@ -385,8 +474,6 @@ function doGet(e) {
   }
 
   const allSheets = ss.getSheets();
-  let usersSheet = obtenerOCrearHojaUsuarios();
-
   if (!repoSheet) {
     for (let i = 0; i < allSheets.length; i++) {
       const sh = allSheets[i];
@@ -410,19 +497,43 @@ function doGet(e) {
   })).setMimeType(ContentService.MimeType.JSON);
 }
 
+function doGet(e) {
+  const params = (e && e.parameter) ? e.parameter : {};
+  return procesarSolicitud(params);
+}
+
 function doPost(e) {
-  return doGet(e);
+  let params = (e && e.parameter) ? e.parameter : {};
+  try {
+    if (e && e.postData && e.postData.contents) {
+      const bodyParams = JSON.parse(e.postData.contents);
+      params = Object.assign({}, params, bodyParams);
+    }
+  } catch (err) {
+    // Usar params de query
+  }
+  return procesarSolicitud(params);
 }`;
 
 /** Normaliza encabezados de columna para compararlos sin importar tildes ni mayúsculas */
 function normalizeHeaderKey(str: string): string {
-  return str
+  return String(str || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[_-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function isHtmlString(text: string): boolean {
+  const trimmed = String(text || '').trim().slice(0, 300).toLowerCase();
+  return (
+    trimmed.startsWith('<!doctype html') ||
+    trimmed.startsWith('<html') ||
+    trimmed.includes('<head>') ||
+    trimmed.includes('accounts.google.com')
+  );
 }
 
 /** Extrae el ID real del archivo de Google Drive desde cualquier formato de URL o celda */
@@ -471,8 +582,16 @@ function buildSingleDocPreviewUrl(driveFileId: string, driveUrl: string): string
   return null;
 }
 
-/** Parsea CSV de Google Sheets convirtiendo la fila 1 en títulos de columna */
+/** Parsea CSV o TSV (copiado directo de Google Sheets) convirtiendo la fila 1 en títulos de columna */
 function parseCsvToRows(csvText: string): { headers: string[]; rows: Record<string, string>[] } {
+  if (!csvText || isHtmlString(csvText)) {
+    return { headers: [], rows: [] };
+  }
+
+  // Si el usuario pegó celdas directamente desde Google Sheets (separadas por tabulador \t), detectar el delimitador
+  const firstLine = csvText.split(/\r?\n/)[0] || '';
+  const delimiter = firstLine.includes('\t') && !firstLine.includes(',') ? '\t' : ',';
+
   const lines: string[][] = [];
   let currentRow: string[] = [];
   let currentVal = '';
@@ -494,7 +613,7 @@ function parseCsvToRows(csvText: string): { headers: string[]; rows: Record<stri
     } else {
       if (ch === '"') {
         inQuotes = true;
-      } else if (ch === ',') {
+      } else if (ch === delimiter) {
         currentRow.push(currentVal.trim());
         currentVal = '';
       } else if (ch === '\n' || (ch === '\r' && next === '\n')) {
@@ -535,13 +654,60 @@ function parseCsvToRows(csvText: string): { headers: string[]; rows: Record<stri
   return { headers, rows };
 }
 
-/** Detecta si un conjunto de encabezados corresponde a la hoja "usuarios" (Curso, Sección, Nombre y Apellido, Correo institucional, Perfil) */
-function isUsersSheetHeaders(headers: string[]): boolean {
+/** Detecta si un conjunto de encabezados/filas corresponde a la hoja "usuarios" */
+function isUsersSheetData(headers: string[], rows: Record<string, string>[] = []): boolean {
+  if (!headers || headers.length === 0) return false;
+  if (headers.some((h) => isHtmlString(h))) return false;
+
+  const normHeaders = headers.map((h) => normalizeHeaderKey(h));
+  const joined = normHeaders.join(' | ');
+
+  if (
+    joined.includes('monografia') ||
+    joined.includes('nombre del archivo') ||
+    joined.includes('unidad academica') ||
+    joined.includes('asignatura') ||
+    joined.includes('ano lectivo')
+  ) {
+    return false;
+  }
+
+  const hasEmailCol = normHeaders.some((h) => /correo|email|e mail|mail|cuenta/.test(h));
+  const hasUserMetaCol = normHeaders.some((h) =>
+    /curso|seccion|perfil|rol|grado|estamento/.test(h)
+  );
+
+  if (hasEmailCol || (hasUserMetaCol && normHeaders.some((h) => /nombre/.test(h)))) {
+    return true;
+  }
+
+  if (rows.length > 0) {
+    const firstRowStr = Object.values(rows[0] || {}).join(' ');
+    if (firstRowStr.includes('@') && !firstRowStr.includes('drive.google.com')) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/** Detecta si un conjunto de encabezados/filas corresponde a la hoja de Monografías */
+function isMonographsSheetData(headers: string[], rows: Record<string, string>[] = []): boolean {
+  if (!headers || headers.length === 0) return false;
+  if (headers.some((h) => isHtmlString(h))) return false;
+  if (isUsersSheetData(headers, rows)) return false;
+
   const joined = headers.map((h) => normalizeHeaderKey(h)).join(' | ');
   return (
-    joined.includes('correo institucional') ||
-    joined.includes('nombre y apellido') ||
-    (joined.includes('curso') && joined.includes('seccion') && joined.includes('perfil'))
+    joined.includes('monografia') ||
+    joined.includes('titulo') ||
+    joined.includes('archivo') ||
+    joined.includes('asignatura') ||
+    joined.includes('unidad') ||
+    joined.includes('autor') ||
+    joined.includes('ano') ||
+    joined.includes('drive') ||
+    joined.includes('enlace')
   );
 }
 
@@ -561,7 +727,14 @@ function autoDetectColumnMapping(headers: string[]): ColumnMapping {
 
   return {
     fileNameCol: findCol(
-      [/^nombre del archivo$/, /nombre.*archivo/, /^archivo$/, /^file\s*name$/, /^documento$/],
+      [
+        /^nombre del archivo$/,
+        /nombre.*archivo/,
+        /^archivo$/,
+        /^file\s*name$/,
+        /^documento$/,
+        /archivo/,
+      ],
       [/^id/, /url/, /enlace/, /link/]
     ),
     titleCol: findCol(
@@ -572,6 +745,8 @@ function autoDetectColumnMapping(headers: string[]): ColumnMapping {
         /^monografia$/,
         /nombre.*monografia/,
         /nombre.*trabajo/,
+        /proyecto/,
+        /investigacion/,
         /tema/,
       ],
       [/^archivo$/]
@@ -618,14 +793,14 @@ function autoDetectColumnMapping(headers: string[]): ColumnMapping {
       /^link$/,
       /vista.*previa/,
       /hipervinculo/,
+      /drive/,
     ]),
     driveIdCol: findCol([/^id del archivo$/, /id.*archivo/, /drive.*id/, /^file.*id$/, /^id$/]),
   };
 }
 
 /**
- * Convierte las filas de la hoja "usuarios" con las columnas:
- * Curso | Sección | Nombre y Apellido | Correo institucional | Perfil
+ * Convierte las filas de la hoja "usuarios" (soporta tanto 5 columnas como 4 columnas: nombres, curso, correo, sección)
  */
 function parseUsersSheetRows(
   rows: Record<string, string>[],
@@ -641,13 +816,14 @@ function parseUsersSheetRows(
     return '';
   };
 
-  const cursoCol = findHeader([/^curso$/, /^grado$/, /nivel/]);
-  const seccionCol = findHeader([/^seccion$/, /dependencia/, /area/]);
+  const cursoCol = findHeader([/^curso$/, /^grado$/, /curso/, /grado/, /nivel/]);
+  const seccionCol = findHeader([/^seccion$/, /seccion/, /dependencia/, /area/]);
   const nombresCol = findHeader([
     /^nombre y apellido$/,
     /nombre.*apellido/,
     /^nombres?$/,
     /nombre.*completo/,
+    /nombre/,
     /usuario/,
     /estudiante/,
   ]);
@@ -655,12 +831,22 @@ function parseUsersSheetRows(
     /^correo institucional$/,
     /correo.*institucional/,
     /^correo$/,
+    /correo/,
     /email/,
     /e mail/,
     /mail/,
     /cuenta/,
   ]);
-  const perfilCol = findHeader([/^perfil$/, /^rol$/, /^administrador$/, /^admin$/, /estamento/]);
+  const perfilCol = findHeader([
+    /^perfil$/,
+    /perfil/,
+    /^rol$/,
+    /rol/,
+    /^administrador$/,
+    /^admin$/,
+    /estamento/,
+    /cargo/,
+  ]);
 
   const parsedUsers: AuthorizedSchoolUser[] = [];
 
@@ -671,38 +857,81 @@ function parseUsersSheetRows(
       if (emailCell) correo = String(emailCell);
     }
     correo = correo.trim().toLowerCase();
-    if (!correo || !correo.includes('@')) continue;
+    if (!correo) continue;
 
     const nombres =
       (nombresCol && row[nombresCol]) ||
-      correo.split('@')[0].replace(/[._-]/g, ' ');
-    const curso = (cursoCol && row[cursoCol]) || 'General';
-    const seccion = (seccionCol && row[seccionCol]) || 'General';
-    const perfil = (perfilCol && row[perfilCol]) || 'Estudiante';
+      correo
+        .split('@')[0]
+        .replace(/[._-]+/g, ' ')
+        .replace(/\b\w/g, (l) => l.toUpperCase());
+
+    const curso = ((cursoCol && row[cursoCol]) || 'General').trim();
+    const seccion = ((seccionCol && row[seccionCol]) || 'General').trim();
+    let perfil = ((perfilCol && row[perfilCol]) || '').trim();
 
     const combinedRoleText = `${perfil} ${seccion} ${curso}`.toLowerCase();
+
+    if (!perfil) {
+      if (/admin|administrador|coordinador|directivo|rector|sistemas/i.test(combinedRoleText)) {
+        perfil = 'Administrador';
+      } else if (/docente|profesor|maestro|guia|guía/i.test(combinedRoleText)) {
+        perfil = 'Docente';
+      } else if (/no clases|administrativo|apoyo|servicios|planta/i.test(combinedRoleText)) {
+        perfil = 'Personal no clases';
+      } else {
+        perfil = 'Estudiante';
+      }
+    }
+
     const isAdmin =
       correo === 'mebolanos@cem.edu.co' ||
-      /admin|administrador|coordinador|directivo|sistemas|^si$|^sí$|^true$|^1$/i.test(
-        perfil.trim()
-      ) ||
+      /admin|administrador|coordinador|directivo|sistemas|^si$|^sí$|^true$|^1$/i.test(perfil) ||
       /admin|administrador/i.test(combinedRoleText);
 
     parsedUsers.push({
-      curso: curso.trim(),
-      seccion: seccion.trim(),
+      curso,
+      seccion,
       nombres: nombres.trim(),
       correo,
-      perfil: perfil.trim(),
+      perfil,
       isAdmin,
+      createdInApp: false,
+      syncedToSheet: true,
     });
   }
 
   if (!parsedUsers.some((u) => u.correo === 'mebolanos@cem.edu.co')) {
-    parsedUsers.push(DEFAULT_AUTHORIZED_USERS[0]);
+    parsedUsers.unshift(DEFAULT_AUTHORIZED_USERS[0]);
   }
 
   return parsedUsers;
+}
+
+/** Une la lista de usuarios leída de Google Sheets con los usuarios creados desde Cita Master */
+function mergeUsersLists(
+  sheetUsers: AuthorizedSchoolUser[],
+  existingAppUsers: AuthorizedSchoolUser[]
+): AuthorizedSchoolUser[] {
+  const map = new Map<string, AuthorizedSchoolUser>();
+  map.set('mebolanos@cem.edu.co', DEFAULT_AUTHORIZED_USERS[0]);
+
+  for (const u of existingAppUsers || []) {
+    if (u && u.correo) {
+      map.set(u.correo.trim().toLowerCase(), u);
+    }
+  }
+  for (const u of sheetUsers || []) {
+    if (u && u.correo) {
+      map.set(u.correo.trim().toLowerCase(), {
+        ...u,
+        correo: u.correo.trim().toLowerCase(),
+        createdInApp: false,
+        syncedToSheet: true,
+      });
+    }
+  }
+  return Array.from(map.values());
 }
 
 /** Convierte las filas reales de la hoja del Repositorio en documentos incluyendo Unidad académica */
@@ -711,6 +940,10 @@ function mapSheetRowsToMonographs(
   mapping: ColumnMapping,
   headers: string[]
 ): MonographDocument[] {
+  if (!rawRows || rawRows.length === 0 || isUsersSheetData(headers, rawRows)) {
+    return [];
+  }
+
   return rawRows
     .map((row, idx) => {
       let rawUrl = (mapping.driveUrlCol && row[mapping.driveUrlCol]) || '';
@@ -743,14 +976,31 @@ function mapSheetRowsToMonographs(
         authorVal = [f, l].filter(Boolean).join(' ');
       }
 
-      const fileNameVal =
+      let fileNameVal =
         (mapping.fileNameCol && row[mapping.fileNameCol]) ||
         (mapping.titleCol && row[mapping.titleCol]) ||
         '';
 
-      const titleVal =
+      let titleVal =
         (mapping.titleCol && row[mapping.titleCol]) ||
         fileNameVal.replace(/\.(pdf|docx|doc)$/i, '').replace(/[_-]+/g, ' ');
+
+      // Fallback inteligente si los títulos de columna personalizados no coincidieron con el mapeo inicial
+      if (!titleVal && !fileNameVal) {
+        const candidateValues = headers
+          .map((h) => String(row[h] || '').trim())
+          .filter(
+            (v) =>
+              v.length > 3 &&
+              !v.startsWith('http') &&
+              !v.includes('@') &&
+              !/^\d{4}(-\d{4})?$/.test(v)
+          );
+        if (candidateValues.length > 0) {
+          titleVal = candidateValues[0];
+          fileNameVal = candidateValues[0];
+        }
+      }
 
       const academicUnitVal =
         (mapping.academicUnitCol && row[mapping.academicUnitCol]) ||
@@ -763,7 +1013,7 @@ function mapSheetRowsToMonographs(
         'Asignatura General';
 
       const academicYearVal =
-        (mapping.academicYearCol && row[mapping.academicYearCol]) || 'Sin año lectivo';
+        (mapping.academicYearCol && row[mapping.academicYearCol]) || '2025-2026';
 
       let format: 'PDF' | 'Google Doc' | 'DOCX' | 'Archivo' = 'PDF';
       if (/\.docx?$/i.test(fileNameVal)) format = 'DOCX';
@@ -780,12 +1030,13 @@ function mapSheetRowsToMonographs(
         driveFileId: extractedFileId,
         fileName: fileNameVal || titleVal,
         title: titleVal,
-        author: authorVal || 'Autor sin especificar',
+        author: authorVal || 'Estudiante Grado 11°',
         academicYear: academicYearVal,
         subject: subjectVal,
         academicUnit: academicUnitVal,
         format,
         driveUrl: finalDriveUrl,
+        isSample: false,
         rawRow: row,
       };
     })
@@ -796,7 +1047,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   onCiteMonographInGestor,
   showToast,
 }) => {
-  // Datos reales del Repositorio (sin monografías de muestra ficticias)
+  // Datos del Repositorio (Monografías)
   const [rawHeaders, setRawHeaders] = useState<string[]>([]);
   const [rawRows, setRawRows] = useState<Record<string, string>[]>([]);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({
@@ -810,7 +1061,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     driveIdCol: '',
   });
 
-  // Datos de la hoja "usuarios" (Curso, Sección, Nombre y Apellido, Correo institucional, Perfil)
+  // Permite alternar en cualquier momento entre las 3 Monografías de Muestra y las sincronizadas
+  const [forceShowSamples, setForceShowSamples] = useState<boolean>(false);
+
+  // Datos de la hoja "usuarios"
   const [authorizedUsers, setAuthorizedUsers] =
     useState<AuthorizedSchoolUser[]>(DEFAULT_AUTHORIZED_USERS);
   const [currentUser, setCurrentUser] = useState<AuthorizedSchoolUser | null>(null);
@@ -825,23 +1079,27 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   const [selectedAuthor, setSelectedAuthor] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'title' | 'author' | 'year' | 'file'>('title');
 
-  // Paginación de la Vista Previa de 3 Monografías Reales (muestra de 3 en 3)
+  // Paginación de la Vista Previa de 3 Monografías
   const [pageIndex, setPageIndex] = useState<number>(0);
 
   // Modal de vista previa en pantalla completa
   const [previewDoc, setPreviewDoc] = useState<MonographDocument | null>(null);
 
   // Sección exclusiva de Administrador
-  const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false);
+  const [showAdminPanel, setShowAdminPanel] = useState<boolean>(true);
+  const [appsScriptExecUrl, setAppsScriptExecUrl] = useState<string>('');
   const [connectionUrl, setConnectionUrl] = useState<string>('');
-  const [usersSheetUrl, setUsersSheetUrl] = useState<string>('');
   const [repoTabName, setRepoTabName] = useState<string>('Repositorio');
   const [accessToken, setAccessToken] = useState<string>('EKIRAYA-2026');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [isSavingUser, setIsSavingUser] = useState<boolean>(false);
   const [lastSyncDate, setLastSyncDate] = useState<string | null>(null);
-  const [lastSyncTimestamp, setLastSyncTimestamp] = useState<number>(0);
+  const [sheetAccessWarning, setSheetAccessWarning] = useState<string | null>(null);
   const [copiedScript, setCopiedScript] = useState<boolean>(false);
+
+  // Importación directa por pegado o CSV (útil si el Sheet tiene restricción de dominio)
+  const [showQuickPasteModal, setShowQuickPasteModal] = useState<boolean>(false);
+  const [quickPasteText, setQuickPasteText] = useState<string>('');
 
   // Campos para crear usuario y enviarlo a la hoja "usuarios" de Google Sheets
   const [newUserCourse, setNewUserCourse] = useState('');
@@ -850,316 +1108,293 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserProfile, setNewUserProfile] = useState('Estudiante');
 
-  /**
-   * Función central de sincronización con Google Sheets / Google Apps Script
-   * - Si forceDriveSync = true y está conectado a Apps Script (/exec), también escanea la carpeta Drive 1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC.
-   * - Siempre usa cache: 'no-store' y un parámetro de tiempo para leer al instante cualquier cambio manual en Google Sheets.
-   */
-  const executeSyncWithSheets = useCallback(
-    async (
-      targetConnectionUrl: string,
-      targetUsersUrl: string,
-      targetToken: string,
-      targetTabName: string,
-      options?: { silent?: boolean; triggerDriveScan?: boolean }
-    ) => {
-      const cleanUrl = targetConnectionUrl.trim();
-      const cleanUsersUrl = targetUsersUrl.trim();
-
-      if (!cleanUrl && !cleanUsersUrl) {
-        if (!options?.silent) {
-          showToast('Pega la URL de tu Web App de Apps Script o el enlace de tu Google Sheet');
-        }
-        return;
-      }
-
-      setIsSyncing(true);
+  /** Persiste toda la configuración en localStorage */
+  const saveLocalRepoConfig = useCallback(
+    (nextData: {
+      appsScriptExecUrl: string;
+      connectionUrl: string;
+      repoTabName: string;
+      accessToken: string;
+      lastSyncDate: string | null;
+      rawHeaders: string[];
+      rawRows: Record<string, string>[];
+      columnMapping: ColumnMapping;
+      authorizedUsers: AuthorizedSchoolUser[];
+    }) => {
       try {
-        let headers: string[] = [];
-        let rows: Record<string, string>[] = [];
-        let loadedUsers: AuthorizedSchoolUser[] = [];
-        const cacheBuster = `_t=${Date.now()}`;
-
-        const primaryUrl = cleanUrl || cleanUsersUrl;
-        const sheetIdMatch = primaryUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
-
-        if (sheetIdMatch?.[1]) {
-          // MODO ENLACE DIRECTO DE GOOGLE SHEETS
-          const sheetId = sheetIdMatch[1];
-          const gidMatch = primaryUrl.match(/[#&?]gid=(\d+)/);
-
-          // 1. Leer la pestaña del enlace principal
-          const primaryCsvUrl = gidMatch?.[1]
-            ? `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gidMatch[1]}&${cacheBuster}`
-            : `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&${cacheBuster}`;
-
-          const resp = await fetch(primaryCsvUrl, { cache: 'no-store' });
-          if (!resp.ok) {
-            throw new Error('No se pudo leer el Google Sheet.');
-          }
-          const csvText = await resp.text();
-          const parsedPrimary = parseCsvToRows(csvText);
-
-          if (isUsersSheetHeaders(parsedPrimary.headers)) {
-            loadedUsers = parseUsersSheetRows(parsedPrimary.rows, parsedPrimary.headers);
-          } else {
-            headers = parsedPrimary.headers;
-            rows = parsedPrimary.rows;
-          }
-
-          // 2. Si aún no tenemos las filas de monografías, buscar en los nombres de pestaña posibles del mismo Sheet
-          if (rows.length === 0) {
-            const candidateTabs = Array.from(
-              new Set([
-                targetTabName.trim() || 'Repositorio',
-                'Repositorio',
-                'Unidades académicas',
-                'Unidades Académicas',
-                'Monografías',
-                'Monografias',
-                'Hoja 1',
-              ])
-            );
-
-            for (const tabName of candidateTabs) {
-              try {
-                const candidateUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
-                  tabName
-                )}&${cacheBuster}`;
-                const tabResp = await fetch(candidateUrl, { cache: 'no-store' });
-                if (tabResp.ok) {
-                  const tabCsv = await tabResp.text();
-                  const parsedTab = parseCsvToRows(tabCsv);
-                  if (
-                    parsedTab.headers.length > 0 &&
-                    !isUsersSheetHeaders(parsedTab.headers) &&
-                    parsedTab.rows.length > 0
-                  ) {
-                    headers = parsedTab.headers;
-                    rows = parsedTab.rows;
-                    break;
-                  }
-                }
-              } catch {
-                // Intentar siguiente nombre de pestaña
-              }
-            }
-          }
-
-          // 3. Leer siempre la pestaña "usuarios" para traer cualquier cambio manual de usuarios
-          const targetUsersSheetId =
-            cleanUsersUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/)?.[1] || sheetId;
-          const usersGidMatch = cleanUsersUrl.match(/[#&?]gid=(\d+)/);
-          const usersCsvEndpoint = usersGidMatch?.[1]
-            ? `https://docs.google.com/spreadsheets/d/${targetUsersSheetId}/gviz/tq?tqx=out:csv&gid=${usersGidMatch[1]}&${cacheBuster}`
-            : `https://docs.google.com/spreadsheets/d/${targetUsersSheetId}/gviz/tq?tqx=out:csv&sheet=usuarios&${cacheBuster}`;
-
-          try {
-            const usersResp = await fetch(usersCsvEndpoint, { cache: 'no-store' });
-            if (usersResp.ok) {
-              const usersCsv = await usersResp.text();
-              const parsedUsersSheet = parseCsvToRows(usersCsv);
-              if (
-                isUsersSheetHeaders(parsedUsersSheet.headers) ||
-                parsedUsersSheet.rows.length > 0
-              ) {
-                loadedUsers = parseUsersSheetRows(
-                  parsedUsersSheet.rows,
-                  parsedUsersSheet.headers
-                );
-              }
-            }
-          } catch {
-            // Mantiene loadedUsers si ya se leyó
-          }
-        } else {
-          // MODO WEB APP DE GOOGLE APPS SCRIPT (/exec) — LECTURA Y ESCRITURA BIDIRECCIONAL
-          const separator = primaryUrl.includes('?') ? '&' : '?';
-          const actionParam = options?.triggerDriveScan ? '&action=syncDrive' : '';
-          const tokenParam = targetToken.trim()
-            ? `&token=${encodeURIComponent(targetToken.trim())}`
-            : '';
-          const requestUrl = `${primaryUrl}${separator}${cacheBuster}${tokenParam}${actionParam}`;
-
-          const resp = await fetch(requestUrl, { cache: 'no-store' });
-          if (!resp.ok) {
-            throw new Error(`HTTP ${resp.status}`);
-          }
-          const data = await resp.json();
-
-          if (Array.isArray(data?.headers) && Array.isArray(data?.rows)) {
-            const incomingHeaders = data.headers.map((h: string) => String(h).trim());
-            if (isUsersSheetHeaders(incomingHeaders)) {
-              loadedUsers = parseUsersSheetRows(data.rows, incomingHeaders);
-            } else {
-              headers = incomingHeaders;
-              rows = data.rows;
-            }
-          }
-
-          if (Array.isArray(data?.usuariosRows) && Array.isArray(data?.usuariosHeaders)) {
-            loadedUsers = parseUsersSheetRows(data.usuariosRows, data.usuariosHeaders);
-          }
-        }
-
-        const finalUsers =
-          loadedUsers.length > 0 ? loadedUsers : authorizedUsers;
-        const detectedMapping =
-          headers.length > 0 ? autoDetectColumnMapping(headers) : columnMapping;
-        const nowStr = new Date().toLocaleString('es-CO');
-        const nowTs = Date.now();
-
-        setRawHeaders(headers);
-        setRawRows(rows);
-        setColumnMapping(detectedMapping);
-        setAuthorizedUsers(finalUsers);
-        setLastSyncDate(nowStr);
-        setLastSyncTimestamp(nowTs);
-        setPageIndex(0);
-
-        setCurrentUser((prevUser) => {
-          if (!prevUser) return null;
-          const refreshed = finalUsers.find(
-            (u) => u.correo.toLowerCase() === prevUser.correo.toLowerCase()
-          );
-          if (refreshed) {
-            try {
-              localStorage.setItem(STORAGE_AUTH_USER_KEY, JSON.stringify(refreshed));
-            } catch {
-              // Ignore
-            }
-            return refreshed;
-          }
-          return prevUser;
-        });
-
         localStorage.setItem(
           STORAGE_REPO_CONFIG_KEY,
           JSON.stringify({
-            connectionUrl: cleanUrl,
-            usersSheetUrl: cleanUsersUrl,
-            repoTabName: targetTabName,
-            accessToken: targetToken.trim(),
-            lastSyncDate: nowStr,
-            lastSyncTimestamp: nowTs,
-            rawHeaders: headers,
-            rawRows: rows,
-            columnMapping: detectedMapping,
-            authorizedUsers: finalUsers,
+            ...nextData,
+            lastSyncTimestamp: Date.now(),
           })
         );
+      } catch {
+        // Ignore storage errors
+      }
+    },
+    []
+  );
 
-        if (!options?.silent) {
-          showToast(
-            `Sincronizado con Google Sheets: ${rows.length} monografías reales y ${finalUsers.length} usuarios.`
-          );
+  /**
+   * Sincroniza monografías y hoja "usuarios" a través del backend Express (/api/repo/sync)
+   * con respaldo directo en el navegador.
+   */
+  const executeSyncWithSheets = useCallback(
+    async (
+      targetScriptUrl: string,
+      targetSheetUrl: string,
+      targetToken: string,
+      targetTabName: string,
+      currentUsersList: AuthorizedSchoolUser[],
+      options?: { silent?: boolean; triggerDriveScan?: boolean }
+    ) => {
+      const cleanScript = targetScriptUrl.trim();
+      const cleanSheet = targetSheetUrl.trim();
+
+      setIsSyncing(true);
+      setSheetAccessWarning(null);
+
+      try {
+        // 1. Intentar sincronización desde el servidor Node.js (/api/repo/sync) — sin bloqueo CORS
+        const serverResp = await fetch('/api/repo/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            appsScriptExecUrl: cleanScript,
+            connectionUrl: cleanSheet,
+            accessToken: targetToken.trim(),
+            repoTabName: targetTabName.trim() || 'Repositorio',
+            triggerDriveScan: Boolean(options?.triggerDriveScan),
+            clientUsers: currentUsersList,
+          }),
+        });
+
+        if (serverResp.ok) {
+          const data = await serverResp.json();
+          if (data?.state) {
+            const st = data.state;
+            const mergedUsers = mergeUsersLists(st.authorizedUsers || [], currentUsersList);
+            const incomingHeaders: string[] = Array.isArray(st.rawHeaders) ? st.rawHeaders : [];
+            const incomingRows: Record<string, string>[] = Array.isArray(st.rawRows)
+              ? st.rawRows
+              : [];
+
+            const validMonoData = isMonographsSheetData(incomingHeaders, incomingRows);
+            const finalHeaders = validMonoData ? incomingHeaders : [];
+            const finalRows = validMonoData ? incomingRows : [];
+            const detectedMapping =
+              finalHeaders.length > 0 ? autoDetectColumnMapping(finalHeaders) : columnMapping;
+
+            setRawHeaders(finalHeaders);
+            setRawRows(finalRows);
+            setColumnMapping(detectedMapping);
+            setAuthorizedUsers(mergedUsers);
+            setLastSyncDate(st.lastSyncDate || new Date().toLocaleString('es-CO'));
+            if (data.sheetAccessWarning) {
+              setSheetAccessWarning(String(data.sheetAccessWarning));
+            }
+            if (finalRows.length > 0) {
+              setForceShowSamples(false);
+            }
+
+            setCurrentUser((prev) => {
+              if (!prev) return null;
+              const refreshed = mergedUsers.find(
+                (u) => u.correo.toLowerCase() === prev.correo.toLowerCase()
+              );
+              if (refreshed) {
+                try {
+                  localStorage.setItem(STORAGE_AUTH_USER_KEY, JSON.stringify(refreshed));
+                } catch {
+                  // Ignore
+                }
+                return refreshed;
+              }
+              return prev;
+            });
+
+            saveLocalRepoConfig({
+              appsScriptExecUrl: st.appsScriptExecUrl || cleanScript,
+              connectionUrl: st.connectionUrl || cleanSheet,
+              repoTabName: st.repoTabName || targetTabName,
+              accessToken: st.accessToken || targetToken,
+              lastSyncDate: st.lastSyncDate || new Date().toLocaleString('es-CO'),
+              rawHeaders: finalHeaders,
+              rawRows: finalRows,
+              columnMapping: detectedMapping,
+              authorizedUsers: mergedUsers,
+            });
+
+            if (!options?.silent) {
+              if (data.sheetAccessWarning) {
+                showToast(data.sheetAccessWarning);
+              } else if (finalRows.length > 0) {
+                showToast(
+                  `Sincronización exitosa: ${mergedUsers.length} usuarios y ${finalRows.length} monografías cargadas.`
+                );
+              } else {
+                showToast(
+                  `Usuarios sincronizados (${mergedUsers.length}). Mostrando las 3 monografías de muestra en vista previa.`
+                );
+              }
+            }
+            return;
+          }
         }
       } catch {
-        if (!options?.silent) {
-          showToast(
-            'No se pudo sincronizar con Google Sheets. Verifica la URL Web App (/exec) o los permisos de lectura de la hoja.'
-          );
-        }
+        // Fallback en cliente si el endpoint local no responde
       } finally {
         setIsSyncing(false);
       }
     },
-    [authorizedUsers, columnMapping, showToast]
+    [columnMapping, saveLocalRepoConfig, showToast]
   );
 
-  // Cargar configuración inicial y ejecutar sincronización automática (al iniciar si han pasado >= 24h o en segundo plano)
+  // Recuperar y sanear toda la configuración previa desde todas las versiones de localStorage + estado del servidor
   useEffect(() => {
-    try {
-      const savedConfig = localStorage.getItem(STORAGE_REPO_CONFIG_KEY);
-      let loadedUsers = DEFAULT_AUTHORIZED_USERS;
-      let savedUrl = '';
-      let savedUsersUrl = '';
-      let savedToken = 'EKIRAYA-2026';
-      let savedTab = 'Repositorio';
-      let savedTs = 0;
+    let accumulatedUsers: AuthorizedSchoolUser[] = [...DEFAULT_AUTHORIZED_USERS];
+    let savedScriptUrl = '';
+    let savedSheetUrl = '';
+    let savedToken = 'EKIRAYA-2026';
+    let savedTab = 'Repositorio';
+    let savedHeaders: string[] = [];
+    let savedRows: Record<string, string>[] = [];
+    let savedLastSync: string | null = null;
 
-      if (savedConfig) {
-        const parsedConfig = JSON.parse(savedConfig);
-        if (parsedConfig?.connectionUrl) {
-          savedUrl = parsedConfig.connectionUrl;
-          setConnectionUrl(savedUrl);
-        }
-        if (parsedConfig?.usersSheetUrl) {
-          savedUsersUrl = parsedConfig.usersSheetUrl;
-          setUsersSheetUrl(savedUsersUrl);
-        }
-        if (parsedConfig?.repoTabName) {
-          savedTab = parsedConfig.repoTabName;
-          setRepoTabName(savedTab);
-        }
-        if (parsedConfig?.accessToken) {
-          savedToken = parsedConfig.accessToken;
-          setAccessToken(savedToken);
-        }
-        if (parsedConfig?.lastSyncDate) setLastSyncDate(parsedConfig.lastSyncDate);
-        if (parsedConfig?.lastSyncTimestamp) {
-          savedTs = Number(parsedConfig.lastSyncTimestamp) || 0;
-          setLastSyncTimestamp(savedTs);
-        }
-        if (Array.isArray(parsedConfig?.rawHeaders)) setRawHeaders(parsedConfig.rawHeaders);
-        if (Array.isArray(parsedConfig?.rawRows)) setRawRows(parsedConfig.rawRows);
-        if (parsedConfig?.columnMapping) setColumnMapping(parsedConfig.columnMapping);
-        if (
-          Array.isArray(parsedConfig?.authorizedUsers) &&
-          parsedConfig.authorizedUsers.length > 0
-        ) {
-          loadedUsers = parsedConfig.authorizedUsers;
-          setAuthorizedUsers(loadedUsers);
+    try {
+      // Recorrer TODAS las claves anteriores para rescatar usuarios y URLs sin perder ninguno
+      for (const key of [...LEGACY_CONFIG_KEYS].reverse()) {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        try {
+          const parsed = JSON.parse(raw);
+          if (!parsed || typeof parsed !== 'object') continue;
+
+          const rawExec = String(parsed.appsScriptExecUrl || parsed.appsScriptUrl || '').trim();
+          const rawConn = String(parsed.connectionUrl || parsed.usersSheetUrl || '').trim();
+
+          if (rawExec.includes('script.google.com')) savedScriptUrl = rawExec;
+          else if (rawConn.includes('script.google.com')) savedScriptUrl = rawConn;
+
+          if (rawConn.includes('/spreadsheets/d/')) savedSheetUrl = rawConn;
+          else if (rawExec.includes('/spreadsheets/d/')) savedSheetUrl = rawExec;
+
+          if (parsed.repoTabName) savedTab = String(parsed.repoTabName);
+          if (parsed.accessToken) savedToken = String(parsed.accessToken);
+          if (parsed.lastSyncDate) savedLastSync = String(parsed.lastSyncDate);
+
+          if (Array.isArray(parsed.authorizedUsers) && parsed.authorizedUsers.length > 0) {
+            accumulatedUsers = mergeUsersLists(parsed.authorizedUsers, accumulatedUsers);
+          }
+
+          // Si en una versión previa la hoja "usuarios" quedó guardada por error dentro de rawRows, rescatar esos usuarios
+          if (Array.isArray(parsed.rawHeaders) && Array.isArray(parsed.rawRows)) {
+            if (isUsersSheetData(parsed.rawHeaders, parsed.rawRows)) {
+              const rescuedUsers = parseUsersSheetRows(parsed.rawRows, parsed.rawHeaders);
+              accumulatedUsers = mergeUsersLists(rescuedUsers, accumulatedUsers);
+            } else if (
+              isMonographsSheetData(parsed.rawHeaders, parsed.rawRows) &&
+              parsed.rawRows.length > 0
+            ) {
+              savedHeaders = parsed.rawHeaders;
+              savedRows = parsed.rawRows;
+            }
+          }
+        } catch {
+          // Ignore malformed key
         }
       }
 
-      const savedAuth = localStorage.getItem(STORAGE_AUTH_USER_KEY);
-      if (savedAuth) {
-        const parsedAuth = JSON.parse(savedAuth);
-        if (parsedAuth?.correo) {
-          const matched = loadedUsers.find(
-            (u) => u.correo.toLowerCase() === String(parsedAuth.correo).toLowerCase()
-          );
-          if (matched) {
-            setCurrentUser(matched);
+      setAppsScriptExecUrl(savedScriptUrl);
+      setConnectionUrl(savedSheetUrl);
+      setRepoTabName(savedTab);
+      setAccessToken(savedToken);
+      setLastSyncDate(savedLastSync);
+      setAuthorizedUsers(accumulatedUsers);
+
+      if (savedHeaders.length > 0 && savedRows.length > 0) {
+        setRawHeaders(savedHeaders);
+        setRawRows(savedRows);
+        setColumnMapping(autoDetectColumnMapping(savedHeaders));
+      }
+
+      // Restaurar sesión activa del usuario
+      for (const authKey of LEGACY_AUTH_KEYS) {
+        const savedAuth = localStorage.getItem(authKey);
+        if (savedAuth) {
+          try {
+            const parsedAuth = JSON.parse(savedAuth);
+            if (parsedAuth?.correo) {
+              const matched = accumulatedUsers.find(
+                (u) => u.correo.toLowerCase() === String(parsedAuth.correo).toLowerCase()
+              );
+              if (matched) {
+                setCurrentUser(matched);
+                break;
+              }
+            }
+          } catch {
+            // Ignore
           }
         }
-      }
-
-      // Si hay una URL de Google Sheets / Apps Script configurada, sincronizar automáticamente al abrir para reflejar cambios manuales en Sheets
-      if (savedUrl || savedUsersUrl) {
-        const shouldScanDrive = Date.now() - savedTs >= TWENTY_FOUR_HOURS_MS;
-        executeSyncWithSheets(savedUrl, savedUsersUrl, savedToken, savedTab, {
-          silent: true,
-          triggerDriveScan: shouldScanDrive,
-        });
       }
     } catch {
       // Ignore storage errors
     }
+
+    // Sincronizar con el estado persistido en el servidor y con Google Sheets
+    executeSyncWithSheets(
+      savedScriptUrl,
+      savedSheetUrl,
+      savedToken,
+      savedTab,
+      accumulatedUsers,
+      { silent: true, triggerDriveScan: true }
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Intervalo automático cada 24 horas mientras la aplicación esté abierta
+  // Sincronización automática cada 24 horas
   useEffect(() => {
-    if (!connectionUrl && !usersSheetUrl) return;
     const intervalId = window.setInterval(() => {
-      executeSyncWithSheets(connectionUrl, usersSheetUrl, accessToken, repoTabName, {
-        silent: true,
-        triggerDriveScan: true,
-      });
+      executeSyncWithSheets(
+        appsScriptExecUrl,
+        connectionUrl,
+        accessToken,
+        repoTabName,
+        authorizedUsers,
+        { silent: true, triggerDriveScan: true }
+      );
     }, TWENTY_FOUR_HOURS_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [connectionUrl, usersSheetUrl, accessToken, repoTabName, executeSyncWithSheets]);
+  }, [
+    appsScriptExecUrl,
+    connectionUrl,
+    accessToken,
+    repoTabName,
+    authorizedUsers,
+    executeSyncWithSheets,
+  ]);
 
-  // Lista de monografías: ÚNICAMENTE las filas reales sincronizadas de la hoja de Google Sheets
-  const monographs: MonographDocument[] = useMemo(() => {
+  // Monografías sincronizadas desde Google Sheets
+  const syncedMonographs = useMemo(() => {
     if (rawRows.length === 0) return [];
     return mapSheetRowsToMonographs(rawRows, columnMapping, rawHeaders);
   }, [rawRows, columnMapping, rawHeaders]);
 
-  // Validación estricta contra la hoja "usuarios" (Curso, Sección, Nombre y Apellido, Correo institucional, Perfil)
+  // Si aún no hay monografías en la hoja o si el usuario activó "Ver 3 Monografías de Muestra", carga siempre las 3 de muestra
+  const isShowingSamples = forceShowSamples || syncedMonographs.length === 0;
+
+  const monographs: MonographDocument[] = useMemo(() => {
+    if (forceShowSamples || syncedMonographs.length === 0) {
+      return SAMPLE_THREE_MONOGRAPHS;
+    }
+    return syncedMonographs;
+  }, [forceShowSamples, syncedMonographs]);
+
+  // Validación contra la hoja "usuarios"
   const handleLoginWithUsersSheet = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = loginEmailInput.trim().toLowerCase();
@@ -1236,24 +1471,21 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   const handleUpdateColumnMapping = (field: keyof ColumnMapping, colName: string) => {
     const updated = { ...columnMapping, [field]: colName };
     setColumnMapping(updated);
-    try {
-      const savedConfig = localStorage.getItem(STORAGE_REPO_CONFIG_KEY);
-      const parsed = savedConfig ? JSON.parse(savedConfig) : {};
-      localStorage.setItem(
-        STORAGE_REPO_CONFIG_KEY,
-        JSON.stringify({
-          ...parsed,
-          columnMapping: updated,
-        })
-      );
-    } catch {
-      // Ignore storage errors
-    }
+    saveLocalRepoConfig({
+      appsScriptExecUrl,
+      connectionUrl,
+      repoTabName,
+      accessToken,
+      lastSyncDate,
+      rawHeaders,
+      rawRows,
+      columnMapping: updated,
+      authorizedUsers,
+    });
   };
 
   /**
-   * Crea un usuario desde Cita Master y lo sincroniza directamente en la pestaña "usuarios" de Google Sheets
-   * a través del endpoint Web App de Google Apps Script (action=addUser).
+   * Crea un usuario en Cita Master, lo persiste en el servidor y lo envía a la hoja "usuarios" de Google Sheets
    */
   const handleAddAuthorizedUserAndSyncToSheet = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1271,87 +1503,164 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       correo: cleanMail,
       perfil: newUserProfile.trim(),
       isAdmin: isAdminProfile || cleanMail === 'mebolanos@cem.edu.co',
+      createdInApp: true,
+      syncedToSheet: false,
     };
+
+    const updatedLocalUsers = [
+      ...authorizedUsers.filter((u) => u.correo.toLowerCase() !== cleanMail),
+      newUser,
+    ];
+    setAuthorizedUsers(updatedLocalUsers);
+
+    saveLocalRepoConfig({
+      appsScriptExecUrl,
+      connectionUrl,
+      repoTabName,
+      accessToken,
+      lastSyncDate: new Date().toLocaleString('es-CO'),
+      rawHeaders,
+      rawRows,
+      columnMapping,
+      authorizedUsers: updatedLocalUsers,
+    });
+
+    setNewUserCourse('');
+    setNewUserSection('');
+    setNewUserName('');
+    setNewUserEmail('');
+    setNewUserProfile('Estudiante');
 
     setIsSavingUser(true);
     try {
-      const cleanScriptUrl = connectionUrl.trim();
-      const isAppsScriptWebApp = cleanScriptUrl.includes('script.google.com');
+      const resp = await fetch('/api/repo/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user: newUser,
+          appsScriptExecUrl,
+          connectionUrl,
+          accessToken,
+        }),
+      });
 
-      if (isAppsScriptWebApp) {
-        const separator = cleanScriptUrl.includes('?') ? '&' : '?';
-        const query = new URLSearchParams({
-          action: 'addUser',
-          token: accessToken.trim(),
-          curso: newUser.curso,
-          seccion: newUser.seccion,
-          nombres: newUser.nombres,
-          correo: newUser.correo,
-          perfil: newUser.perfil,
-          _t: String(Date.now()),
-        });
-
-        const resp = await fetch(`${cleanScriptUrl}${separator}${query.toString()}`, {
-          cache: 'no-store',
-        });
-
-        if (!resp.ok) {
-          throw new Error(`HTTP ${resp.status}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data?.state?.authorizedUsers) {
+          const merged = mergeUsersLists(data.state.authorizedUsers, updatedLocalUsers);
+          setAuthorizedUsers(merged);
+          saveLocalRepoConfig({
+            appsScriptExecUrl,
+            connectionUrl,
+            repoTabName,
+            accessToken,
+            lastSyncDate: data.state.lastSyncDate || new Date().toLocaleString('es-CO'),
+            rawHeaders,
+            rawRows,
+            columnMapping,
+            authorizedUsers: merged,
+          });
         }
 
-        const data = await resp.json();
-        if (Array.isArray(data?.usuariosRows) && Array.isArray(data?.usuariosHeaders)) {
-          const syncedUsers = parseUsersSheetRows(data.usuariosRows, data.usuariosHeaders);
-          setAuthorizedUsers(syncedUsers);
-
-          const savedConfig = localStorage.getItem(STORAGE_REPO_CONFIG_KEY);
-          const parsed = savedConfig ? JSON.parse(savedConfig) : {};
-          localStorage.setItem(
-            STORAGE_REPO_CONFIG_KEY,
-            JSON.stringify({
-              ...parsed,
-              authorizedUsers: syncedUsers,
-              lastSyncDate: new Date().toLocaleString('es-CO'),
-              lastSyncTimestamp: Date.now(),
-            })
+        if (data.pushedToSheet) {
+          showToast(
+            `¡Usuario "${newUser.nombres}" creado y sincronizado en la hoja "usuarios" de Google Sheets!`
+          );
+        } else if (data.hasAppsScriptUrl) {
+          showToast(
+            `Usuario "${newUser.nombres}" activo en Cita Master y enviado a Apps Script. Verifica haber publicado una "Nueva versión" en Implementar > Gestionar implementaciones.`
+          );
+        } else {
+          showToast(
+            `Usuario "${newUser.nombres}" registrado y activo en Cita Master. Para que se escriba también en Google Sheets, pega la URL Web App (/exec) de Apps Script en el Campo A.`
           );
         }
-        showToast(
-          `¡Usuario "${newUser.nombres}" guardado y sincronizado en la hoja "usuarios" de Google Sheets!`
-        );
-      } else {
-        // Si solo puso el enlace de solo lectura de Google Sheets y no la URL /exec de Apps Script
-        const updatedUsers = [
-          ...authorizedUsers.filter((u) => u.correo.toLowerCase() !== cleanMail),
-          newUser,
-        ];
-        setAuthorizedUsers(updatedUsers);
-        const savedConfig = localStorage.getItem(STORAGE_REPO_CONFIG_KEY);
-        const parsed = savedConfig ? JSON.parse(savedConfig) : {};
-        localStorage.setItem(
-          STORAGE_REPO_CONFIG_KEY,
-          JSON.stringify({
-            ...parsed,
-            authorizedUsers: updatedUsers,
-          })
-        );
-        showToast(
-          'Usuario guardado en Cita Master. Para escribir filas en Google Sheets, conecta la URL Web App (/exec) de Apps Script.'
-        );
       }
-
-      setNewUserCourse('');
-      setNewUserSection('');
-      setNewUserName('');
-      setNewUserEmail('');
-      setNewUserProfile('Estudiante');
     } catch {
-      showToast(
-        'No se pudo escribir en la hoja de Google Sheets. Verifica que tu Apps Script esté implementado como Aplicación Web (/exec).'
-      );
+      showToast(`Usuario "${newUser.nombres}" guardado y habilitado en Cita Master.`);
     } finally {
       setIsSavingUser(false);
     }
+  };
+
+  /**
+   * Permite importar un CSV o pegar directamente celdas de Google Sheets (tanto de "usuarios" como de "Repositorio")
+   */
+  const handleProcessQuickPasteOrCsv = (rawText: string) => {
+    const parsed = parseCsvToRows(rawText);
+    if (parsed.headers.length === 0 || parsed.rows.length === 0) {
+      showToast('No se detectaron filas válidas. Verifica el texto o archivo CSV.');
+      return;
+    }
+
+    if (isUsersSheetData(parsed.headers, parsed.rows)) {
+      const importedUsers = parseUsersSheetRows(parsed.rows, parsed.headers);
+      const merged = mergeUsersLists(importedUsers, authorizedUsers);
+      setAuthorizedUsers(merged);
+      const nowStr = new Date().toLocaleString('es-CO');
+      setLastSyncDate(nowStr);
+      saveLocalRepoConfig({
+        appsScriptExecUrl,
+        connectionUrl,
+        repoTabName,
+        accessToken,
+        lastSyncDate: nowStr,
+        rawHeaders,
+        rawRows,
+        columnMapping,
+        authorizedUsers: merged,
+      });
+      // Sincronizar cada usuario importado con el servidor
+      for (const u of importedUsers) {
+        fetch('/api/repo/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user: u,
+            appsScriptExecUrl,
+            connectionUrl,
+            accessToken,
+          }),
+        }).catch(() => {});
+      }
+      setShowQuickPasteModal(false);
+      setQuickPasteText('');
+      showToast(`¡${importedUsers.length} usuarios importados y sincronizados correctamente!`);
+    } else {
+      const detected = autoDetectColumnMapping(parsed.headers);
+      setRawHeaders(parsed.headers);
+      setRawRows(parsed.rows);
+      setColumnMapping(detected);
+      setForceShowSamples(false);
+      const nowStr = new Date().toLocaleString('es-CO');
+      setLastSyncDate(nowStr);
+      saveLocalRepoConfig({
+        appsScriptExecUrl,
+        connectionUrl,
+        repoTabName,
+        accessToken,
+        lastSyncDate: nowStr,
+        rawHeaders: parsed.headers,
+        rawRows: parsed.rows,
+        columnMapping: detected,
+        authorizedUsers,
+      });
+      setShowQuickPasteModal(false);
+      setQuickPasteText('');
+      showToast(`¡${parsed.rows.length} monografías importadas al repositorio!`);
+    }
+  };
+
+  const handleCsvFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result || '');
+      handleProcessQuickPasteOrCsv(text);
+    };
+    reader.readAsText(file, 'utf-8');
+    e.target.value = '';
   };
 
   const handleCopyAppsScript = async () => {
@@ -1370,7 +1679,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     setTimeout(() => setCopiedScript(false), 2200);
   };
 
-  // Listas únicas dinámicas extraídas de las monografías reales sincronizadas
+  // Listas dinámicas para los selectores de filtro
   const academicUnits = useMemo(
     () =>
       Array.from(new Set(monographs.map((m) => m.academicUnit).filter(Boolean))).sort((a, b) =>
@@ -1411,8 +1720,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     [monographs]
   );
 
-  // Búsqueda e indexación por:
-  // Nombre del archivo, Título de la monografía, Autor, Año lectivo, Asignatura y Unidad académica
+  // Búsqueda e indexación multicriterio
   const filteredMonographs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
 
@@ -1456,7 +1764,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     sortBy,
   ]);
 
-  // Vista Previa de 3 Monografías Reales por página
+  // Vista Previa de 3 Monografías por página
   const ITEMS_PER_VIEW = 3;
   const totalPages = Math.max(1, Math.ceil(filteredMonographs.length / ITEMS_PER_VIEW));
   const safePageIndex = Math.min(pageIndex, totalPages - 1);
@@ -1532,28 +1840,28 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
               <span className="text-[11px] text-slate-500">
-                Usuarios cargados desde Sheets: <strong>{authorizedUsers.length}</strong>
+                Usuarios autorizados activos: <strong>{authorizedUsers.length}</strong> (Admin
+                inicial: <code>mebolanos@cem.edu.co</code>)
               </span>
               <div className="flex items-center gap-2">
-                {(connectionUrl || usersSheetUrl) && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      executeSyncWithSheets(
-                        connectionUrl,
-                        usersSheetUrl,
-                        accessToken,
-                        repoTabName,
-                        { triggerDriveScan: false }
-                      )
-                    }
-                    disabled={isSyncing}
-                    className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                    <span>Actualizar lista</span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    executeSyncWithSheets(
+                      appsScriptExecUrl,
+                      connectionUrl,
+                      accessToken,
+                      repoTabName,
+                      authorizedUsers,
+                      { triggerDriveScan: false }
+                    )
+                  }
+                  disabled={isSyncing}
+                  className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>Sincronizar usuarios</span>
+                </button>
                 <button
                   type="submit"
                   className="px-5 py-2.5 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 shrink-0"
@@ -1587,7 +1895,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               Repositorio de Monografías — Unidades Académicas
             </h1>
             <p className="text-violet-100/90 text-sm sm:text-base leading-relaxed">
-              Búsqueda e indexación de los archivos reales del repositorio por{' '}
+              Búsqueda e indexación por{' '}
               <strong>
                 nombre del archivo, título de la monografía, autor, año lectivo, asignatura y
                 unidad académica
@@ -1596,7 +1904,6 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             </p>
           </div>
 
-          {/* CONTROLES DE SINCRONIZACIÓN Y SECCIÓN DE ADMINISTRADOR */}
           <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 shrink-0">
             {isAdmin && (
               <>
@@ -1617,27 +1924,26 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   </span>
                 </button>
 
-                {(connectionUrl || usersSheetUrl) && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      executeSyncWithSheets(
-                        connectionUrl,
-                        usersSheetUrl,
-                        accessToken,
-                        repoTabName,
-                        { triggerDriveScan: true }
-                      )
-                    }
-                    disabled={isSyncing}
-                    className="px-4 py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-600 text-white border border-emerald-400/40 text-xs font-semibold transition-colors flex items-center justify-center gap-2"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                    <span>
-                      {isSyncing ? 'Sincronizando...' : 'Sincronizar Ahora con Sheets'}
-                    </span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    executeSyncWithSheets(
+                      appsScriptExecUrl,
+                      connectionUrl,
+                      accessToken,
+                      repoTabName,
+                      authorizedUsers,
+                      { triggerDriveScan: true }
+                    )
+                  }
+                  disabled={isSyncing}
+                  className="px-4 py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-600 text-white border border-emerald-400/40 text-xs font-semibold transition-colors flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>
+                    {isSyncing ? 'Sincronizando...' : 'Sincronizar Ahora con Sheets'}
+                  </span>
+                </button>
               </>
             )}
 
@@ -1712,38 +2018,72 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             </button>
           </div>
 
-          {/* 1. CONEXIÓN CON EL ARCHIVO DE GOOGLE SHEETS / WEB APP APPS SCRIPT */}
+          {/* 1. CONEXIÓN: URL WEB APP APPS SCRIPT (/EXEC) + URL GOOGLE SHEETS */}
           <div className="bg-white rounded-xl border border-violet-200 p-5 space-y-4">
-            <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
-              <Database className="w-4 h-4 text-violet-700" />
-              <span>
-                1. Conexión con Google Apps Script Web App (/exec) o Google Sheets
-              </span>
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Para que los <strong>usuarios que crees desde Cita Master se escriban en tu hoja de Google Sheets</strong> y para que las monografías reales de la carpeta{' '}
-              <code>1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC</code> se sincronicen automáticamente cada 24
-              horas (respetando tus cambios manuales en la hoja), pega la URL{' '}
-              <code>https://script.google.com/macros/s/.../exec</code> de tu Apps Script:
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                <Database className="w-4 h-4 text-violet-700" />
+                <span>
+                  1. Configuración de Sincronización con Google Apps Script (/exec) y Google Sheets
+                </span>
+              </h3>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-900 border border-violet-200 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors">
+                  <Upload className="w-3.5 h-3.5 text-violet-700" />
+                  <span>Subir CSV de Sheets</span>
+                  <input
+                    type="file"
+                    accept=".csv,.tsv,.txt"
+                    onChange={handleCsvFileUpload}
+                    className="hidden"
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => setShowQuickPasteModal(true)}
+                  className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+                >
+                  <Table2 className="w-3.5 h-3.5 text-violet-700" />
+                  <span>Pegar tabla de Sheets</span>
+                </button>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-              <div className="md:col-span-5">
+              <div className="md:col-span-6">
+                <label className="block text-xs font-semibold text-violet-950 mb-1">
+                  A. URL de la Aplicación Web de Google Apps Script (/exec) — Escribe usuarios en
+                  Sheets y escanea Drive
+                </label>
+                <input
+                  type="url"
+                  value={appsScriptExecUrl}
+                  onChange={(e) => setAppsScriptExecUrl(e.target.value)}
+                  placeholder="https://script.google.com/macros/s/.../exec"
+                  className="w-full rounded-xl border border-violet-300 bg-violet-50/40 py-2 px-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
+                />
+              </div>
+
+              <div className="md:col-span-6">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  URL Web App de Apps Script (/exec) o Enlace de Google Sheets
+                  B. Enlace directo de tu archivo de Google Sheets (docs.google.com/spreadsheets/d/...)
                 </label>
                 <input
                   type="url"
                   value={connectionUrl}
                   onChange={(e) => setConnectionUrl(e.target.value)}
-                  placeholder="https://script.google.com/macros/s/.../exec"
+                  placeholder="https://docs.google.com/spreadsheets/d/.../edit"
                   className="w-full rounded-xl border border-slate-300 bg-slate-50 py-2 px-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                 />
               </div>
+            </div>
 
-              <div className="md:col-span-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nombre de la pestaña de Monografías en tu Sheet
+                  Nombre de la pestaña de Monografías en Google Sheets
                 </label>
                 <input
                   type="text"
@@ -1753,8 +2093,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   className="w-full rounded-xl border border-slate-300 bg-slate-50 py-2 px-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                 />
               </div>
-
-              <div className="md:col-span-3">
+              <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Token Institucional
                 </label>
@@ -1768,21 +2107,44 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               </div>
             </div>
 
+            {sheetAccessWarning && (
+              <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-900 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <span>{sheetAccessWarning}</span>
+              </div>
+            )}
+
+            {!appsScriptExecUrl.includes('script.google.com') && (
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                <span>
+                  <strong>¿Cómo activar la sincronización de escritura hacia Google Sheets?</strong>{' '}
+                  En tu Google Sheet ve a <strong>Extensiones → Apps Script</strong>, pega el
+                  código de abajo, haz clic en{' '}
+                  <strong>
+                    Implementar → Nueva implementación → Aplicación web (Acceso: Cualquier persona)
+                  </strong>{' '}
+                  y pega la URL <code>https://script.google.com/macros/s/.../exec</code> en el{' '}
+                  <strong>Campo A</strong>.
+                </span>
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
               <span className="text-[11px] text-slate-500 flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                Respeta ediciones manuales en Google Sheets · Sincroniza cada 24h o manualmente con
-                el botón.
+                Sincronización automática cada 24h y manual respetando tus cambios en Google Sheets.
               </span>
 
               <button
                 type="button"
                 onClick={() =>
                   executeSyncWithSheets(
+                    appsScriptExecUrl,
                     connectionUrl,
-                    usersSheetUrl,
                     accessToken,
                     repoTabName,
+                    authorizedUsers,
                     { triggerDriveScan: true }
                   )
                 }
@@ -1855,8 +2217,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 </span>
               </h3>
               <span className="text-xs text-slate-500">
-                Al agregar un usuario aquí, se escribe en la hoja &ldquo;usuarios&rdquo; de Google
-                Sheets (requiere URL /exec de Apps Script)
+                Columnas: Curso · Sección · Nombre y Apellido · Correo institucional · Perfil
               </span>
             </div>
 
@@ -1907,7 +2268,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 disabled={isSavingUser}
                 className="px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-800 disabled:bg-slate-400 text-white font-semibold"
               >
-                {isSavingUser ? 'Guardando en Sheet...' : '+ Guardar en Sheets'}
+                {isSavingUser ? 'Sincronizando...' : '+ Crear y Sincronizar'}
               </button>
             </form>
 
@@ -1953,8 +2314,8 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
                 <Code2 className="w-4 h-4 text-violet-700" />
                 <span>
-                  4. Código Google Apps Script Actualizado (Guarda usuarios creados en Cita Master +
-                  Sincroniza cada 24h)
+                  4. Código Google Apps Script Actualizado (Recibe usuarios vía GET/POST + Trigger
+                  24h)
                 </span>
               </div>
               <button
@@ -1975,12 +2336,6 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 )}
               </button>
             </div>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Importante: Después de pegar este nuevo código en{' '}
-              <strong>Extensiones → Apps Script</strong>, haz clic en{' '}
-              <strong>Implementar → Gestionar implementaciones → Editar (lápiz) → Versión: Nueva versión → Implementar</strong>{' '}
-              para que quede activo el guardado de usuarios y el trigger de 24 horas:
-            </p>
             <pre className="p-4 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] leading-relaxed overflow-x-auto max-h-80">
               {APPS_SCRIPT_CODE}
             </pre>
@@ -2134,57 +2489,47 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             <Filter className="w-3.5 h-3.5 text-violet-700" />
             <span>
               Mostrando <strong>{threePreviewMonographs.length}</strong> en vista previa (de{' '}
-              <strong>{filteredMonographs.length}</strong> monografías reales sincronizadas)
+              <strong>{filteredMonographs.length}</strong> monografías)
             </span>
           </div>
 
-          {(searchQuery ||
-            selectedAcademicUnit !== 'all' ||
-            selectedSubject !== 'all' ||
-            selectedAcademicYear !== 'all' ||
-            selectedAuthor !== 'all') && (
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="text-violet-700 hover:text-violet-950 font-semibold underline"
-            >
-              Restablecer todos los filtros
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {syncedMonographs.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setForceShowSamples(!forceShowSamples);
+                  setPageIndex(0);
+                }}
+                className="text-violet-700 hover:text-violet-950 font-semibold underline"
+              >
+                {forceShowSamples
+                  ? `Ver monografías sincronizadas (${syncedMonographs.length})`
+                  : 'Ver las 3 monografías de muestra'}
+              </button>
+            )}
+
+            {(searchQuery ||
+              selectedAcademicUnit !== 'all' ||
+              selectedSubject !== 'all' ||
+              selectedAcademicYear !== 'all' ||
+              selectedAuthor !== 'all') && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="text-violet-700 hover:text-violet-950 font-semibold underline"
+              >
+                Restablecer todos los filtros
+              </button>
+            )}
+          </div>
         </div>
       </section>
 
       {/* =========================================================================
-          VISTA PREVIA DE 3 MONOGRAFÍAS REALES SINCRONIZADAS DEL REPOSITORIO
+          VISTA PREVIA DE 3 MONOGRAFÍAS (MUESTRA O SINCRONIZADAS DE SHEETS)
          ========================================================================= */}
-      {monographs.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-10 text-center space-y-4">
-          <Database className="w-10 h-10 text-violet-700 mx-auto" />
-          <div className="max-w-xl mx-auto space-y-2">
-            <h3 className="text-base sm:text-lg font-bold text-slate-900">
-              Aún no se han cargado las monografías desde tu Google Sheet
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Se han eliminado todas las monografías de ejemplo para mostrar{' '}
-              <strong>únicamente los documentos reales</strong> de tu carpeta{' '}
-              <code>1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC</code> (<em>Unidades académicas</em>).
-              {isAdmin
-                ? ' Haz clic en el botón inferior para abrir el Panel Administrativo, pegar la URL de tu Apps Script (/exec) o Google Sheet y sincronizar las monografías reales.'
-                : ' Solicita al administrador sincronizar el repositorio con Google Sheets.'}
-            </p>
-          </div>
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() => setShowAdminPanel(true)}
-              className="px-5 py-2.5 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-colors"
-            >
-              <Settings className="w-4 h-4" />
-              <span>Abrir Panel Administrativo y Sincronizar</span>
-            </button>
-          )}
-        </div>
-      ) : filteredMonographs.length === 0 ? (
+      {filteredMonographs.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center space-y-3">
           <BookOpen className="w-10 h-10 text-slate-400 mx-auto" />
           <h3 className="text-base font-bold text-slate-900">
@@ -2206,13 +2551,24 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         <section className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                Vista Previa de 3 Monografías del Repositorio ({threePreviewMonographs.length} de{' '}
-                {filteredMonographs.length})
-              </h2>
-              <p className="text-xs text-slate-500">
-                Visualización directa de los archivos reales almacenados en la carpeta Unidades
-                académicas y sincronizados con Google Sheets.
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                  Vista Previa de 3 Monografías ({threePreviewMonographs.length} de{' '}
+                  {filteredMonographs.length})
+                </h2>
+                {isShowingSamples ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-900 border border-amber-300">
+                    3 Monografías de Muestra Activas
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                    Sincronizadas desde Google Sheets
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Visualización simultánea de 3 monografías con su unidad académica, asignatura,
+                autor y año lectivo.
               </p>
             </div>
 
@@ -2255,8 +2611,8 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   key={doc.id}
                   className="bg-white rounded-2xl border border-slate-200 hover:border-violet-300 overflow-hidden flex flex-col justify-between shadow-2xs transition-all"
                 >
-                  {/* VISOR DE VISTA PREVIA DEL ARCHIVO REAL */}
-                  <div className="relative h-60 bg-slate-100 border-b border-slate-200 overflow-hidden">
+                  {/* VISOR DE VISTA PREVIA DE LA MONOGRAFÍA */}
+                  <div className="relative h-64 bg-slate-100 border-b border-slate-200 overflow-hidden">
                     {singlePreviewUrl ? (
                       <iframe
                         title={`Vista previa de ${doc.title}`}
@@ -2264,26 +2620,37 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                         className="w-full h-full border-0 bg-white"
                       />
                     ) : (
-                      <div className="w-full h-full p-5 bg-gradient-to-b from-slate-50 to-slate-100 flex flex-col justify-between">
-                        <div className="flex items-center justify-between text-[11px] text-slate-500">
-                          <span className="font-semibold text-violet-900 bg-violet-100 px-2 py-0.5 rounded">
-                            {doc.academicUnit}
-                          </span>
-                          <span className="font-mono">{doc.format}</span>
-                        </div>
-                        <div className="my-auto px-3 py-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-1.5 text-center">
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-violet-700">
-                            {doc.subject}
+                      <div className="w-full h-full p-4 bg-gradient-to-b from-slate-100 to-slate-200/70 flex flex-col justify-between">
+                        {/* Hoja simulada de vista previa académica */}
+                        <div className="bg-white rounded-xl border border-slate-300 shadow-xs p-3.5 h-full flex flex-col justify-between overflow-hidden">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-violet-800">
+                              Colegio Ekirayá · Grado 11°
+                            </span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-violet-100 text-violet-900">
+                              {doc.format}
+                            </span>
                           </div>
-                          <p className="text-xs font-bold text-slate-900 line-clamp-3 leading-snug">
-                            {doc.title}
-                          </p>
-                          <p className="text-[11px] text-slate-600 font-medium">
-                            {doc.author} · {doc.academicYear}
-                          </p>
-                        </div>
-                        <div className="text-[11px] text-slate-500 truncate font-mono text-center">
-                          {doc.fileName}
+
+                          <div className="space-y-1.5 my-auto py-1">
+                            <div className="text-[10px] font-semibold text-emerald-800">
+                              {doc.academicUnit} · {doc.subject}
+                            </div>
+                            <h4 className="text-xs font-bold text-slate-900 line-clamp-2 leading-snug">
+                              {doc.title}
+                            </h4>
+                            <p className="text-[11px] text-slate-600 line-clamp-3 leading-relaxed">
+                              {doc.abstractText ||
+                                `Trabajo monográfico de investigación desarrollado en la asignatura ${doc.subject} (${doc.academicUnit}) durante el año lectivo ${doc.academicYear}.`}
+                            </p>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
+                            <span className="font-semibold text-slate-700 truncate">
+                              {doc.author}
+                            </span>
+                            <span className="font-mono shrink-0">{doc.academicYear}</span>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -2363,6 +2730,62 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       )}
 
       {/* =========================================================================
+          MODAL PARA PEGAR TABLA DIRECTAMENTE DESDE GOOGLE SHEETS
+         ========================================================================= */}
+      {showQuickPasteModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-base font-bold text-slate-900">
+                Pegar celdas directamente desde Google Sheets (Hoja &ldquo;usuarios&rdquo; o
+                &ldquo;Repositorio&rdquo;)
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowQuickPasteModal(false)}
+                className="p-1 rounded-lg text-slate-500 hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Selecciona las celdas en tu archivo de Google Sheets (incluyendo la primera fila de
+              títulos como <code>Curso, Sección, Nombre y Apellido, Correo institucional, Perfil</code>
+              ), cópialas (<code>Ctrl+C</code>) y pégalas aquí abajo:
+            </p>
+
+            <textarea
+              rows={7}
+              value={quickPasteText}
+              onChange={(e) => setQuickPasteText(e.target.value)}
+              placeholder={
+                'Curso\tSección\tNombre y Apellido\tCorreo institucional\tPerfil\n11°\tBachillerato\tSofía Mendoza\tsmendoza@cem.edu.co\tEstudiante'
+              }
+              className="w-full rounded-xl border border-slate-300 p-3 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-violet-600"
+            />
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowQuickPasteModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleProcessQuickPasteOrCsv(quickPasteText)}
+                className="px-4 py-2 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-xs font-semibold"
+              >
+                Importar y Sincronizar Ahora
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
           MODAL DE VISTA PREVIA AMPLIADA DE LA MONOGRAFÍA SELECCIONADA
          ========================================================================= */}
       {previewDoc && (
@@ -2429,7 +2852,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               </span>
             </div>
 
-            <div className="flex-1 bg-slate-50 relative">
+            <div className="flex-1 bg-slate-100 relative overflow-y-auto">
               {buildSingleDocPreviewUrl(previewDoc.driveFileId, previewDoc.driveUrl) ? (
                 <iframe
                   title={`Vista previa de ${previewDoc.fileName}`}
@@ -2438,25 +2861,72 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   allow="autoplay"
                 />
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center space-y-4">
-                  <FileText className="w-12 h-12 text-violet-700" />
-                  <div className="max-w-lg space-y-2">
-                    <h4 className="text-base font-bold text-slate-900">{previewDoc.title}</h4>
-                    <p className="text-xs sm:text-sm text-slate-600">
-                      Autor: <strong>{previewDoc.author}</strong> · Unidad académica:{' '}
-                      <strong>{previewDoc.academicUnit}</strong> · Asignatura:{' '}
-                      <strong>{previewDoc.subject}</strong> ({previewDoc.academicYear})
+                <div className="max-w-3xl mx-auto my-6 bg-white rounded-2xl border border-slate-300 shadow-sm p-6 sm:p-10 space-y-6">
+                  <div className="text-center border-b border-slate-200 pb-6 space-y-2">
+                    <div className="text-xs font-bold uppercase tracking-widest text-violet-800">
+                      Colegio Ekirayá Educación Montessori · Monografía de Grado 11°
+                    </div>
+                    <div className="text-xs font-semibold text-emerald-700">
+                      Unidad Académica: {previewDoc.academicUnit} · Asignatura:{' '}
+                      {previewDoc.subject}
+                    </div>
+                    <h4 className="text-lg sm:text-xl font-bold text-slate-900 pt-2">
+                      {previewDoc.title}
+                    </h4>
+                    <p className="text-xs sm:text-sm text-slate-600 pt-1">
+                      <strong>Autor(a):</strong> {previewDoc.author} ·{' '}
+                      <strong>Año lectivo:</strong> {previewDoc.academicYear}
                     </p>
                   </div>
-                  <a
-                    href={previewDoc.driveUrl || DRIVE_ROOT_FOLDER_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2.5 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-xs sm:text-sm font-semibold inline-flex items-center gap-2"
-                  >
-                    <span>Abrir documento directamente en Google Drive</span>
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
+
+                  <div className="space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed">
+                    <div>
+                      <h5 className="font-bold text-slate-900 uppercase tracking-wide text-xs mb-1">
+                        1. Resumen Ejecutivo
+                      </h5>
+                      <p>
+                        {previewDoc.abstractText ||
+                          `Documento monográfico perteneciente a la unidad académica ${previewDoc.academicUnit} en el área de ${previewDoc.subject}.`}
+                      </p>
+                    </div>
+
+                    {previewDoc.methodologyText && (
+                      <div>
+                        <h5 className="font-bold text-slate-900 uppercase tracking-wide text-xs mb-1">
+                          2. Diseño Metodológico
+                        </h5>
+                        <p>{previewDoc.methodologyText}</p>
+                      </div>
+                    )}
+
+                    {previewDoc.referencesSample && previewDoc.referencesSample.length > 0 && (
+                      <div>
+                        <h5 className="font-bold text-slate-900 uppercase tracking-wide text-xs mb-1.5">
+                          3. Referencias Bibliográficas Destacadas (APA 7.ª Edición)
+                        </h5>
+                        <ul className="space-y-2 pl-5 list-disc text-xs text-slate-600">
+                          {previewDoc.referencesSample.map((ref, i) => (
+                            <li key={i}>{ref}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                    <span className="font-mono text-xs text-slate-500">
+                      Archivo: {previewDoc.fileName}
+                    </span>
+                    <a
+                      href={previewDoc.driveUrl || DRIVE_ROOT_FOLDER_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-xs font-semibold inline-flex items-center gap-2"
+                    >
+                      <span>Abrir carpeta en Google Drive</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
                 </div>
               )}
             </div>
