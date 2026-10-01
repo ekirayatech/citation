@@ -47,10 +47,11 @@ export interface MonographDocument {
 }
 
 export interface AuthorizedSchoolUser {
-  nombres: string;
   curso: string;
-  correo: string;
   seccion: string;
+  nombres: string;
+  correo: string;
+  perfil: string;
   isAdmin: boolean;
 }
 
@@ -73,21 +74,22 @@ interface RepositorioSectionProps {
 const DRIVE_ROOT_FOLDER_ID = '1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC';
 const DRIVE_ROOT_FOLDER_URL = `https://drive.google.com/drive/folders/${DRIVE_ROOT_FOLDER_ID}`;
 
-const STORAGE_REPO_CONFIG_KEY = 'ekiraya_repo_unidades_academicas_v3';
-const STORAGE_AUTH_USER_KEY = 'ekiraya_repo_authorized_user_v3';
+const STORAGE_REPO_CONFIG_KEY = 'ekiraya_repo_unidades_academicas_v4';
+const STORAGE_AUTH_USER_KEY = 'ekiraya_repo_authorized_user_v4';
 
-// Usuarios iniciales mientras el administrador conecta la hoja "usuarios" de Google Sheets
+// Administrador inicial para garantizar acceso al Panel Administrativo antes de sincronizar la hoja
 const DEFAULT_AUTHORIZED_USERS: AuthorizedSchoolUser[] = [
   {
-    nombres: 'Coordinación y Administración Cita Master',
     curso: 'Administración',
+    seccion: 'Dirección / Coordinación',
+    nombres: 'Coordinación y Administración Cita Master',
     correo: 'mebolanos@cem.edu.co',
-    seccion: 'Administrador',
+    perfil: 'Administrador',
     isAdmin: true,
   },
 ];
 
-// Tres monografías iniciales para la vista previa de 3 monografías (se reemplazan al sincronizar Google Sheets)
+// Tres monografías iniciales para la vista previa de 3 monografías (se reemplazan automáticamente al sincronizar Google Sheets)
 const DEFAULT_THREE_MONOGRAPHS: MonographDocument[] = [
   {
     id: 'preview-mono-1',
@@ -130,13 +132,16 @@ const DEFAULT_THREE_MONOGRAPHS: MonographDocument[] = [
   },
 ];
 
-const APPS_SCRIPT_CODE = `/**
+export const APPS_SCRIPT_CODE = `/**
  * COLEGIO EKIRAYÁ EDUCACIÓN MONTESSORI — CITA MASTER
- * Script de Indexación para:
- * 1) Hoja "Repositorio": Carpeta "Unidades académicas" (1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC)
- *    Columnas: Nombre del archivo, Título de la monografía, Autor, Año lectivo, Asignatura, Unidad académica, ID del archivo, Enlace Drive
- * 2) Hoja "usuarios": Control de acceso y perfil Administrador
- *    Columnas: Nombres, Curso, Correo, Sección, Administrador
+ * Script de Sincronización entre la Carpeta de Drive "Unidades académicas"
+ * (ID: 1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC) y el archivo de Google Sheets.
+ *
+ * Hojas gestionadas en este Google Sheet:
+ * 1) Hoja "Repositorio":
+ *    Columnas: Nombre del archivo | Título de la monografía | Autor | Año lectivo | Asignatura | Unidad académica | ID del archivo | Enlace Drive
+ * 2) Hoja "usuarios":
+ *    Columnas exactas: Curso | Sección | Nombre y Apellido | Correo institucional | Perfil
  */
 
 const ROOT_FOLDER_ID = '1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC';
@@ -147,31 +152,55 @@ const INSTITUTIONAL_TOKEN = 'EKIRAYA-2026';
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('📚 Repositorio Ekirayá')
-    .addItem('🔄 Sincronizar carpeta Unidades Académicas', 'sincronizarUnidadesAcademicas')
-    .addItem('👥 Crear/Verificar hoja usuarios', 'inicializarHojaUsuarios')
+    .addItem('🔄 Sincronizar carpeta Unidades Académicas con Sheets', 'sincronizarUnidadesAcademicas')
+    .addItem('👥 Verificar estructura hoja usuarios', 'inicializarHojaUsuarios')
     .addToUi();
 }
 
+/**
+ * Crea o verifica la hoja "usuarios" respetando exactamente las columnas:
+ * Curso | Sección | Nombre y Apellido | Correo institucional | Perfil
+ */
 function inicializarHojaUsuarios() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let userSheet = ss.getSheetByName(USERS_SHEET_NAME);
+  let userSheet =
+    ss.getSheetByName(USERS_SHEET_NAME) ||
+    ss.getSheetByName('Usuarios') ||
+    ss.getSheetByName('USUARIOS');
+
+  const expectedUserHeaders = [
+    'Curso',
+    'Sección',
+    'Nombre y Apellido',
+    'Correo institucional',
+    'Perfil'
+  ];
+
   if (!userSheet) {
     userSheet = ss.insertSheet(USERS_SHEET_NAME);
-    const headers = ['Nombres', 'Curso', 'Correo', 'Sección', 'Administrador'];
-    userSheet.appendRow(headers);
-    userSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
-    userSheet.appendRow(['Administrador Cita Master', 'Administración', 'mebolanos@cem.edu.co', 'Administrador', 'Sí']);
+    userSheet.appendRow(expectedUserHeaders);
+    userSheet.getRange(1, 1, 1, expectedUserHeaders.length).setFontWeight('bold');
+    userSheet.appendRow([
+      'Administración',
+      'Coordinación Académica',
+      'Administrador Cita Master',
+      'mebolanos@cem.edu.co',
+      'Administrador'
+    ]);
+  } else if (userSheet.getLastRow() === 0) {
+    userSheet.appendRow(expectedUserHeaders);
+    userSheet.getRange(1, 1, 1, expectedUserHeaders.length).setFontWeight('bold');
   }
 }
 
 /**
  * Recorre recursivamente la carpeta 1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC ("Unidades académicas")
- * recopilando también la Unidad académica junto con Nombre del archivo, Título de la monografía,
- * Autor, Año lectivo y Asignatura.
+ * y sincroniza todos los archivos en la hoja "Repositorio" según los títulos de cada columna:
+ * Nombre del archivo, Título de la monografía, Autor, Año lectivo, Asignatura, Unidad académica, ID del archivo, Enlace Drive
  */
 function sincronizarUnidadesAcademicas() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(REPO_SHEET_NAME) || ss.getActiveSheet();
+  let sheet = ss.getSheetByName(REPO_SHEET_NAME);
 
   const expectedHeaders = [
     'Nombre del archivo',
@@ -184,6 +213,10 @@ function sincronizarUnidadesAcademicas() {
     'Enlace Drive'
   ];
 
+  if (!sheet) {
+    sheet = ss.insertSheet(REPO_SHEET_NAME);
+  }
+
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(expectedHeaders);
     sheet.getRange(1, 1, 1, expectedHeaders.length).setFontWeight('bold');
@@ -192,26 +225,39 @@ function sincronizarUnidadesAcademicas() {
   const data = sheet.getDataRange().getValues();
   const headers = data[0].map(function(h) { return String(h).trim(); });
 
-  let idColIdx = headers.findIndex(function(h) { return /id/i.test(h); });
-  let urlColIdx = headers.findIndex(function(h) { return /enlace|url|link|drive/i.test(h); });
-  let nameColIdx = headers.findIndex(function(h) { return /archivo|file/i.test(h); });
+  // Si la hoja activa era la de "usuarios", crear/usar la pestaña "Repositorio" separada
+  const normalizedFirstRow = headers.join(' ').toLowerCase();
+  if (normalizedFirstRow.includes('correo institucional') || normalizedFirstRow.includes('perfil')) {
+    sheet = ss.getSheetByName(REPO_SHEET_NAME) || ss.insertSheet(REPO_SHEET_NAME);
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(expectedHeaders);
+      sheet.getRange(1, 1, 1, expectedHeaders.length).setFontWeight('bold');
+    }
+  }
+
+  const repoData = sheet.getDataRange().getValues();
+  const repoHeaders = repoData[0].map(function(h) { return String(h).trim(); });
+
+  let idColIdx = repoHeaders.findIndex(function(h) { return /id/i.test(h); });
+  let urlColIdx = repoHeaders.findIndex(function(h) { return /enlace|url|link|drive/i.test(h); });
+  let nameColIdx = repoHeaders.findIndex(function(h) { return /archivo|file/i.test(h); });
 
   const existingKeys = new Set();
-  for (let i = 1; i < data.length; i++) {
-    const rowId = idColIdx >= 0 ? String(data[i][idColIdx]).trim() : '';
-    const rowUrl = urlColIdx >= 0 ? String(data[i][urlColIdx]).trim() : '';
-    const rowName = nameColIdx >= 0 ? String(data[i][nameColIdx]).trim() : '';
+  for (let i = 1; i < repoData.length; i++) {
+    const rowId = idColIdx >= 0 ? String(repoData[i][idColIdx]).trim() : '';
+    const rowUrl = urlColIdx >= 0 ? String(repoData[i][urlColIdx]).trim() : '';
+    const rowName = nameColIdx >= 0 ? String(repoData[i][nameColIdx]).trim() : '';
     if (rowId) existingKeys.add(rowId);
     if (rowUrl) existingKeys.add(rowUrl);
     if (rowName) existingKeys.add(rowName);
   }
 
   const rootFolder = DriveApp.getFolderById(ROOT_FOLDER_ID);
-  recorrerCarpetas(rootFolder, [], sheet, headers, existingKeys);
+  recorrerCarpetasDrive(rootFolder, [], sheet, repoHeaders, existingKeys);
   inicializarHojaUsuarios();
 }
 
-function recorrerCarpetas(folder, pathParts, sheet, headers, existingKeys) {
+function recorrerCarpetasDrive(folder, pathParts, sheet, headers, existingKeys) {
   const files = folder.getFiles();
   while (files.hasNext()) {
     const file = files.next();
@@ -221,17 +267,23 @@ function recorrerCarpetas(folder, pathParts, sheet, headers, existingKeys) {
 
     if (existingKeys.has(fileId) || existingKeys.has(fileUrl)) continue;
 
-    const cleanTitle = fileName.replace(/\\.(pdf|docx|doc)$/i, '').replace(/[_-]+/g, ' ').trim();
+    const cleanTitle = fileName
+      .replace(/\\.(pdf|docx|doc)$/i, '')
+      .replace(/[_-]+/g, ' ')
+      .trim();
+
+    // Jerarquía dentro de Unidades académicas:
+    // Nivel 0: Unidad académica | Nivel 1: Asignatura / Estudiante | Nivel final: Autor
     const unidadAcademica = pathParts.length > 0 ? pathParts[0] : folder.getName();
     const asignatura = pathParts.length > 1 ? pathParts[1] : unidadAcademica;
-    const autor = pathParts.length > 0 ? pathParts[pathParts.length - 1] : '';
+    const autor = pathParts.length > 0 ? pathParts[pathParts.length - 1] : 'Estudiante Grado 11';
     const anioLectivo = String(new Date(file.getDateCreated()).getFullYear());
 
     const newRow = headers.map(function(headerName) {
       const h = headerName.toLowerCase();
       if (h.includes('archivo') && !h.includes('id')) return fileName;
       if (h.includes('título') || h.includes('titulo') || h.includes('monografía') || h.includes('monografia')) return cleanTitle;
-      if (h.includes('autor') || h.includes('estudiante')) return autor;
+      if (h.includes('autor') || h.includes('estudiante') || h.includes('nombre y apellido')) return autor;
       if (h.includes('año') || h.includes('ano') || h.includes('lectivo') || h.includes('fecha')) return anioLectivo;
       if (h.includes('asignatura') || h.includes('materia') || h.includes('área') || h.includes('area')) return asignatura;
       if (h.includes('unidad')) return unidadAcademica;
@@ -247,7 +299,7 @@ function recorrerCarpetas(folder, pathParts, sheet, headers, existingKeys) {
   const subFolders = folder.getFolders();
   while (subFolders.hasNext()) {
     const sub = subFolders.next();
-    recorrerCarpetas(sub, pathParts.concat([sub.getName()]), sheet, headers, existingKeys);
+    recorrerCarpetasDrive(sub, pathParts.concat([sub.getName()]), sheet, headers, existingKeys);
   }
 }
 
@@ -283,7 +335,8 @@ function leerHojaPorTitulos(sheet) {
 }
 
 /**
- * Endpoint Web App (JSON): Devuelve tanto los documentos del Repositorio como la hoja "usuarios".
+ * Endpoint Web App (JSON) para Cita Master:
+ * Devuelve los documentos de "Repositorio" y los perfiles de "usuarios" (Curso, Sección, Nombre y Apellido, Correo institucional, Perfil).
  */
 function doGet(e) {
   const tokenParam = e && e.parameter && e.parameter.token ? e.parameter.token : '';
@@ -293,11 +346,28 @@ function doGet(e) {
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const repoSheet = ss.getSheetByName(REPO_SHEET_NAME) || ss.getSheets()[0];
-  const usersSheet =
+  const allSheets = ss.getSheets();
+
+  let repoSheet = ss.getSheetByName(REPO_SHEET_NAME);
+  let usersSheet =
     ss.getSheetByName(USERS_SHEET_NAME) ||
     ss.getSheetByName('Usuarios') ||
     ss.getSheetByName('USUARIOS');
+
+  // Detectar automáticamente si alguna pestaña tiene las columnas de usuarios (Curso, Sección, Nombre y Apellido, Correo institucional, Perfil)
+  for (let i = 0; i < allSheets.length; i++) {
+    const sh = allSheets[i];
+    if (sh.getLastRow() > 0) {
+      const firstRowStr = sh.getRange(1, 1, 1, Math.max(1, sh.getLastColumn())).getDisplayValues()[0].join(' ').toLowerCase();
+      if (!usersSheet && (firstRowStr.includes('correo institucional') || firstRowStr.includes('nombre y apellido') || firstRowStr.includes('perfil'))) {
+        usersSheet = sh;
+      } else if (!repoSheet && (firstRowStr.includes('monografía') || firstRowStr.includes('monografia') || firstRowStr.includes('asignatura') || firstRowStr.includes('archivo'))) {
+        repoSheet = sh;
+      }
+    }
+  }
+
+  if (!repoSheet) repoSheet = allSheets[0];
 
   const repoData = leerHojaPorTitulos(repoSheet);
   const usersData = leerHojaPorTitulos(usersSheet);
@@ -432,6 +502,16 @@ function parseCsvToRows(csvText: string): { headers: string[]; rows: Record<stri
   return { headers, rows };
 }
 
+/** Detecta si un conjunto de encabezados corresponde a la hoja "usuarios" (Curso, Sección, Nombre y Apellido, Correo institucional, Perfil) */
+function isUsersSheetHeaders(headers: string[]): boolean {
+  const joined = headers.map((h) => normalizeHeaderKey(h)).join(' | ');
+  return (
+    joined.includes('correo institucional') ||
+    joined.includes('nombre y apellido') ||
+    (joined.includes('curso') && joined.includes('seccion') && joined.includes('perfil'))
+  );
+}
+
 /** Detecta automáticamente los títulos de columna en la hoja de Monografías */
 function autoDetectColumnMapping(headers: string[]): ColumnMapping {
   const findCol = (patterns: RegExp[], excludePatterns: RegExp[] = []): string => {
@@ -466,6 +546,8 @@ function autoDetectColumnMapping(headers: string[]): ColumnMapping {
     authorCol: findCol([
       /^autor$/,
       /^autores$/,
+      /^nombre y apellido$/,
+      /nombre.*apellido/,
       /^estudiante$/,
       /nombre.*estudiante/,
       /autor.*estudiante/,
@@ -487,7 +569,6 @@ function autoDetectColumnMapping(headers: string[]): ColumnMapping {
       /asignatura/,
       /^materia$/,
       /^area$/,
-      /curso/,
       /disciplina/,
     ]),
     academicUnitCol: findCol([
@@ -509,7 +590,10 @@ function autoDetectColumnMapping(headers: string[]): ColumnMapping {
   };
 }
 
-/** Convierte las filas de la hoja "usuarios" (Nombres, Curso, Correo, Sección) en usuarios autorizados */
+/**
+ * Convierte las filas de la hoja "usuarios" con las columnas:
+ * Curso | Sección | Nombre y Apellido | Correo institucional | Perfil
+ */
 function parseUsersSheetRows(
   rows: Record<string, string>[],
   headers: string[]
@@ -524,16 +608,30 @@ function parseUsersSheetRows(
     return '';
   };
 
-  const nombresCol = findHeader([/^nombres?$/, /nombre.*completo/, /usuario/, /estudiante/]);
-  const cursoCol = findHeader([/^curso$/, /^grado$/, /nivel/, /cargo/]);
-  const correoCol = findHeader([/^correo$/, /email/, /e mail/, /mail/, /cuenta/]);
-  const seccionCol = findHeader([/^seccion$/, /area/, /dependencia/, /estamento/, /perfil/, /rol/]);
-  const adminCol = findHeader([/^administrador$/, /^admin$/, /^rol$/, /^perfil$/]);
+  const cursoCol = findHeader([/^curso$/, /^grado$/, /nivel/]);
+  const seccionCol = findHeader([/^seccion$/, /dependencia/, /area/]);
+  const nombresCol = findHeader([
+    /^nombre y apellido$/,
+    /nombre.*apellido/,
+    /^nombres?$/,
+    /nombre.*completo/,
+    /usuario/,
+    /estudiante/,
+  ]);
+  const correoCol = findHeader([
+    /^correo institucional$/,
+    /correo.*institucional/,
+    /^correo$/,
+    /email/,
+    /e mail/,
+    /mail/,
+    /cuenta/,
+  ]);
+  const perfilCol = findHeader([/^perfil$/, /^rol$/, /^administrador$/, /^admin$/, /estamento/]);
 
   const parsedUsers: AuthorizedSchoolUser[] = [];
 
   for (const row of rows) {
-    // Buscar correo por columna o buscando la celda con '@'
     let correo = (correoCol && row[correoCol]) || '';
     if (!correo) {
       const emailCell = Object.values(row).find((v) => String(v || '').includes('@'));
@@ -546,27 +644,28 @@ function parseUsersSheetRows(
       (nombresCol && row[nombresCol]) ||
       correo.split('@')[0].replace(/[._-]/g, ' ');
     const curso = (cursoCol && row[cursoCol]) || 'General';
-    const seccion = (seccionCol && row[seccionCol]) || 'Comunidad Ekirayá';
-    const adminVal = (adminCol && row[adminCol]) || '';
+    const seccion = (seccionCol && row[seccionCol]) || 'General';
+    const perfil = (perfilCol && row[perfilCol]) || 'Estudiante';
 
-    const combinedRoleText = `${seccion} ${curso} ${adminVal}`.toLowerCase();
+    const combinedRoleText = `${perfil} ${seccion} ${curso}`.toLowerCase();
     const isAdmin =
       correo === 'mebolanos@cem.edu.co' ||
-      /admin|administrador|coordinador|directivo|sistemas|^si$|^sí$|^true$|^1$|^x$/i.test(
-        adminVal.trim()
+      /admin|administrador|coordinador|directivo|sistemas|^si$|^sí$|^true$|^1$/i.test(
+        perfil.trim()
       ) ||
       /admin|administrador/i.test(combinedRoleText);
 
     parsedUsers.push({
-      nombres: nombres.trim(),
       curso: curso.trim(),
-      correo,
       seccion: seccion.trim(),
+      nombres: nombres.trim(),
+      correo,
+      perfil: perfil.trim(),
       isAdmin,
     });
   }
 
-  // Garantizar que el correo administrador principal siga presente para evitar bloqueos de configuración
+  // Asegurar que el correo administrador principal siempre esté autorizado
   if (!parsedUsers.some((u) => u.correo === 'mebolanos@cem.edu.co')) {
     parsedUsers.push(DEFAULT_AUTHORIZED_USERS[0]);
   }
@@ -679,7 +778,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     driveIdCol: '',
   });
 
-  // Datos de la hoja "usuarios" (Nombres, Curso, Correo, Sección)
+  // Datos de la hoja "usuarios" (Curso, Sección, Nombre y Apellido, Correo institucional, Perfil)
   const [authorizedUsers, setAuthorizedUsers] =
     useState<AuthorizedSchoolUser[]>(DEFAULT_AUTHORIZED_USERS);
   const [currentUser, setCurrentUser] = useState<AuthorizedSchoolUser | null>(null);
@@ -701,7 +800,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   const [previewDoc, setPreviewDoc] = useState<MonographDocument | null>(null);
 
   // Sección exclusiva de Administrador (oculta para estudiantes, docentes y personal no administrador)
-  const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false);
+  const [showAdminPanel, setShowAdminPanel] = useState<boolean>(true);
   const [connectionUrl, setConnectionUrl] = useState<string>('');
   const [usersSheetUrl, setUsersSheetUrl] = useState<string>('');
   const [accessToken, setAccessToken] = useState<string>('EKIRAYA-2026');
@@ -709,12 +808,12 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   const [lastSyncDate, setLastSyncDate] = useState<string | null>(null);
   const [copiedScript, setCopiedScript] = useState<boolean>(false);
 
-  // Manual addition of a user by Admin in case they want to test before syncing
-  const [newUserName, setNewUserName] = useState('');
+  // Agregar usuario en la tabla autorizada (Curso, Sección, Nombre y Apellido, Correo institucional, Perfil)
   const [newUserCourse, setNewUserCourse] = useState('');
+  const [newUserSection, setNewUserSection] = useState('');
+  const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserSection, setNewUserSection] = useState('Estudiante');
-  const [newUserIsAdmin, setNewUserIsAdmin] = useState(false);
+  const [newUserProfile, setNewUserProfile] = useState('Estudiante');
 
   // Cargar configuración y sesión de localStorage
   useEffect(() => {
@@ -764,12 +863,12 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     return mapped.length > 0 ? mapped : DEFAULT_THREE_MONOGRAPHS;
   }, [rawRows, columnMapping, rawHeaders]);
 
-  // Validación estricta contra la hoja "usuarios" (Nombres, Curso, Correo, Sección)
+  // Validación estricta contra la hoja "usuarios" (Curso, Sección, Nombre y Apellido, Correo institucional, Perfil)
   const handleLoginWithUsersSheet = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = loginEmailInput.trim().toLowerCase();
     if (!cleanEmail) {
-      setLoginError('Por favor ingresa tu correo electrónico institucional.');
+      setLoginError('Por favor ingresa tu Correo institucional.');
       return;
     }
 
@@ -777,7 +876,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
     if (!foundUser) {
       setLoginError(
-        'Acceso restringido: Tu correo no se encuentra registrado en la hoja "usuarios" autorizada del Colegio Ekirayá (Estudiantes, Docentes y Personal de no clases).'
+        'Acceso restringido: Tu Correo institucional no se encuentra registrado en la hoja "usuarios" autorizada del Colegio Ekirayá.'
       );
       return;
     }
@@ -790,7 +889,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     } catch {
       // Ignore storage errors
     }
-    showToast(`Bienvenido(a), ${foundUser.nombres} (${foundUser.seccion})`);
+    showToast(`Bienvenido(a), ${foundUser.nombres} (${foundUser.perfil})`);
   };
 
   const handleLogoutUser = () => {
@@ -839,42 +938,69 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   };
 
   /**
-   * Sincroniza tanto la hoja del Repositorio como la hoja "usuarios" (Nombres, Curso, Correo, Sección)
+   * Sincroniza tanto la hoja del Repositorio como la hoja "usuarios"
+   * (Curso, Sección, Nombre y Apellido, Correo institucional, Perfil)
    */
   const handleSyncRepositoryAndUsers = async () => {
     const cleanUrl = connectionUrl.trim();
-    if (!cleanUrl) {
+    const cleanUsersUrl = usersSheetUrl.trim();
+
+    if (!cleanUrl && !cleanUsersUrl) {
       showToast('Pega el enlace de tu Google Sheet o la URL Web App de Apps Script');
       return;
     }
 
     setIsSyncing(true);
     try {
-      let headers: string[] = [];
-      let rows: Record<string, string>[] = [];
+      let headers: string[] = [...rawHeaders];
+      let rows: Record<string, string>[] = [...rawRows];
       let loadedUsers: AuthorizedSchoolUser[] = [...authorizedUsers];
 
-      const sheetIdMatch = cleanUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+      const primaryUrl = cleanUrl || cleanUsersUrl;
+      const sheetIdMatch = primaryUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+
       if (sheetIdMatch?.[1]) {
         const sheetId = sheetIdMatch[1];
-        const gidMatch = cleanUrl.match(/[#&?]gid=(\d+)/);
+        const gidMatch = primaryUrl.match(/[#&?]gid=(\d+)/);
         const gidParam = gidMatch?.[1] ? `&gid=${gidMatch[1]}` : '';
 
-        // 1. Leer hoja principal del Repositorio
+        // 1. Leer la hoja indicada en el enlace principal
         const csvEndpoint = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv${gidParam}`;
         const resp = await fetch(csvEndpoint);
         if (!resp.ok) {
           throw new Error('No se pudo leer el Google Sheet.');
         }
         const csvText = await resp.text();
-        const parsedRepo = parseCsvToRows(csvText);
-        headers = parsedRepo.headers;
-        rows = parsedRepo.rows;
+        const parsedPrimary = parseCsvToRows(csvText);
 
-        // 2. Leer hoja "usuarios" (ya sea de un enlace específico o de la pestaña llamada "usuarios" en el mismo archivo)
+        // Verificar si la primera pestaña es la de "usuarios" (Curso, Sección, Nombre y Apellido, Correo institucional, Perfil)
+        if (isUsersSheetHeaders(parsedPrimary.headers)) {
+          loadedUsers = parseUsersSheetRows(parsedPrimary.rows, parsedPrimary.headers);
+          // Intentar cargar también la pestaña "Repositorio" del mismo archivo
+          try {
+            const repoResp = await fetch(
+              `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=Repositorio`
+            );
+            if (repoResp.ok) {
+              const repoCsv = await repoResp.text();
+              const parsedRepo = parseCsvToRows(repoCsv);
+              if (!isUsersSheetHeaders(parsedRepo.headers) && parsedRepo.rows.length > 0) {
+                headers = parsedRepo.headers;
+                rows = parsedRepo.rows;
+              }
+            }
+          } catch {
+            // No hay pestaña Repositorio aún
+          }
+        } else {
+          headers = parsedPrimary.headers;
+          rows = parsedPrimary.rows;
+        }
+
+        // 2. Intentar leer la hoja "usuarios" explícitamente
         const targetUsersSheetId =
-          usersSheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/)?.[1] || sheetId;
-        const usersGidMatch = usersSheetUrl.match(/[#&?]gid=(\d+)/);
+          cleanUsersUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/)?.[1] || sheetId;
+        const usersGidMatch = cleanUsersUrl.match(/[#&?]gid=(\d+)/);
         const usersCsvEndpoint = usersGidMatch?.[1]
           ? `https://docs.google.com/spreadsheets/d/${targetUsersSheetId}/gviz/tq?tqx=out:csv&gid=${usersGidMatch[1]}`
           : `https://docs.google.com/spreadsheets/d/${targetUsersSheetId}/gviz/tq?tqx=out:csv&sheet=usuarios`;
@@ -884,7 +1010,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           if (usersResp.ok) {
             const usersCsv = await usersResp.text();
             const parsedUsersSheet = parseCsvToRows(usersCsv);
-            if (parsedUsersSheet.rows.length > 0) {
+            if (isUsersSheetHeaders(parsedUsersSheet.headers) || parsedUsersSheet.rows.length > 0) {
               loadedUsers = parseUsersSheetRows(
                 parsedUsersSheet.rows,
                 parsedUsersSheet.headers
@@ -892,14 +1018,14 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             }
           }
         } catch {
-          // Si no se pudo leer la pestaña usuarios por CSV, mantenemos los usuarios actuales
+          // Mantiene loadedUsers
         }
       } else {
         // Conexión vía Web App de Google Apps Script (/exec)
-        const separator = cleanUrl.includes('?') ? '&' : '?';
+        const separator = primaryUrl.includes('?') ? '&' : '?';
         const requestUrl = accessToken.trim()
-          ? `${cleanUrl}${separator}token=${encodeURIComponent(accessToken.trim())}`
-          : cleanUrl;
+          ? `${primaryUrl}${separator}token=${encodeURIComponent(accessToken.trim())}`
+          : primaryUrl;
 
         const resp = await fetch(requestUrl);
         if (!resp.ok) {
@@ -908,20 +1034,12 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         const data = await resp.json();
 
         if (Array.isArray(data?.headers) && Array.isArray(data?.rows)) {
-          headers = data.headers.map((h: string) => String(h).trim());
-          rows = data.rows;
-        } else if (Array.isArray(data?.items) || Array.isArray(data)) {
-          const rawArr = Array.isArray(data?.items) ? data.items : data;
-          if (rawArr.length > 0 && typeof rawArr[0] === 'object') {
-            headers = Object.keys(rawArr[0]);
-            rows = rawArr.map((obj: Record<string, unknown>) => {
-              const r: Record<string, string> = {};
-              headers.forEach((k) => {
-                const v = obj[k];
-                r[k] = Array.isArray(v) ? v.join(', ') : String(v ?? '');
-              });
-              return r;
-            });
+          const incomingHeaders = data.headers.map((h: string) => String(h).trim());
+          if (isUsersSheetHeaders(incomingHeaders)) {
+            loadedUsers = parseUsersSheetRows(data.rows, incomingHeaders);
+          } else {
+            headers = incomingHeaders;
+            rows = data.rows;
           }
         }
 
@@ -944,7 +1062,6 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       setLastSyncDate(nowStr);
       setPageIndex(0);
 
-      // Si el usuario actual sigue en la lista, actualizar su perfil
       if (currentUser) {
         const refreshedCurrent = loadedUsers.find(
           (u) => u.correo.toLowerCase() === currentUser.correo.toLowerCase()
@@ -959,7 +1076,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         STORAGE_REPO_CONFIG_KEY,
         JSON.stringify({
           connectionUrl: cleanUrl,
-          usersSheetUrl: usersSheetUrl.trim(),
+          usersSheetUrl: cleanUsersUrl,
           accessToken: accessToken.trim(),
           lastSyncDate: nowStr,
           rawHeaders: headers,
@@ -970,11 +1087,11 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       );
 
       showToast(
-        `Sincronización completada: ${rows.length} monografías y ${loadedUsers.length} usuarios cargados.`
+        `Sincronizado: ${rows.length} monografías y ${loadedUsers.length} usuarios registrados.`
       );
     } catch {
       showToast(
-        'Error al conectar con Google Sheets. Verifica que el enlace tenga permiso de lectura o usa el Web App de Apps Script.'
+        'Error al conectar con Google Sheets. Verifica que el archivo tenga permiso de lectura o usa el Web App de Apps Script.'
       );
     } finally {
       setIsSyncing(false);
@@ -1003,16 +1120,18 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     e.preventDefault();
     const cleanMail = newUserEmail.trim().toLowerCase();
     if (!cleanMail || !cleanMail.includes('@') || !newUserName.trim()) {
-      showToast('Completa al menos Nombres y Correo del usuario');
+      showToast('Completa Nombre y Apellido y Correo institucional');
       return;
     }
 
+    const isAdminProfile = /admin/i.test(newUserProfile);
     const newUser: AuthorizedSchoolUser = {
-      nombres: newUserName.trim(),
       curso: newUserCourse.trim() || 'General',
+      seccion: newUserSection.trim() || 'General',
+      nombres: newUserName.trim(),
       correo: cleanMail,
-      seccion: newUserIsAdmin ? 'Administrador' : newUserSection.trim(),
-      isAdmin: newUserIsAdmin,
+      perfil: newUserProfile.trim(),
+      isAdmin: isAdminProfile || cleanMail === 'mebolanos@cem.edu.co',
     };
 
     const updatedUsers = [
@@ -1020,10 +1139,11 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       newUser,
     ];
     setAuthorizedUsers(updatedUsers);
-    setNewUserName('');
     setNewUserCourse('');
+    setNewUserSection('');
+    setNewUserName('');
     setNewUserEmail('');
-    setNewUserIsAdmin(false);
+    setNewUserProfile('Estudiante');
 
     try {
       const savedConfig = localStorage.getItem(STORAGE_REPO_CONFIG_KEY);
@@ -1038,7 +1158,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     } catch {
       // Ignore storage errors
     }
-    showToast(`Usuario agregado a la lista autorizada: ${newUser.nombres}`);
+    showToast(`Usuario agregado: ${newUser.nombres} (${newUser.perfil})`);
   };
 
   const handleCopyAppsScript = async () => {
@@ -1098,7 +1218,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     [monographs]
   );
 
-  // Búsqueda e indexación teniendo en cuenta:
+  // Búsqueda e indexación por:
   // Nombre del archivo, Título de la monografía, Autor, Año lectivo, Asignatura y Unidad académica
   const filteredMonographs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -1162,7 +1282,8 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   };
 
   // ============================================================================
-  // PANTALLA DE CONTROL DE ACCESO: SOLO USUARIOS REGISTRADOS EN LA HOJA "USUARIOS"
+  // PANTALLA DE CONTROL DE ACCESO: SOLO USUARIOS EN LA HOJA "USUARIOS"
+  // (Curso, Sección, Nombre y Apellido, Correo institucional, Perfil)
   // ============================================================================
   if (!currentUser) {
     return (
@@ -1170,7 +1291,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         <div className="bg-gradient-to-br from-[#2E1065] via-[#4C1D95] to-[#1E1B4B] rounded-2xl p-6 sm:p-8 text-white border border-violet-800/40 shadow-md space-y-5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-violet-100 text-xs font-semibold">
             <Lock className="w-3.5 h-3.5 text-amber-300" />
-            <span>Acceso Exclusivo · Hoja de Usuarios Autorizados</span>
+            <span>Acceso Exclusivo · Hoja &ldquo;usuarios&rdquo; Colegio Ekirayá</span>
           </div>
 
           <div className="space-y-2">
@@ -1178,9 +1299,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               Repositorio de Monografías — Unidades Académicas
             </h1>
             <p className="text-violet-100/90 text-sm leading-relaxed">
-              El acceso al repositorio de monografías del <strong>Colegio Ekirayá</strong> está
-              habilitado únicamente para los <strong>estudiantes, docentes y personal de no clases</strong>{' '}
-              registrados en la hoja <code>usuarios</code>.
+              El acceso al repositorio está habilitado únicamente para los{' '}
+              <strong>estudiantes, docentes, personal de no clases y administradores</strong>{' '}
+              registrados en la hoja <code>usuarios</code> (
+              <em>Curso, Sección, Nombre y Apellido, Correo institucional, Perfil</em>).
             </p>
           </div>
 
@@ -1193,7 +1315,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 htmlFor="repoUserEmail"
                 className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5"
               >
-                Ingresa tu correo registrado en la hoja &ldquo;usuarios&rdquo;
+                Correo institucional registrado en la hoja &ldquo;usuarios&rdquo;
               </label>
               <input
                 id="repoUserEmail"
@@ -1203,7 +1325,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   setLoginEmailInput(e.target.value);
                   if (loginError) setLoginError(null);
                 }}
-                placeholder="nombre@cem.edu.co"
+                placeholder="ejemplo: mebolanos@cem.edu.co"
                 className="w-full rounded-xl border border-slate-300 py-2.5 px-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-600"
                 autoFocus
               />
@@ -1218,8 +1340,8 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
               <span className="text-[11px] text-slate-500">
-                Verifica: <strong>Nombres, Curso, Correo y Sección</strong> (incluye perfil
-                Administrador).
+                Para configurar por primera vez como administrador ingresa{' '}
+                <code>mebolanos@cem.edu.co</code>.
               </span>
               <button
                 type="submit"
@@ -1239,7 +1361,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* ENCABEZADO DEL REPOSITORIO CON PERFIL DEL USUARIO VALIDADO EN LA HOJA "USUARIOS" */}
+      {/* ENCABEZADO DEL REPOSITORIO CON PERFIL VALIDADO DESDE LA HOJA "USUARIOS" */}
       <div className="bg-gradient-to-br from-[#2E1065] via-[#4C1D95] to-[#1E1B4B] rounded-2xl p-6 sm:p-8 text-white border border-violet-800/40 shadow-sm">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-2.5 max-w-3xl">
@@ -1247,9 +1369,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               <FolderGit2 className="w-3.5 h-3.5 text-violet-200" />
               <span>Carpeta: Unidades Académicas ({DRIVE_ROOT_FOLDER_ID})</span>
               <span aria-hidden="true">·</span>
-              <span>
-                {isAdmin ? 'Perfil: Administrador' : `Sección: ${currentUser.seccion}`}
-              </span>
+              <span>Perfil: {currentUser.perfil}</span>
             </div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight">
               Repositorio de Monografías — Unidades Académicas
@@ -1264,7 +1384,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             </p>
           </div>
 
-          {/* CONTROLES SUPERIORES: SOLO EL ADMINISTRADOR VE EL BOTÓN DE CONEXIÓN CON SHEETS Y ADMINISTRACIÓN */}
+          {/* SOLO EL PERFIL ADMINISTRADOR VE EL ACCESO A LA SECCIÓN ADMINISTRATIVA */}
           <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 shrink-0">
             {isAdmin && (
               <button
@@ -1280,7 +1400,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 <span>
                   {showAdminPanel
                     ? 'Ocultar Sección de Administrador'
-                    : 'Sección de Administrador (Sheets y Usuarios)'}
+                    : 'Abrir Sección de Administrador'}
                 </span>
               </button>
             )}
@@ -1296,18 +1416,21 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           </div>
         </div>
 
-        {/* FICHA DEL USUARIO VERIFICADO DESDE LA HOJA "USUARIOS" */}
+        {/* DATOS DEL USUARIO AUTENTICADO SEGÚN LA HOJA "USUARIOS" */}
         <div className="mt-5 pt-4 border-t border-white/15 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-semibold bg-emerald-500/20 text-emerald-100 border border-emerald-400/40">
               <Unlock className="w-3.5 h-3.5 text-emerald-300" />
-              <span>Usuario verificado: {currentUser.nombres}</span>
+              <span>Nombre y Apellido: {currentUser.nombres}</span>
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-white/10 text-violet-100">
               <strong>Curso:</strong> {currentUser.curso}
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-white/10 text-violet-100">
               <strong>Sección:</strong> {currentUser.seccion}
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-white/10 text-violet-100">
+              <strong>Perfil:</strong> {currentUser.perfil}
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-white/10 text-violet-100 font-mono">
               {currentUser.correo}
@@ -1323,7 +1446,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       </div>
 
       {/* =========================================================================
-          SECCIÓN EXCLUSIVA DE ADMINISTRADOR (OCULTA PARA NO ADMINISTRADORES)
+          SECCIÓN EXCLUSIVA DE ADMINISTRADOR (OCULTA PARA OTROS PERFILES)
          ========================================================================= */}
       {isAdmin && showAdminPanel && (
         <section className="bg-[#FAF5FF] rounded-2xl border-2 border-violet-300 p-5 sm:p-6 space-y-6 shadow-sm">
@@ -1334,10 +1457,11 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               </div>
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-violet-700">
-                  Visible únicamente para el perfil Administrador
+                  Exclusivo Perfil Administrador
                 </span>
                 <h2 className="text-base sm:text-lg font-bold text-violet-950">
-                  Sección de Administrador · Conexión con Google Sheets y Hoja &ldquo;usuarios&rdquo;
+                  Panel Administrativo · Sincronización Carpeta Drive ↔ Google Sheets y Hoja
+                  &ldquo;usuarios&rdquo;
                 </h2>
               </div>
             </div>
@@ -1346,48 +1470,54 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               onClick={() => setShowAdminPanel(false)}
               className="text-xs font-semibold text-violet-700 hover:underline self-start sm:self-auto"
             >
-              Minimizar panel
+              Minimizar panel administrativo
             </button>
           </div>
 
-          {/* 1. CONECTOR CON GOOGLE SHEETS (REPOSITORIO + HOJA USUARIOS) */}
+          {/* 1. CONEXIÓN CON EL ARCHIVO DE GOOGLE SHEETS / WEB APP APPS SCRIPT */}
           <div className="bg-white rounded-xl border border-violet-200 p-5 space-y-4">
             <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
               <Database className="w-4 h-4 text-violet-700" />
               <span>
-                1. Conexión con Google Sheets (Hoja de Monografías y Hoja &ldquo;usuarios&rdquo;)
+                1. Sincronizar Google Sheets (Pestaña &ldquo;Repositorio&rdquo; y Pestaña
+                &ldquo;usuarios&rdquo;)
               </span>
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Pega la URL de tu <strong>Web App de Google Apps Script</strong> (recomendado, ya que
-              lee automáticamente tanto la hoja <code>Repositorio</code> como la hoja{' '}
-              <code>usuarios</code>) o el enlace directo de tu archivo de{' '}
-              <strong>Google Sheets</strong>:
+              Pega aquí la URL de tu <strong>Google Sheet</strong> o la URL <code>/exec</code> del{' '}
+              <strong>Google Apps Script</strong> desplegado en tu hoja. El sistema sincronizará
+              automáticamente las monografías de la carpeta{' '}
+              <code>1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC</code> y la hoja <code>usuarios</code> con
+              las columnas{' '}
+              <strong>
+                Curso, Sección, Nombre y Apellido, Correo institucional, Perfil
+              </strong>
+              :
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
               <div className="md:col-span-5">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Enlace Google Sheets Principal o URL Web App (/exec)
+                  URL de tu Google Sheet o Web App de Apps Script (/exec)
                 </label>
                 <input
                   type="url"
                   value={connectionUrl}
                   onChange={(e) => setConnectionUrl(e.target.value)}
-                  placeholder="https://script.google.com/macros/s/.../exec o link de Sheets"
+                  placeholder="https://docs.google.com/spreadsheets/d/... o https://script.google.com/..."
                   className="w-full rounded-xl border border-slate-300 bg-slate-50 py-2 px-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                 />
               </div>
 
               <div className="md:col-span-4">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Enlace Hoja &ldquo;usuarios&rdquo; (Opcional si está en otro archivo)
+                  URL específica de la pestaña &ldquo;usuarios&rdquo; (Opcional)
                 </label>
                 <input
                   type="url"
                   value={usersSheetUrl}
                   onChange={(e) => setUsersSheetUrl(e.target.value)}
-                  placeholder="Por defecto lee la pestaña 'usuarios' del mismo Sheet"
+                  placeholder="Si está en el mismo archivo se detecta sola"
                   className="w-full rounded-xl border border-slate-300 bg-slate-50 py-2 px-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                 />
               </div>
@@ -1409,8 +1539,8 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
               <span className="text-[11px] text-slate-500 flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                Recopila: Nombre del archivo, Título de la monografía, Autor, Año lectivo,
-                Asignatura y Unidad académica + Hoja &ldquo;usuarios&rdquo;.
+                Reconoce las columnas de usuarios:{' '}
+                <strong>Curso · Sección · Nombre y Apellido · Correo institucional · Perfil</strong>
               </span>
 
               <button
@@ -1421,19 +1551,19 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                 <span>
-                  {isSyncing ? 'Sincronizando hojas...' : 'Sincronizar Monografías y Usuarios'}
+                  {isSyncing ? 'Sincronizando con Sheets...' : 'Sincronizar Ahora con Sheets'}
                 </span>
               </button>
             </div>
           </div>
 
-          {/* 2. MAPEO DINÁMICO DE TÍTULOS DE COLUMNA (INCLUYENDO UNIDAD ACADÉMICA) */}
+          {/* 2. MAPEO DINÁMICO DE TÍTULOS DE COLUMNA DE MONOGRAFÍAS */}
           {rawHeaders.length > 0 && (
             <div className="bg-white rounded-xl border border-violet-200 p-5 space-y-3">
               <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
                 <Table2 className="w-4 h-4 text-violet-700" />
                 <span>
-                  2. Mapeo de Títulos de Columna Detectados en Google Sheets ({rawHeaders.length}{' '}
+                  2. Títulos de Columna Leídos en la Hoja de Monografías ({rawHeaders.length}{' '}
                   columnas)
                 </span>
               </h3>
@@ -1448,7 +1578,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   { key: 'driveUrlCol' as const, label: 'Enlace Drive' },
                   { key: 'driveIdCol' as const, label: 'ID del archivo' },
                 ].map((field) => (
-                  <div key={field.key} className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                  <div
+                    key={field.key}
+                    className="p-2.5 rounded-lg bg-slate-50 border border-slate-200"
+                  >
                     <label className="block font-semibold text-slate-800 mb-1">
                       {field.label}
                     </label>
@@ -1470,32 +1603,26 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             </div>
           )}
 
-          {/* 3. GESTIÓN Y VISTA DE LA HOJA "USUARIOS" (NOMBRES, CURSO, CORREO, SECCIÓN, ADMINISTRADOR) */}
+          {/* 3. TABLA DE LA HOJA "USUARIOS" (CURSO, SECCIÓN, NOMBRE Y APELLIDO, CORREO INSTITUCIONAL, PERFIL) */}
           <div className="bg-white rounded-xl border border-violet-200 p-5 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
                 <Users className="w-4 h-4 text-violet-700" />
                 <span>
-                  3. Usuarios Autorizados en la Hoja &ldquo;usuarios&rdquo; ({authorizedUsers.length})
+                  3. Hoja &ldquo;usuarios&rdquo; Sincronizada ({authorizedUsers.length} usuarios con
+                  acceso)
                 </span>
               </h3>
               <span className="text-xs text-slate-500">
-                Columnas: Nombres · Curso · Correo · Sección
+                Columnas: Curso · Sección · Nombre y Apellido · Correo institucional · Perfil
               </span>
             </div>
 
-            {/* Formulario rápido para agregar usuario o administrador manualmente */}
+            {/* Formulario rápido con las 5 columnas exactas de la hoja del usuario */}
             <form
               onSubmit={handleAddAuthorizedUserManually}
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
             >
-              <input
-                type="text"
-                value={newUserName}
-                onChange={(e) => setNewUserName(e.target.value)}
-                placeholder="Nombres completos"
-                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5"
-              />
               <input
                 type="text"
                 value={newUserCourse}
@@ -1504,15 +1631,29 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5"
               />
               <input
+                type="text"
+                value={newUserSection}
+                onChange={(e) => setNewUserSection(e.target.value)}
+                placeholder="Sección (ej. Bachillerato)"
+                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5"
+              />
+              <input
+                type="text"
+                value={newUserName}
+                onChange={(e) => setNewUserName(e.target.value)}
+                placeholder="Nombre y Apellido"
+                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5"
+              />
+              <input
                 type="email"
                 value={newUserEmail}
                 onChange={(e) => setNewUserEmail(e.target.value)}
-                placeholder="Correo (@cem.edu.co)"
+                placeholder="Correo institucional"
                 className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5"
               />
               <select
-                value={newUserSection}
-                onChange={(e) => setNewUserSection(e.target.value)}
+                value={newUserProfile}
+                onChange={(e) => setNewUserProfile(e.target.value)}
                 className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5"
               >
                 <option value="Estudiante">Estudiante</option>
@@ -1520,50 +1661,40 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 <option value="Personal no clases">Personal no clases</option>
                 <option value="Administrador">Administrador</option>
               </select>
-              <label className="flex items-center gap-1.5 px-2 font-semibold text-violet-950 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={newUserIsAdmin}
-                  onChange={(e) => setNewUserIsAdmin(e.target.checked)}
-                  className="rounded text-violet-700"
-                />
-                <span>Es Administrador</span>
-              </label>
               <button
                 type="submit"
                 className="px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-800 text-white font-semibold"
               >
-                + Agregar Usuario
+                + Añadir Usuario
               </button>
             </form>
 
-            {/* Tabla de usuarios cargados desde la hoja "usuarios" */}
             <div className="overflow-x-auto max-h-56 border border-slate-200 rounded-xl">
               <table className="w-full text-left border-collapse text-xs">
                 <thead className="bg-slate-100 text-slate-700 sticky top-0">
                   <tr>
-                    <th className="py-2 px-3 font-semibold">Nombres</th>
                     <th className="py-2 px-3 font-semibold">Curso</th>
-                    <th className="py-2 px-3 font-semibold">Correo</th>
                     <th className="py-2 px-3 font-semibold">Sección</th>
+                    <th className="py-2 px-3 font-semibold">Nombre y Apellido</th>
+                    <th className="py-2 px-3 font-semibold">Correo institucional</th>
                     <th className="py-2 px-3 font-semibold">Perfil</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {authorizedUsers.map((u) => (
                     <tr key={u.correo} className="hover:bg-slate-50">
-                      <td className="py-2 px-3 font-medium text-slate-900">{u.nombres}</td>
                       <td className="py-2 px-3 text-slate-600">{u.curso}</td>
-                      <td className="py-2 px-3 font-mono text-slate-700">{u.correo}</td>
                       <td className="py-2 px-3 text-slate-600">{u.seccion}</td>
+                      <td className="py-2 px-3 font-medium text-slate-900">{u.nombres}</td>
+                      <td className="py-2 px-3 font-mono text-slate-700">{u.correo}</td>
                       <td className="py-2 px-3">
                         {u.isAdmin ? (
                           <span className="px-2 py-0.5 rounded bg-violet-100 text-violet-900 font-semibold">
-                            Administrador
+                            {u.perfil} (Admin)
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                            Autorizado
+                            {u.perfil}
                           </span>
                         )}
                       </td>
@@ -1574,14 +1705,14 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             </div>
           </div>
 
-          {/* 4. CÓDIGO GOOGLE APPS SCRIPT (SOLO VISIBLE PARA ADMINISTRADORES) */}
+          {/* 4. CÓDIGO GOOGLE APPS SCRIPT COMPLETO EN EL PERFIL ADMINISTRATIVO */}
           <div className="bg-white rounded-xl border border-violet-200 p-5 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
                 <Code2 className="w-4 h-4 text-violet-700" />
                 <span>
-                  4. Código Google Apps Script (Recopila Unidad Académica + Lee Hoja
-                  &ldquo;usuarios&rdquo;)
+                  4. Código Google Apps Script Actualizado (Sincroniza Carpeta Drive ↔ Hoja
+                  &ldquo;Repositorio&rdquo; y Hoja &ldquo;usuarios&rdquo;)
                 </span>
               </div>
               <button
@@ -1602,7 +1733,13 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 )}
               </button>
             </div>
-            <pre className="p-4 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] leading-relaxed overflow-x-auto max-h-64">
+            <p className="text-xs text-slate-600">
+              Pega este código en <strong>Extensiones → Apps Script</strong> dentro de tu archivo de
+              Google Sheets y ejecuta <code>sincronizarUnidadesAcademicas</code> para llenar
+              automáticamente la hoja con los archivos de la carpeta{' '}
+              <code>1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC</code>:
+            </p>
+            <pre className="p-4 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] leading-relaxed overflow-x-auto max-h-80">
               {APPS_SCRIPT_CODE}
             </pre>
           </div>
@@ -1798,14 +1935,13 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         </div>
       ) : (
         <section className="space-y-4">
-          {/* Barra de encabezado de la Vista Previa de 3 Monografías y Paginación */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-base sm:text-lg font-bold text-slate-900">
                 Vista Previa de Monografías ({threePreviewMonographs.length})
               </h2>
               <p className="text-xs text-slate-500">
-                Visualización directa de hasta 3 monografías simultáneas con su unidad académica,
+                Visualización de hasta 3 monografías simultáneas con su unidad académica,
                 asignatura, autor y año lectivo.
               </p>
             </div>
@@ -1837,7 +1973,6 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             )}
           </div>
 
-          {/* Cuadrícula de las 3 Monografías en Vista Previa */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {threePreviewMonographs.map((doc) => {
               const singlePreviewUrl = buildSingleDocPreviewUrl(
@@ -1850,7 +1985,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   key={doc.id}
                   className="bg-white rounded-2xl border border-slate-200 hover:border-violet-300 overflow-hidden flex flex-col justify-between shadow-2xs transition-all"
                 >
-                  {/* 1. VISOR DE VISTA PREVIA DE LA MONOGRAFÍA EN LA PARTE SUPERIOR DE LA TARJETA */}
+                  {/* VISOR DE VISTA PREVIA DE LA MONOGRAFÍA */}
                   <div className="relative h-56 bg-slate-100 border-b border-slate-200 overflow-hidden">
                     {singlePreviewUrl ? (
                       <iframe
@@ -1859,7 +1994,6 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                         className="w-full h-full border-0 bg-white"
                       />
                     ) : (
-                      /* Vista previa tipo portada académica del documento cuando no tiene ID individual aún */
                       <div className="w-full h-full p-5 bg-gradient-to-b from-slate-50 to-slate-100 flex flex-col justify-between">
                         <div className="flex items-center justify-between text-[11px] text-slate-500">
                           <span className="font-semibold text-violet-900 bg-violet-100 px-2 py-0.5 rounded">
@@ -1885,7 +2019,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                     )}
                   </div>
 
-                  {/* 2. METADATOS COMPLETOS DE LA MONOGRAFÍA */}
+                  {/* METADATOS DE LA MONOGRAFÍA */}
                   <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                     <div className="space-y-3">
                       <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px]">
@@ -1931,7 +2065,6 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                       </div>
                     </div>
 
-                    {/* 3. BOTONES DE ACCIÓN */}
                     <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                       <button
                         type="button"
