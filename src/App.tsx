@@ -151,13 +151,13 @@ export default function App() {
     <div className="min-h-screen flex flex-col bg-[#F8FAFC] text-[#0F172A]">
       {/* Top Navigation Bar following the 3-Zone Contract */}
       <header className="sticky top-0 z-40 bg-[#4C1D95] text-white border-b border-violet-800 shadow-sm">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 lg:py-0 lg:h-16 flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 lg:gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-2.5 lg:py-2 min-h-[3.75rem] flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 lg:gap-3">
           {/* Zone 1: Brand Title */}
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 min-w-0 w-full lg:w-auto">
             <button
               type="button"
               onClick={() => handleSwitchTab('teoria')}
-              className="flex items-center gap-2.5 sm:gap-3 text-left focus:outline-none group min-w-0"
+              className="flex items-center gap-2 sm:gap-2.5 text-left focus:outline-none group min-w-0 flex-1 lg:flex-initial"
             >
               {!logoFailed ? (
                 <img
@@ -165,14 +165,14 @@ export default function App() {
                   alt="Logo Colegio Ekirayá"
                   referrerPolicy="no-referrer"
                   onError={() => setLogoFailed(true)}
-                  className="h-9 sm:h-10 w-auto object-contain bg-white px-2 py-1 rounded-lg shadow-xs shrink-0"
+                  className="h-8 sm:h-9 w-auto object-contain bg-white px-1.5 py-0.5 rounded-lg shadow-xs shrink-0"
                 />
               ) : (
-                <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-white text-violet-900 flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
+                <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-white text-violet-900 flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
                   CE
                 </div>
               )}
-              <span className="font-display text-base sm:text-xl font-semibold tracking-tight text-white truncate">
+              <span className="font-display text-sm sm:text-base lg:text-lg font-semibold tracking-tight text-white truncate max-w-[190px] sm:max-w-xs md:max-w-none">
                 Colegio Ekirayá · Cita Master
               </span>
             </button>
@@ -180,104 +180,106 @@ export default function App() {
             <button
               type="button"
               onClick={() => handleSwitchTab('gestor')}
-              className="lg:hidden px-2.5 py-1.5 text-xs font-semibold bg-violet-950/70 hover:bg-violet-950 text-violet-100 border border-violet-600/50 rounded-lg transition-colors whitespace-nowrap shrink-0"
+              className="lg:hidden px-2.5 py-1 text-xs font-semibold bg-violet-800 hover:bg-violet-700 text-white border border-violet-500/50 rounded-lg transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap shadow-xs"
             >
-              + Cita
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <span>Nueva Cita</span>
             </button>
           </div>
 
-          {/* Zone 2: Navigation Links (Responsive grid on mobile, row on sm+) */}
+          {/* Zone 2: Navigation Links */}
           <nav
             aria-label="Navegación principal"
-            className="grid grid-cols-2 sm:flex sm:flex-wrap lg:flex-nowrap items-center gap-1.5 sm:gap-2 w-full lg:w-auto"
+            className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar py-0.5 w-full lg:w-auto min-w-0 flex-nowrap sm:flex-wrap"
           >
             <button
               type="button"
               onClick={() => handleSwitchTab('teoria')}
-              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center sm:justify-start gap-1.5 whitespace-nowrap ${
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                 activeTab === 'teoria'
                   ? 'bg-white text-violet-950 font-semibold shadow-xs'
                   : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
               }`}
             >
-              <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              <span className="truncate">Guía Teórica</span>
+              <BookOpen className="w-3.5 h-3.5 shrink-0" />
+              <span>Guía Teórica</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleSwitchTab('apa2026')}
-              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center sm:justify-start gap-1.5 whitespace-nowrap ${
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                 activeTab === 'apa2026'
                   ? 'bg-white text-violet-950 font-semibold shadow-xs'
                   : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
               }`}
             >
-              <FileCheck2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              <span className="truncate">Normas APA 2026</span>
+              <FileCheck2 className="w-3.5 h-3.5 shrink-0" />
+              <span>Normas APA 2026</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleSwitchTab('gestor')}
-              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center sm:justify-start gap-1.5 whitespace-nowrap ${
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                 activeTab === 'gestor'
                   ? 'bg-white text-violet-950 font-semibold shadow-xs'
                   : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
               }`}
             >
-              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              <span className="truncate">Gestor ({savedReferences.length})</span>
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
+              <span>Gestor ({savedReferences.length})</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleSwitchTab('repositorio')}
-              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center sm:justify-start gap-1.5 whitespace-nowrap ${
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                 activeTab === 'repositorio'
                   ? 'bg-white text-violet-950 font-semibold shadow-xs'
                   : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
               }`}
             >
-              <FolderGit2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              <span className="truncate">Repositorio</span>
+              <FolderGit2 className="w-3.5 h-3.5 shrink-0" />
+              <span>Repositorio</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleSwitchTab('universitarios')}
-              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center sm:justify-start gap-1.5 whitespace-nowrap ${
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                 activeTab === 'universitarios'
                   ? 'bg-white text-violet-950 font-semibold shadow-xs'
                   : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
               }`}
             >
-              <GraduationCap className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              <span className="truncate">Universitarios</span>
+              <GraduationCap className="w-3.5 h-3.5 shrink-0" />
+              <span>Universitarios</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleSwitchTab('taller')}
-              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center sm:justify-start gap-1.5 whitespace-nowrap ${
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                 activeTab === 'taller'
                   ? 'bg-white text-violet-950 font-semibold shadow-xs'
                   : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
               }`}
             >
-              <ClipboardList className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              <span className="truncate">Ejercicios y Test</span>
+              <ClipboardList className="w-3.5 h-3.5 shrink-0" />
+              <span>Ejercicios</span>
             </button>
           </nav>
 
           {/* Zone 3: Primary Action */}
-          <div className="hidden xl:flex items-center shrink-0">
+          <div className="hidden lg:flex items-center shrink-0">
             <button
               type="button"
               onClick={() => handleSwitchTab('gestor')}
-              className="px-3.5 py-1.5 text-xs font-semibold bg-violet-950/70 hover:bg-violet-950 text-violet-100 border border-violet-600/50 rounded-lg transition-colors whitespace-nowrap"
+              className="px-3 py-1.5 text-xs font-semibold bg-violet-800 hover:bg-violet-700 text-white border border-violet-500/50 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs whitespace-nowrap"
             >
-              Nueva Cita / Referencia
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <span>Nueva Cita</span>
             </button>
           </div>
         </div>

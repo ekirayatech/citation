@@ -144,7 +144,7 @@ export const APPS_SCRIPT_CODE = `/**
  */
 
 const ROOT_FOLDER_ID = '1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC';
-const REPO_SHEET_NAME = 'Repositorio';
+const REPO_SHEET_NAME = 'Hoja 1';
 const USERS_SHEET_NAME = 'usuarios';
 const INSTITUTIONAL_TOKEN = 'EKIRAYA-2026';
 
@@ -168,6 +168,39 @@ function configurarTrigger24Horas() {
     .timeBased()
     .everyDays(1)
     .create();
+}
+
+function obtenerHojaRepositorio(ss, tabNameParam) {
+  if (tabNameParam) {
+    const custom = ss.getSheetByName(tabNameParam);
+    if (custom) return custom;
+  }
+  const allSheets = ss.getSheets();
+  const usersSh = ss.getSheetByName('usuarios') || ss.getSheetByName('Usuarios');
+  const usersName = usersSh ? usersSh.getName().toLowerCase() : 'usuarios';
+
+  // 1. Si existe una hoja llamada "Hoja 1", "Sheet 1", "Hoja1" o "Sheet1"
+  for (let i = 0; i < allSheets.length; i++) {
+    const name = allSheets[i].getName().trim().toLowerCase();
+    if (name === 'hoja 1' || name === 'sheet 1' || name === 'hoja1' || name === 'sheet1') {
+      return allSheets[i];
+    }
+  }
+
+  // 2. Si la primera hoja no es la hoja de usuarios, tomar la primera hoja del libro
+  if (allSheets.length > 0 && allSheets[0].getName().toLowerCase() !== usersName) {
+    return allSheets[0];
+  }
+
+  // 3. Buscar cualquier otra hoja que no sea usuarios
+  for (let j = 0; j < allSheets.length; j++) {
+    const n = allSheets[j].getName().trim().toLowerCase();
+    if (n !== usersName && allSheets[j].getLastRow() > 0) {
+      return allSheets[j];
+    }
+  }
+
+  return allSheets[0];
 }
 
 function obtenerOCrearHojaUsuarios() {
@@ -333,7 +366,7 @@ function agregarUsuarioEnSheet(params) {
 
 function sincronizarUnidadesAcademicas() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(REPO_SHEET_NAME);
+  let sheet = obtenerHojaRepositorio(ss, null);
 
   const expectedHeaders = [
     'Nombre del archivo',
@@ -347,7 +380,7 @@ function sincronizarUnidadesAcademicas() {
   ];
 
   if (!sheet) {
-    sheet = ss.insertSheet(REPO_SHEET_NAME);
+    sheet = ss.insertSheet('Hoja 1');
   }
 
   if (sheet.getLastRow() === 0) {
@@ -466,25 +499,14 @@ function procesarSolicitud(params) {
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let usersSheet = obtenerOCrearHojaUsuarios();
-  let repoSheet = ss.getSheetByName(REPO_SHEET_NAME);
+  let repoSheet = obtenerHojaRepositorio(ss, params.sheet || params.tab || params.repoTabName);
 
-  if (params.action === 'syncDrive' || !repoSheet || repoSheet.getLastRow() <= 1) {
+  if (params.action === 'syncDrive') {
     try {
       sincronizarUnidadesAcademicas();
-      repoSheet = ss.getSheetByName(REPO_SHEET_NAME);
+      repoSheet = obtenerHojaRepositorio(ss, params.sheet || params.tab || params.repoTabName);
     } catch (err) {
       // Continúa leyendo las hojas disponibles
-    }
-  }
-
-  const allSheets = ss.getSheets();
-  if (!repoSheet) {
-    for (let i = 0; i < allSheets.length; i++) {
-      const sh = allSheets[i];
-      if (sh.getName() !== usersSheet.getName() && sh.getLastRow() > 0) {
-        repoSheet = sh;
-        break;
-      }
     }
   }
 
@@ -589,8 +611,9 @@ function fetchSheetTabViaBrowserJsonp(
         let headers = cols.map((c) => String(c?.label || '').trim());
         let startRowIdx = 0;
 
-        // Si gviz no puso las etiquetas en cols.label, tomar la primera fila como encabezados
-        if (headers.every((h) => !h) && rawTableRows.length > 0) {
+        const nonEmptyColsCount = headers.filter(Boolean).length;
+        // Si gviz no puso las etiquetas en cols.label o la mayoría están vacías, tomar la primera fila como encabezados
+        if ((nonEmptyColsCount < Math.ceil(cols.length / 2) || nonEmptyColsCount === 0) && rawTableRows.length > 0) {
           const firstRowCells = rawTableRows[0]?.c || [];
           headers = firstRowCells.map((cell, idx) =>
             String(cell?.f ?? cell?.v ?? '').trim() || `Columna_${idx + 1}`
@@ -882,10 +905,12 @@ function isUsersSheetData(headers: string[], rows: Record<string, string>[] = []
     return true;
   }
 
-  if (rows.length > 0) {
-    const firstRowStr = Object.values(rows[0] || {}).join(' ');
-    if (firstRowStr.includes('@') && !firstRowStr.includes('drive.google.com')) {
-      return true;
+  if (rows && rows.length > 0) {
+    for (let r = 0; r < Math.min(rows.length, 10); r++) {
+      const rowStr = Object.values(rows[r] || {}).join(' ');
+      if (rowStr.includes('@') && !rowStr.includes('drive.google.com')) {
+        return true;
+      }
     }
   }
 
@@ -1070,8 +1095,11 @@ function parseUsersSheetRows(
 
   for (const row of rows) {
     let correo = (correoCol && row[correoCol]) || '';
-    if (!correo) {
-      const emailCell = Object.values(row).find((v) => String(v || '').includes('@'));
+    if (!correo || !correo.includes('@')) {
+      const emailCell = Object.values(row).find((v) => {
+        const str = String(v || '').trim();
+        return str.includes('@') && !str.includes('drive.google.com') && !str.includes('http');
+      });
       if (emailCell) correo = String(emailCell);
     }
     correo = correo.trim().toLowerCase();
@@ -1378,7 +1406,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   const [showAdminPanel, setShowAdminPanel] = useState<boolean>(true);
   const [appsScriptExecUrl, setAppsScriptExecUrl] = useState<string>('');
   const [connectionUrl, setConnectionUrl] = useState<string>('');
-  const [repoTabName, setRepoTabName] = useState<string>('Repositorio');
+  const [repoTabName, setRepoTabName] = useState<string>('Hoja 1');
   const [accessToken, setAccessToken] = useState<string>('EKIRAYA-2026');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [isSavingUser, setIsSavingUser] = useState<boolean>(false);
@@ -1468,7 +1496,15 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         const urlGid = gidMatch?.[1];
 
         if (sheetId) {
-          for (const sheetCandidate of ['usuarios', 'Usuarios', 'USUARIOS']) {
+          for (const sheetCandidate of [
+            'usuarios',
+            'Usuarios',
+            'USUARIOS',
+            'usuario',
+            'Usuario',
+            'users',
+            'Users',
+          ]) {
             const browserUsersTab = await fetchSheetTabViaBrowserJsonp(sheetId, {
               sheetName: sheetCandidate,
             });
@@ -1504,6 +1540,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           if (clientRawHeaders.length === 0) {
             const candidateRepoTabs = Array.from(
               new Set([
+                'Hoja 1',
+                'Sheet 1',
+                'Hoja1',
+                'Sheet1',
                 targetTabName.trim(),
                 'Repositorio',
                 'Monografías',
@@ -1536,14 +1576,16 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             action: options?.triggerDriveScan ? 'syncDriveAndSheets' : 'readAll',
           });
           if (jsonpExec && !jsonpExec.error) {
-            const uHeaders: string[] = Array.isArray(jsonpExec.usersHeaders)
-              ? jsonpExec.usersHeaders.map(String)
-              : [];
-            const uRows: Record<string, string>[] = Array.isArray(jsonpExec.usersRows)
-              ? jsonpExec.usersRows
-              : Array.isArray(jsonpExec.users)
-                ? jsonpExec.users
-                : [];
+            const rawUHeaders =
+              (Array.isArray(jsonpExec.usuariosHeaders) ? jsonpExec.usuariosHeaders : null) ||
+              (Array.isArray(jsonpExec.usersHeaders) ? jsonpExec.usersHeaders : null) ||
+              [];
+            const uHeaders: string[] = rawUHeaders.map(String);
+            const uRows: Record<string, string>[] =
+              (Array.isArray(jsonpExec.usuariosRows) ? jsonpExec.usuariosRows : null) ||
+              (Array.isArray(jsonpExec.usersRows) ? jsonpExec.usersRows : null) ||
+              (Array.isArray(jsonpExec.users) ? jsonpExec.users : null) ||
+              [];
             if (uHeaders.length > 0 || uRows.length > 0) {
               const effHeaders =
                 uHeaders.length > 0 ? uHeaders : Object.keys(uRows[0] || {});
@@ -1687,7 +1729,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     let savedScriptUrl = '';
     let savedSheetUrl = '';
     let savedToken = 'EKIRAYA-2026';
-    let savedTab = 'Repositorio';
+    let savedTab = 'Hoja 1';
     let savedHeaders: string[] = [];
     let savedRows: Record<string, string>[] = [];
     let savedUsuariosHeaders: string[] = DEFAULT_USUARIOS_HEADERS;
@@ -1787,7 +1829,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       savedToken,
       savedTab,
       accumulatedUsers,
-      { silent: true, triggerDriveScan: true }
+      { silent: true, triggerDriveScan: false }
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1801,7 +1843,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         accessToken,
         repoTabName,
         authorizedUsers,
-        { silent: true, triggerDriveScan: true }
+        { silent: true, triggerDriveScan: false }
       );
     }, TWENTY_FOUR_HOURS_MS);
 
@@ -2599,12 +2641,17 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-              <span className="text-[11px] text-slate-500">
-                Usuarios autorizados activos: <strong>{authorizedUsers.length}</strong> (Admin
-                inicial: <code>mebolanos@cem.edu.co</code>)
-              </span>
-              <div className="flex items-center gap-2">
+            <div className="pt-2 border-t border-slate-100 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+                <span>
+                  Usuarios autorizados activos: <strong className="text-slate-800">{authorizedUsers.length}</strong>
+                </span>
+                <span className="text-slate-500">
+                  Admin inicial: <code className="text-violet-700 bg-violet-50 px-1 py-0.5 rounded font-mono text-[10px]">mebolanos@cem.edu.co</code>
+                </span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full">
                 <button
                   type="button"
                   onClick={() =>
@@ -2618,17 +2665,17 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                     )
                   }
                   disabled={isSyncing}
-                  className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5"
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-slate-200 shrink-0"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                   <span>Sincronizar usuarios</span>
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 shrink-0"
+                  className="w-full sm:flex-1 px-5 py-2.5 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-xs"
                 >
-                  <UserCheck className="w-4 h-4" />
-                  <span>Ingresar al Repositorio</span>
+                  <UserCheck className="w-4 h-4 shrink-0" />
+                  <span className="truncate">Ingresar al Repositorio</span>
                 </button>
               </div>
             </div>
@@ -2857,7 +2904,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   type="text"
                   value={repoTabName}
                   onChange={(e) => setRepoTabName(e.target.value)}
-                  placeholder="Repositorio"
+                  placeholder="Hoja 1 (o Repositorio)"
                   className="w-full rounded-xl border border-slate-300 bg-slate-50 py-2 px-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                 />
               </div>
@@ -2898,34 +2945,55 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               </div>
             )}
 
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1 border-t border-slate-100">
               <span className="text-[11px] text-slate-500 flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                Sincronización automática cada 24h y manual respetando las columnas exactas de tu Google Sheets.
+                Lee la base de datos (Hoja 1) y sincroniza usuarios automáticamente cada 24h.
               </span>
 
-              <button
-                type="button"
-                onClick={() =>
-                  executeSyncWithSheets(
-                    appsScriptExecUrl,
-                    connectionUrl,
-                    accessToken,
-                    repoTabName,
-                    authorizedUsers,
-                    { triggerDriveScan: true }
-                  )
-                }
-                disabled={isSyncing}
-                className="px-4 py-2 rounded-xl bg-violet-700 hover:bg-violet-800 disabled:bg-slate-400 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span>
-                  {isSyncing
-                    ? 'Sincronizando carpeta y hojas...'
-                    : 'Sincronizar Ahora (Drive ↔ Sheets ↔ Cita Master)'}
-                </span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    executeSyncWithSheets(
+                      appsScriptExecUrl,
+                      connectionUrl,
+                      accessToken,
+                      repoTabName,
+                      authorizedUsers,
+                      { triggerDriveScan: false }
+                    )
+                  }
+                  disabled={isSyncing}
+                  className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-violet-700 hover:bg-violet-800 disabled:bg-slate-400 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>
+                    {isSyncing ? 'Sincronizando...' : 'Sincronizar Sheets (Hoja 1 y Usuarios)'}
+                  </span>
+                </button>
+
+                {appsScriptExecUrl.includes('script.google.com') && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      executeSyncWithSheets(
+                        appsScriptExecUrl,
+                        connectionUrl,
+                        accessToken,
+                        repoTabName,
+                        authorizedUsers,
+                        { triggerDriveScan: true }
+                      )
+                    }
+                    disabled={isSyncing}
+                    className="px-3 py-2 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-900 border border-violet-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <FolderGit2 className="w-3.5 h-3.5" />
+                    <span>Escanear Google Drive</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 

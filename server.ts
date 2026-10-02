@@ -152,10 +152,12 @@ function isUsersSheetData(headers: string[], rows: Record<string, string>[] = []
   }
 
   // Verificar si las filas contienen correos electrónicos
-  if (rows.length > 0) {
-    const sampleRowValues = Object.values(rows[0] || {}).join(' ');
-    if (sampleRowValues.includes('@') && !sampleRowValues.includes('drive.google.com')) {
-      return true;
+  if (rows && rows.length > 0) {
+    for (let r = 0; r < Math.min(rows.length, 10); r++) {
+      const sampleRowValues = Object.values(rows[r] || {}).join(' ');
+      if (sampleRowValues.includes('@') && !sampleRowValues.includes('drive.google.com')) {
+        return true;
+      }
     }
   }
 
@@ -235,8 +237,11 @@ function parseUsersSheetRows(
 
   rows.forEach((row) => {
     let correo = (correoCol && row[correoCol]) || '';
-    if (!correo) {
-      const emailCell = Object.values(row).find((v) => String(v || '').includes('@'));
+    if (!correo || !correo.includes('@')) {
+      const emailCell = Object.values(row).find((v) => {
+        const str = String(v || '').trim();
+        return str.includes('@') && !str.includes('drive.google.com') && !str.includes('http');
+      });
       if (emailCell) correo = String(emailCell);
     }
     correo = correo.trim().toLowerCase();
@@ -345,7 +350,7 @@ function loadPersistedState(): PersistedRepoState {
       return {
         appsScriptExecUrl: parsed.appsScriptExecUrl || '',
         connectionUrl: parsed.connectionUrl || '',
-        repoTabName: parsed.repoTabName || 'Metadata Repositorio Eki',
+        repoTabName: parsed.repoTabName || 'Hoja 1',
         accessToken: parsed.accessToken || 'EKIRAYA-2026',
         lastSyncDate: parsed.lastSyncDate || new Date().toLocaleString('es-CO'),
         lastSyncTimestamp: parsed.lastSyncTimestamp || Date.now(),
@@ -365,7 +370,7 @@ function loadPersistedState(): PersistedRepoState {
   return {
     appsScriptExecUrl: '',
     connectionUrl: '',
-    repoTabName: 'Metadata Repositorio Eki',
+    repoTabName: 'Hoja 1',
     accessToken: 'EKIRAYA-2026',
     lastSyncDate: new Date().toLocaleString('es-CO'),
     lastSyncTimestamp: Date.now(),
@@ -752,7 +757,7 @@ async function startServer() {
         accessToken !== undefined ? accessToken : currentState.accessToken || 'EKIRAYA-2026'
       ).trim();
       const tabName = String(
-        repoTabName !== undefined ? repoTabName : currentState.repoTabName || 'Repositorio'
+        repoTabName !== undefined ? repoTabName : currentState.repoTabName || 'Hoja 1'
       ).trim();
 
       const effectiveScriptUrl = rawScriptInput.includes('script.google.com')
@@ -938,7 +943,15 @@ async function startServer() {
 
         // 2. Buscar explícitamente la hoja "usuarios" (usuarios / Usuarios / USUARIOS)
         if (sheetUsers.length <= 1) {
-          const userTabCandidates = ['usuarios', 'Usuarios', 'USUARIOS', 'Hoja 1'];
+          const userTabCandidates = [
+            'usuarios',
+            'Usuarios',
+            'USUARIOS',
+            'usuario',
+            'Usuario',
+            'users',
+            'Users',
+          ];
           for (const uTab of userTabCandidates) {
             const uUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
               uTab
@@ -959,18 +972,21 @@ async function startServer() {
           }
         }
 
-        // 3. Buscar explícitamente la hoja de Monografías ("Repositorio", "Unidades académicas", etc.)
+        // 3. Buscar explícitamente la hoja de Monografías ("Hoja 1", "Sheet 1", etc.)
         if (rows.length === 0) {
           const repoTabCandidates = Array.from(
             new Set([
-              tabName || 'Repositorio',
+              'Hoja 1',
+              'Sheet 1',
+              'Hoja1',
+              'Sheet1',
+              tabName || 'Hoja 1',
               'Repositorio',
               'Unidades académicas',
               'Unidades Académicas',
               'Monografías',
               'Monografias',
               'Metadata Repositorio Eki',
-              'Hoja 1',
             ])
           );
 
