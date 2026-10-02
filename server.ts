@@ -3,23 +3,19 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
+import {
+  AuthorizedSchoolUser,
+  DEFAULT_AUTHORIZED_USERS,
+  DEFAULT_REPO_HEADERS,
+  DEFAULT_REPO_ROWS,
+  DEFAULT_USUARIOS_HEADERS,
+} from './src/data/repositorioDefaultData';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = 3000;
 const STATE_FILE_PATH = path.join(__dirname, '.ekiraya-repo-state.json');
-
-export interface AuthorizedSchoolUser {
-  curso: string;
-  seccion: string;
-  nombres: string;
-  correo: string;
-  perfil: string;
-  isAdmin: boolean;
-  createdInApp?: boolean;
-  syncedToSheet?: boolean;
-}
 
 interface PersistedRepoState {
   appsScriptExecUrl: string;
@@ -30,19 +26,12 @@ interface PersistedRepoState {
   lastSyncTimestamp: number | null;
   rawHeaders: string[];
   rawRows: Record<string, string>[];
+  usuariosHeaders: string[];
+  usuariosRows: Record<string, string>[];
   authorizedUsers: AuthorizedSchoolUser[];
 }
 
-const DEFAULT_ADMIN_USER: AuthorizedSchoolUser = {
-  curso: 'Administración',
-  seccion: 'Dirección / Coordinación',
-  nombres: 'Coordinación y Administración Cita Master',
-  correo: 'mebolanos@cem.edu.co',
-  perfil: 'Administrador',
-  isAdmin: true,
-  createdInApp: false,
-  syncedToSheet: true,
-};
+const DEFAULT_ADMIN_USER: AuthorizedSchoolUser = DEFAULT_AUTHORIZED_USERS[0];
 
 function normalizeHeaderKey(str: string): string {
   return String(str || '')
@@ -139,6 +128,9 @@ function isUsersSheetData(headers: string[], rows: Record<string, string>[] = []
 
   // Si tiene columnas típicas de monografías, NO es la hoja de usuarios
   if (
+    joined.includes('documento id') ||
+    joined.includes('palabras clave') ||
+    joined.includes('linea de investigacion') ||
     joined.includes('monografia') ||
     joined.includes('nombre del archivo') ||
     joined.includes('unidad academica') ||
@@ -176,6 +168,11 @@ function isMonographsSheetData(headers: string[], rows: Record<string, string>[]
 
   const joined = headers.map((h) => normalizeHeaderKey(h)).join(' | ');
   return (
+    joined.includes('documento id') ||
+    joined.includes('palabras clave') ||
+    joined.includes('linea de investigacion') ||
+    joined.includes('resumen') ||
+    joined.includes('asesor') ||
     joined.includes('monografia') ||
     joined.includes('titulo') ||
     joined.includes('archivo') ||
@@ -192,7 +189,7 @@ function parseUsersSheetRows(
   rows: Record<string, string>[],
   headers: string[]
 ): AuthorizedSchoolUser[] {
-  if (!rows || rows.length === 0) return [DEFAULT_ADMIN_USER];
+  if (!rows || rows.length === 0) return DEFAULT_AUTHORIZED_USERS;
 
   const findHeader = (patterns: RegExp[]): string => {
     for (const p of patterns) {
@@ -290,6 +287,7 @@ function parseUsersSheetRows(
       isAdmin,
       createdInApp: false,
       syncedToSheet: true,
+      rawRow: { ...row },
     });
   });
 
@@ -306,7 +304,9 @@ function mergeUsersLists(
 ): AuthorizedSchoolUser[] {
   const map = new Map<string, AuthorizedSchoolUser>();
 
-  map.set(DEFAULT_ADMIN_USER.correo.toLowerCase(), DEFAULT_ADMIN_USER);
+  for (const defUser of DEFAULT_AUTHORIZED_USERS) {
+    map.set(defUser.correo.toLowerCase(), defUser);
+  }
 
   for (const u of existingUsers || []) {
     if (u && u.correo) {
@@ -316,11 +316,14 @@ function mergeUsersLists(
 
   for (const u of sheetUsers || []) {
     if (u && u.correo) {
+      const existing = map.get(u.correo.trim().toLowerCase());
       map.set(u.correo.trim().toLowerCase(), {
+        ...existing,
         ...u,
         correo: u.correo.trim().toLowerCase(),
         createdInApp: false,
         syncedToSheet: true,
+        rawRow: u.rawRow || existing?.rawRow,
       });
     }
   }
@@ -333,16 +336,27 @@ function loadPersistedState(): PersistedRepoState {
     if (fs.existsSync(STATE_FILE_PATH)) {
       const raw = fs.readFileSync(STATE_FILE_PATH, 'utf-8');
       const parsed = JSON.parse(raw);
+      const hasValidMonoRows =
+        Array.isArray(parsed.rawRows) &&
+        parsed.rawRows.length > 0 &&
+        Array.isArray(parsed.rawHeaders) &&
+        isMonographsSheetData(parsed.rawHeaders, parsed.rawRows);
+
       return {
         appsScriptExecUrl: parsed.appsScriptExecUrl || '',
         connectionUrl: parsed.connectionUrl || '',
-        repoTabName: parsed.repoTabName || 'Repositorio',
+        repoTabName: parsed.repoTabName || 'Metadata Repositorio Eki',
         accessToken: parsed.accessToken || 'EKIRAYA-2026',
-        lastSyncDate: parsed.lastSyncDate || null,
-        lastSyncTimestamp: parsed.lastSyncTimestamp || null,
-        rawHeaders: Array.isArray(parsed.rawHeaders) ? parsed.rawHeaders : [],
-        rawRows: Array.isArray(parsed.rawRows) ? parsed.rawRows : [],
-        authorizedUsers: mergeUsersLists([], parsed.authorizedUsers || [DEFAULT_ADMIN_USER]),
+        lastSyncDate: parsed.lastSyncDate || new Date().toLocaleString('es-CO'),
+        lastSyncTimestamp: parsed.lastSyncTimestamp || Date.now(),
+        rawHeaders: hasValidMonoRows ? parsed.rawHeaders : DEFAULT_REPO_HEADERS,
+        rawRows: hasValidMonoRows ? parsed.rawRows : DEFAULT_REPO_ROWS,
+        usuariosHeaders:
+          Array.isArray(parsed.usuariosHeaders) && parsed.usuariosHeaders.length > 0
+            ? parsed.usuariosHeaders
+            : DEFAULT_USUARIOS_HEADERS,
+        usuariosRows: Array.isArray(parsed.usuariosRows) ? parsed.usuariosRows : [],
+        authorizedUsers: mergeUsersLists([], parsed.authorizedUsers || DEFAULT_AUTHORIZED_USERS),
       };
     }
   } catch {
@@ -351,13 +365,15 @@ function loadPersistedState(): PersistedRepoState {
   return {
     appsScriptExecUrl: '',
     connectionUrl: '',
-    repoTabName: 'Repositorio',
+    repoTabName: 'Metadata Repositorio Eki',
     accessToken: 'EKIRAYA-2026',
-    lastSyncDate: null,
-    lastSyncTimestamp: null,
-    rawHeaders: [],
-    rawRows: [],
-    authorizedUsers: [DEFAULT_ADMIN_USER],
+    lastSyncDate: new Date().toLocaleString('es-CO'),
+    lastSyncTimestamp: Date.now(),
+    rawHeaders: DEFAULT_REPO_HEADERS,
+    rawRows: DEFAULT_REPO_ROWS,
+    usuariosHeaders: DEFAULT_USUARIOS_HEADERS,
+    usuariosRows: [],
+    authorizedUsers: DEFAULT_AUTHORIZED_USERS,
   };
 }
 
@@ -373,14 +389,29 @@ async function pushUserToAppsScriptFromServer(
   scriptUrl: string,
   token: string,
   user: AuthorizedSchoolUser
-): Promise<{ pushed: boolean; updatedUsers: AuthorizedSchoolUser[] | null }> {
+): Promise<{
+  pushed: boolean;
+  updatedUsers: AuthorizedSchoolUser[] | null;
+  usuariosHeaders?: string[];
+  usuariosRows?: Record<string, string>[];
+}> {
   const cleanUrl = (scriptUrl || '').trim();
   if (!cleanUrl || !cleanUrl.includes('script.google.com')) {
     return { pushed: false, updatedUsers: null };
   }
 
   const separator = cleanUrl.includes('?') ? '&' : '?';
+  const extraFields: Record<string, string> = {};
+  if (user.rawRow) {
+    for (const [k, v] of Object.entries(user.rawRow)) {
+      if (v !== undefined && v !== null) {
+        extraFields[k] = String(v);
+      }
+    }
+  }
+
   const query = new URLSearchParams({
+    ...extraFields,
     action: 'addUser',
     token: (token || 'EKIRAYA-2026').trim(),
     curso: user.curso || 'General',
@@ -391,6 +422,7 @@ async function pushUserToAppsScriptFromServer(
     email: user.correo,
     perfil: user.perfil || 'Estudiante',
     rol: user.perfil || 'Estudiante',
+    rawRowJson: JSON.stringify(user.rawRow || {}),
     _t: String(Date.now()),
   });
 
@@ -415,7 +447,12 @@ async function pushUserToAppsScriptFromServer(
           const existsInSheet = parsed.some(
             (u) => u.correo.toLowerCase() === user.correo.toLowerCase()
           );
-          return { pushed: existsInSheet, updatedUsers: parsed };
+          return {
+            pushed: existsInSheet,
+            updatedUsers: parsed,
+            usuariosHeaders: json.usuariosHeaders,
+            usuariosRows: json.usuariosRows,
+          };
         }
       } catch {
         // Continue to POST attempt
@@ -434,6 +471,7 @@ async function pushUserToAppsScriptFromServer(
         Accept: 'application/json, text/plain, */*',
       },
       body: JSON.stringify({
+        ...extraFields,
         action: 'addUser',
         token: (token || 'EKIRAYA-2026').trim(),
         curso: user.curso || 'General',
@@ -441,6 +479,7 @@ async function pushUserToAppsScriptFromServer(
         nombres: user.nombres,
         correo: user.correo,
         perfil: user.perfil || 'Estudiante',
+        rawRow: user.rawRow || {},
       }),
     });
 
@@ -450,7 +489,12 @@ async function pushUserToAppsScriptFromServer(
         const json = JSON.parse(postText);
         if (Array.isArray(json?.usuariosRows) && Array.isArray(json?.usuariosHeaders)) {
           const parsed = parseUsersSheetRows(json.usuariosRows, json.usuariosHeaders);
-          return { pushed: true, updatedUsers: parsed };
+          return {
+            pushed: true,
+            updatedUsers: parsed,
+            usuariosHeaders: json.usuariosHeaders,
+            usuariosRows: json.usuariosRows,
+          };
         }
       } catch {
         // Ignore
@@ -477,10 +521,11 @@ async function startServer() {
   app.post('/api/repo/users', async (req, res) => {
     try {
       const state = loadPersistedState();
-      const { user, appsScriptExecUrl, connectionUrl, accessToken } = req.body || {};
+      const { user, appsScriptExecUrl, connectionUrl, accessToken, usuariosHeaders } =
+        req.body || {};
 
       if (!user || !user.correo || !user.nombres) {
-        res.status(400).json({ error: 'Nombre y correo institucional son obligatorios' });
+        res.status(400).json({ error: 'Nombre y correo son obligatorios' });
         return;
       }
 
@@ -489,6 +534,25 @@ async function startServer() {
       const isAdmin =
         cleanEmail === 'mebolanos@cem.edu.co' ||
         /admin|administrador|coordinador|directivo/i.test(cleanProfile);
+
+      const activeUserHeaders: string[] =
+        Array.isArray(usuariosHeaders) && usuariosHeaders.length > 0
+          ? usuariosHeaders
+          : state.usuariosHeaders || DEFAULT_USUARIOS_HEADERS;
+
+      const builtRawRow: Record<string, string> = { ...(user.rawRow || {}) };
+      for (const h of activeUserHeaders) {
+        if (builtRawRow[h]) continue;
+        const norm = normalizeHeaderKey(h);
+        if (/correo|email|mail|cuenta/.test(norm)) builtRawRow[h] = cleanEmail;
+        else if (/nombre|estudiante|usuario/.test(norm))
+          builtRawRow[h] = String(user.nombres).trim();
+        else if (/curso|grado|nivel/.test(norm))
+          builtRawRow[h] = String(user.curso || 'General').trim();
+        else if (/seccion|dependencia|area/.test(norm))
+          builtRawRow[h] = String(user.seccion || 'General').trim();
+        else if (/perfil|rol|admin|estamento|cargo/.test(norm)) builtRawRow[h] = cleanProfile;
+      }
 
       const newUser: AuthorizedSchoolUser = {
         curso: String(user.curso || 'General').trim(),
@@ -499,6 +563,7 @@ async function startServer() {
         isAdmin,
         createdInApp: true,
         syncedToSheet: false,
+        rawRow: builtRawRow,
       };
 
       const effectiveScriptUrl =
@@ -512,6 +577,8 @@ async function startServer() {
 
       let pushedToSheet = false;
       let remoteUsers: AuthorizedSchoolUser[] | null = null;
+      let nextUserHeaders = activeUserHeaders;
+      let nextUserRows = state.usuariosRows || [];
 
       if (effectiveScriptUrl) {
         const pushResult = await pushUserToAppsScriptFromServer(
@@ -521,6 +588,12 @@ async function startServer() {
         );
         pushedToSheet = pushResult.pushed;
         remoteUsers = pushResult.updatedUsers;
+        if (pushResult.usuariosHeaders && pushResult.usuariosHeaders.length > 0) {
+          nextUserHeaders = pushResult.usuariosHeaders;
+        }
+        if (pushResult.usuariosRows) {
+          nextUserRows = pushResult.usuariosRows;
+        }
         if (pushedToSheet) {
           newUser.syncedToSheet = true;
           newUser.createdInApp = false;
@@ -541,6 +614,8 @@ async function startServer() {
         appsScriptExecUrl: effectiveScriptUrl || state.appsScriptExecUrl,
         connectionUrl: String(connectionUrl || state.connectionUrl || '').trim(),
         accessToken: effectiveToken,
+        usuariosHeaders: nextUserHeaders,
+        usuariosRows: nextUserRows,
         authorizedUsers: finalUsers,
         lastSyncDate: new Date().toLocaleString('es-CO'),
         lastSyncTimestamp: Date.now(),
@@ -562,6 +637,94 @@ async function startServer() {
     }
   });
 
+  // 2B. Crear / Poblar toda la hoja "usuarios" en Google Sheets en un clic
+  app.post('/api/repo/init-users-sheet', async (req, res) => {
+    try {
+      const state = loadPersistedState();
+      const { appsScriptExecUrl, connectionUrl, accessToken, users, usuariosHeaders } =
+        req.body || {};
+
+      const effectiveScriptUrl = String(
+        appsScriptExecUrl || state.appsScriptExecUrl || ''
+      ).includes('script.google.com')
+        ? String(appsScriptExecUrl || state.appsScriptExecUrl).trim()
+        : String(connectionUrl || state.connectionUrl || '').includes('script.google.com')
+          ? String(connectionUrl || state.connectionUrl).trim()
+          : '';
+
+      const effectiveToken = String(accessToken || state.accessToken || 'EKIRAYA-2026').trim();
+      const activeHeaders: string[] =
+        Array.isArray(usuariosHeaders) && usuariosHeaders.length > 0
+          ? usuariosHeaders
+          : state.usuariosHeaders || DEFAULT_USUARIOS_HEADERS;
+
+      const usersToPush: AuthorizedSchoolUser[] = mergeUsersLists(
+        [],
+        Array.isArray(users) && users.length > 0 ? users : state.authorizedUsers
+      );
+
+      let pushedCount = 0;
+
+      if (effectiveScriptUrl) {
+        try {
+          const postResp = await fetch(effectiveScriptUrl, {
+            method: 'POST',
+            redirect: 'follow',
+            headers: {
+              'Content-Type': 'text/plain;charset=utf-8',
+              Accept: 'application/json, text/plain, */*',
+            },
+            body: JSON.stringify({
+              action: 'initUsersSheet',
+              token: effectiveToken,
+              usuariosHeaders: activeHeaders,
+              users: usersToPush,
+            }),
+          });
+          const txt = await postResp.text();
+          if (txt && !isHtmlContent(txt)) {
+            pushedCount = usersToPush.length;
+          }
+        } catch {
+          // Fallback individual
+        }
+
+        if (pushedCount === 0) {
+          for (const u of usersToPush) {
+            const r = await pushUserToAppsScriptFromServer(effectiveScriptUrl, effectiveToken, u);
+            if (r.pushed) pushedCount++;
+          }
+        }
+      }
+
+      const nextState: PersistedRepoState = {
+        ...state,
+        appsScriptExecUrl: effectiveScriptUrl || state.appsScriptExecUrl,
+        usuariosHeaders: activeHeaders,
+        authorizedUsers: usersToPush.map((u) => ({
+          ...u,
+          syncedToSheet: pushedCount > 0 ? true : u.syncedToSheet,
+        })),
+        lastSyncDate: new Date().toLocaleString('es-CO'),
+        lastSyncTimestamp: Date.now(),
+      };
+
+      savePersistedState(nextState);
+
+      res.json({
+        ok: true,
+        pushedCount,
+        totalUsers: usersToPush.length,
+        hasAppsScriptUrl: Boolean(effectiveScriptUrl),
+        state: nextState,
+      });
+    } catch (err) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : 'Error inicializando hoja usuarios',
+      });
+    }
+  });
+
   // 3. Sincronización completa desde el servidor (Drive <-> Google Sheets <-> Cita Master)
   app.post('/api/repo/sync', async (req, res) => {
     try {
@@ -573,6 +736,10 @@ async function startServer() {
         repoTabName,
         triggerDriveScan,
         clientUsers,
+        clientUsuariosHeaders,
+        clientUsuariosRows,
+        clientRawHeaders,
+        clientRawRows,
       } = req.body || {};
 
       const rawScriptInput = String(
@@ -605,9 +772,21 @@ async function startServer() {
         [...(currentState.authorizedUsers || []), ...(Array.isArray(clientUsers) ? clientUsers : [])]
       );
 
-      let headers: string[] = [];
-      let rows: Record<string, string>[] = [];
-      let sheetUsers: AuthorizedSchoolUser[] = [];
+      let headers: string[] = Array.isArray(clientRawHeaders) ? clientRawHeaders : [];
+      let rows: Record<string, string>[] = Array.isArray(clientRawRows) ? clientRawRows : [];
+      let usuariosHeaders: string[] =
+        Array.isArray(clientUsuariosHeaders) && clientUsuariosHeaders.length > 0
+          ? clientUsuariosHeaders
+          : currentState.usuariosHeaders || DEFAULT_USUARIOS_HEADERS;
+      let usuariosRows: Record<string, string>[] = Array.isArray(clientUsuariosRows)
+        ? clientUsuariosRows
+        : currentState.usuariosRows || [];
+      let sheetUsers: AuthorizedSchoolUser[] =
+        Array.isArray(clientUsuariosRows) &&
+        clientUsuariosRows.length > 0 &&
+        Array.isArray(clientUsuariosHeaders)
+          ? parseUsersSheetRows(clientUsuariosRows, clientUsuariosHeaders)
+          : [];
       let sheetAccessWarning: string | null = null;
       const cacheBuster = `_t=${Date.now()}`;
 
@@ -642,13 +821,19 @@ async function startServer() {
             const data = JSON.parse(text);
 
             if (Array.isArray(data?.usuariosRows) && Array.isArray(data?.usuariosHeaders)) {
-              sheetUsers = parseUsersSheetRows(data.usuariosRows, data.usuariosHeaders);
+              if (data.usuariosHeaders.length > 0) {
+                usuariosHeaders = data.usuariosHeaders.map((h: string) => String(h).trim());
+              }
+              usuariosRows = data.usuariosRows;
+              sheetUsers = parseUsersSheetRows(data.usuariosRows, usuariosHeaders);
             }
 
             if (Array.isArray(data?.headers) && Array.isArray(data?.rows)) {
               const incHeaders = data.headers.map((h: string) => String(h).trim());
               if (isUsersSheetData(incHeaders, data.rows)) {
                 if (sheetUsers.length <= 1) {
+                  usuariosHeaders = incHeaders;
+                  usuariosRows = data.rows;
                   sheetUsers = parseUsersSheetRows(data.rows, incHeaders);
                 }
               } else if (isMonographsSheetData(incHeaders, data.rows)) {
@@ -663,6 +848,8 @@ async function startServer() {
               if (firstItem && typeof firstItem === 'object') {
                 const itemHeaders = Object.keys(firstItem);
                 if (isUsersSheetData(itemHeaders, data.items)) {
+                  usuariosHeaders = itemHeaders;
+                  usuariosRows = data.items;
                   sheetUsers = parseUsersSheetRows(data.items, itemHeaders);
                 } else {
                   headers = itemHeaders;
@@ -670,9 +857,9 @@ async function startServer() {
                 }
               }
             }
-          } else if (isHtmlContent(text)) {
+          } else if (isHtmlContent(text) && sheetUsers.length <= 1) {
             sheetAccessWarning =
-              'El Web App de Google Apps Script devolvió una página de inicio de sesión. Asegúrate de implementarlo con "Quién tiene acceso: Cualquier persona".';
+              'El Web App de Google Apps Script devolvió inicio de sesión. Implementa como "Quién tiene acceso: Cualquier persona".';
           }
         } catch {
           // Continuar con lectura directa de Google Sheets
@@ -724,13 +911,17 @@ async function startServer() {
         for (const pUrl of primaryUrls) {
           const resPrimary = await fetchSheetCsv(pUrl);
           if (resPrimary.isHtml) {
-            sheetAccessWarning =
-              'El archivo de Google Sheets requiere permisos de lectura. En Google Sheets haz clic en "Compartir" → "Cualquier persona con el enlace (Lector)".';
+            if (sheetUsers.length <= 1 && rows.length === 0) {
+              sheetAccessWarning =
+                'El archivo de Google Sheets tiene acceso restringido en el servidor. Puedes cambiar Compartir → "Cualquier persona con el enlace (Lector)" o usar "Pegar tabla de Sheets".';
+            }
             continue;
           }
           if (resPrimary.headers.length > 0 && resPrimary.rows.length > 0) {
             if (isUsersSheetData(resPrimary.headers, resPrimary.rows)) {
               if (sheetUsers.length <= 1) {
+                usuariosHeaders = resPrimary.headers;
+                usuariosRows = resPrimary.rows;
                 sheetUsers = parseUsersSheetRows(resPrimary.rows, resPrimary.headers);
               }
               sheetAccessWarning = null;
@@ -759,6 +950,8 @@ async function startServer() {
               uRes.rows.length > 0 &&
               isUsersSheetData(uRes.headers, uRes.rows)
             ) {
+              usuariosHeaders = uRes.headers;
+              usuariosRows = uRes.rows;
               sheetUsers = parseUsersSheetRows(uRes.rows, uRes.headers);
               sheetAccessWarning = null;
               break;
@@ -808,15 +1001,17 @@ async function startServer() {
       const nextHeaders =
         headers.length > 0
           ? headers
-          : isMonographsSheetData(currentState.rawHeaders, currentState.rawRows)
-          ? currentState.rawHeaders
-          : [];
+          : isMonographsSheetData(currentState.rawHeaders, currentState.rawRows) &&
+              currentState.rawHeaders.length > 0
+            ? currentState.rawHeaders
+            : DEFAULT_REPO_HEADERS;
       const nextRows =
         rows.length > 0
           ? rows
-          : isMonographsSheetData(currentState.rawHeaders, currentState.rawRows)
-          ? currentState.rawRows
-          : [];
+          : isMonographsSheetData(currentState.rawHeaders, currentState.rawRows) &&
+              currentState.rawRows.length > 0
+            ? currentState.rawRows
+            : DEFAULT_REPO_ROWS;
 
       const nextState: PersistedRepoState = {
         appsScriptExecUrl: effectiveScriptUrl || rawScriptInput,
@@ -827,6 +1022,8 @@ async function startServer() {
         lastSyncTimestamp: nowTs,
         rawHeaders: nextHeaders,
         rawRows: nextRows,
+        usuariosHeaders,
+        usuariosRows,
         authorizedUsers: mergedUsers,
       };
 

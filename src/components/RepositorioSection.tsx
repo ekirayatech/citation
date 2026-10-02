@@ -31,47 +31,72 @@ import {
   Building2,
   Clock,
   Upload,
+  Download,
 } from 'lucide-react';
 import { CitationFormData } from '../types/citation';
+import {
+  AuthorizedSchoolUser,
+  DEFAULT_AUTHORIZED_USERS,
+  DEFAULT_REPO_HEADERS,
+  DEFAULT_REPO_ROWS,
+  DEFAULT_USUARIOS_HEADERS,
+} from '../data/repositorioDefaultData';
+
+export type { AuthorizedSchoolUser };
 
 export interface MonographDocument {
   id: string;
+  documentoId: string;
+  documentCode: string;
   driveFileId: string;
   fileName: string;
   title: string;
   author: string;
+  grade: string;
   academicYear: string;
   subject: string;
+  docType: string;
+  keywords: string[];
+  keywordsRaw: string;
+  abstractText: string;
+  advisors: string[];
+  advisorsRaw: string;
   academicUnit: string;
+  areaList: string[];
+  researchLine: string;
+  researchLineList: string[];
+  visibility: string;
+  status: string;
+  registeredDate: string;
+  updatedDate: string;
   format: 'PDF' | 'Google Doc' | 'DOCX' | 'Archivo';
   driveUrl: string;
   isSample?: boolean;
-  abstractText?: string;
   methodologyText?: string;
   referencesSample?: string[];
   rawRow?: Record<string, string>;
 }
 
-export interface AuthorizedSchoolUser {
-  curso: string;
-  seccion: string;
-  nombres: string;
-  correo: string;
-  perfil: string;
-  isAdmin: boolean;
-  createdInApp?: boolean;
-  syncedToSheet?: boolean;
-}
-
 interface ColumnMapping {
+  docIdCol: string;
   fileNameCol: string;
   titleCol: string;
   authorCol: string;
+  gradeCol: string;
   academicYearCol: string;
   subjectCol: string;
-  academicUnitCol: string;
-  driveUrlCol: string;
+  typeCol: string;
+  keywordsCol: string;
+  abstractCol: string;
+  advisorsCol: string;
   driveIdCol: string;
+  driveUrlCol: string;
+  visibilityCol: string;
+  statusCol: string;
+  registeredDateCol: string;
+  updatedDateCol: string;
+  academicUnitCol: string;
+  researchLineCol: string;
 }
 
 interface RepositorioSectionProps {
@@ -82,8 +107,9 @@ interface RepositorioSectionProps {
 const DRIVE_ROOT_FOLDER_ID = '1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC';
 const DRIVE_ROOT_FOLDER_URL = `https://drive.google.com/drive/folders/${DRIVE_ROOT_FOLDER_ID}`;
 
-const STORAGE_REPO_CONFIG_KEY = 'ekiraya_repo_unidades_academicas_v6';
+const STORAGE_REPO_CONFIG_KEY = 'ekiraya_repo_unidades_academicas_v7';
 const LEGACY_CONFIG_KEYS = [
+  'ekiraya_repo_unidades_academicas_v7',
   'ekiraya_repo_unidades_academicas_v6',
   'ekiraya_repo_unidades_academicas_v5',
   'ekiraya_repo_unidades_academicas_v4',
@@ -92,8 +118,9 @@ const LEGACY_CONFIG_KEYS = [
   'ekiraya_repo_sync_config_v1',
 ];
 
-const STORAGE_AUTH_USER_KEY = 'ekiraya_repo_authorized_user_v6';
+const STORAGE_AUTH_USER_KEY = 'ekiraya_repo_authorized_user_v7';
 const LEGACY_AUTH_KEYS = [
+  'ekiraya_repo_authorized_user_v7',
   'ekiraya_repo_authorized_user_v6',
   'ekiraya_repo_authorized_user_v5',
   'ekiraya_repo_authorized_user_v4',
@@ -101,91 +128,6 @@ const LEGACY_AUTH_KEYS = [
 ];
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
-
-// Administrador inicial garantizado
-const DEFAULT_AUTHORIZED_USERS: AuthorizedSchoolUser[] = [
-  {
-    curso: 'Administración',
-    seccion: 'Dirección / Coordinación',
-    nombres: 'Coordinación y Administración Cita Master',
-    correo: 'mebolanos@cem.edu.co',
-    perfil: 'Administrador',
-    isAdmin: true,
-    createdInApp: false,
-    syncedToSheet: true,
-  },
-];
-
-// 3 Monografías de Muestra con Vista Previa Académica Completa
-const SAMPLE_THREE_MONOGRAPHS: MonographDocument[] = [
-  {
-    id: 'sample-mono-1',
-    driveFileId: '',
-    fileName: 'Monografia_Bioindicadores_Humedales_Sabana_2026.pdf',
-    title:
-      'Evaluación de macroinvertebrados bentónicos como bioindicadores de calidad del agua en humedales altoandinos de la Sabana',
-    author: 'Mendoza Restrepo, Sofía',
-    academicYear: '2025-2026',
-    subject: 'Biología y Ecología',
-    academicUnit: 'Ciencias Naturales y Educación Ambiental',
-    format: 'PDF',
-    driveUrl: DRIVE_ROOT_FOLDER_URL,
-    isSample: true,
-    abstractText:
-      'Esta monografía de Grado 11° analiza la diversidad de familias de macroinvertebrados bentónicos en tres microcuencas altoandinas mediante el índice BMWP/Col, correlacionando los parámetros fisicoquímicos (oxígeno disuelto, pH y conductividad) con el estado de conservación ecológica.',
-    methodologyText:
-      'Muestreo cuantitativo con red Surber en temporadas seca y de lluvias, identificación taxonómica en estereoscopio e integración estadística del índice de Shannon-Wiener.',
-    referencesSample: [
-      'Roldán Pérez, G. (2016). Los macroinvertebrados como bioindicadores de la calidad del agua: cuatro décadas de desarrollo en Colombia y Latinoamérica. Revista de la Academia Colombiana de Ciencias Exactas, Físicas y Naturales, 40(155), 254–274.',
-      'Instituto de Investigación de Recursos Biológicos Alexander von Humboldt. (2024). Guía de ecosistemas acuáticos altoandinos de Cundinamarca.',
-    ],
-  },
-  {
-    id: 'sample-mono-2',
-    driveFileId: '',
-    fileName: 'Monografia_Memoria_Historica_Literatura_Colombiana_2026.pdf',
-    title:
-      'Narrativas de la memoria y reconstrucción del tejido social en la novela colombiana contemporánea',
-    author: 'Castellanos Uribe, Mateo',
-    academicYear: '2025-2026',
-    subject: 'Literatura y Lengua Castellana',
-    academicUnit: 'Humanidades y Lenguas',
-    academicYearCol: '2025-2026',
-    format: 'PDF',
-    driveUrl: DRIVE_ROOT_FOLDER_URL,
-    isSample: true,
-    abstractText:
-      'Investigación monográfica centrada en las estrategias simbólicas y polifónicas con las que la narrativa colombiana del siglo XXI representa el duelo colectivo, la memoria territorial y la resiliencia de las comunidades rurales.',
-    methodologyText:
-      'Análisis hermenéutico y comparativo de corpus literario contemporáneo mediante matrices de categorías narratológicas (espacio simbólico, voz testimonial y memoria intergeneracional).',
-    referencesSample: [
-      'Jelin, E. (2017). La lucha por el pasado: Cómo construimos la memoria social. Siglo XXI Editores.',
-      'Vásquez, J. G. (2021). Volver la vista atrás. Alfaguara.',
-    ],
-  } as MonographDocument,
-  {
-    id: 'sample-mono-3',
-    driveFileId: '',
-    fileName: 'Monografia_Modelado_Matematico_Energia_Solar_2026.pdf',
-    title:
-      'Modelado matemático de la eficiencia energética de paneles fotovoltaicos en entornos escolares de montaña',
-    author: 'Quintero Lozano, Samuel',
-    academicYear: '2025-2026',
-    subject: 'Física y Matemáticas',
-    academicUnit: 'Matemáticas, Física y Tecnología',
-    format: 'PDF',
-    driveUrl: DRIVE_ROOT_FOLDER_URL,
-    isSample: true,
-    abstractText:
-      'Desarrollo de un modelo matemático multivariable para estimar la potencia eléctrica efectiva generada por arreglos fotovoltaicos bajo condiciones de nubosidad variable y radiación difusa propias de la cordillera Oriental.',
-    methodologyText:
-      'Registro experimental de irradiancia solar y temperatura superficial cada 15 minutos durante 8 semanas, ajuste por regresión no lineal y validación frente al consumo energético escolar.',
-    referencesSample: [
-      'Duffie, J. A., & Beckman, W. A. (2020). Solar engineering of thermal processes, photovoltaics and wind (5.ª ed.). Wiley.',
-      'Unidad de Planeación Minero Energética. (2024). Atlas de radiación solar de Colombia.',
-    ],
-  },
-];
 
 export const APPS_SCRIPT_CODE = `/**
  * COLEGIO EKIRAYÁ EDUCACIÓN MONTESSORI — CITA MASTER
@@ -263,10 +205,10 @@ function obtenerOCrearHojaUsuarios() {
   }
 
   const expectedUserHeaders = [
+    'Nombres',
     'Curso',
+    'Correo',
     'Sección',
-    'Nombre y Apellido',
-    'Correo institucional',
     'Perfil'
   ];
 
@@ -274,23 +216,68 @@ function obtenerOCrearHojaUsuarios() {
     userSheet = ss.insertSheet(USERS_SHEET_NAME);
     userSheet.appendRow(expectedUserHeaders);
     userSheet.getRange(1, 1, 1, expectedUserHeaders.length).setFontWeight('bold');
-    userSheet.appendRow([
-      'Administración',
-      'Coordinación Académica',
-      'Administrador Cita Master',
-      'mebolanos@cem.edu.co',
-      'Administrador'
-    ]);
+    poblarUsuariosInicialesEnHoja(userSheet);
   } else if (userSheet.getLastRow() === 0) {
     userSheet.appendRow(expectedUserHeaders);
     userSheet.getRange(1, 1, 1, expectedUserHeaders.length).setFontWeight('bold');
+    poblarUsuariosInicialesEnHoja(userSheet);
   }
 
   return userSheet;
 }
 
+function poblarUsuariosInicialesEnHoja(userSheet) {
+  const initialUsers = [
+    ['Coordinación Repositorio Ekirayá', 'Administrativo', 'mebolanos@cem.edu.co', 'Dirección Académica', 'Administrador'],
+    ['Diego Nicolás Mancera', 'Docente', 'dmancera@cem.edu.co', 'Ciencias', 'Docente'],
+    ['Camilo Almario Zea', 'Docente', 'calmario@cem.edu.co', 'Psicología y Ciencias Sociales', 'Docente'],
+    ['Mauricio Lora Aguirre', 'Docente', 'mlora@cem.edu.co', 'Ciencias Sociales y Música', 'Docente'],
+    ['Valentina Sarria Suárez', 'Docente', 'vsarria@cem.edu.co', 'Psicología', 'Docente'],
+    ['Giovanna Rebolledo', 'Docente', 'grebolledo@cem.edu.co', 'Ciencias de la Salud', 'Docente'],
+    ['Luis Fernando Huertas', 'Docente', 'lhuertas@cem.edu.co', 'Ciencias y Aviación', 'Docente'],
+    ['Yenifer Hernández León', 'Docente', 'yhernandez@cem.edu.co', 'Salud Ocupacional', 'Docente'],
+    ['Juliana León', 'Docente', 'jleon@cem.edu.co', 'Artes', 'Docente'],
+    ['Pablo Forero', 'Docente', 'pforero@cem.edu.co', 'Arquitectura y Psicología', 'Docente'],
+    ['John Alexander Aponte Peña', 'Docente', 'japonte@cem.edu.co', 'Ingeniería de Sistemas', 'Docente'],
+    ['Jorge Mario Bernal', 'Docente', 'jbernal@cem.edu.co', 'Ciencias Económicas y Administrativas', 'Docente'],
+    ['Cristina Crane', 'Docente', 'ccrane@cem.edu.co', 'Música', 'Docente'],
+    ['Ricardo Umaña', 'Docente', 'rumana@cem.edu.co', 'Ciencias Sociales', 'Docente'],
+    ['Maria Paula Ramos', 'Docente', 'mpramos@cem.edu.co', 'Administración', 'Docente'],
+    ['Agudelo Gil Emilia', '11', 'eagudelo@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Camacho Tobón Mariana', '11', 'mcamacho@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Chica Navarro Mateo', '11', 'mchica@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Correa González Juan Andrés', '11', 'jcorrea@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Díaz García Isabela', '11', 'idiaz@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Donado Abella Salomé', '11', 'sdonado@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Duplat Rebolledo Camila', '11', 'cduplat@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Durán Sterling Santiago', '11', 'sduran@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Figueredo Zapata Lucas', '11', 'lfigueredo@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['González Pérez Lorenzo', '11', 'lgonzalez@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Jáuregui Cubillos Samuel', '11', 'sjauregui@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Maldonado Delgado Alejandra', '11', 'amaldonado@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Mejía De Valdenebro Úrsula', '11', 'umejia@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Perdigón Mejía Jacobo', '11', 'jperdigon@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Roldán Acosta Valentina', '11', 'vroldan@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Ruiz Bohórquez Mariana', '11', 'mruiz@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Torres Prada Catalina', '11', 'ctorres@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Tubi Medders Luka', '11', 'ltubi@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Vásquez Velásquez Nicolás', '11', 'nvasquez@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Vidal Herrera Violeta', '11', 'vvidal@cem.edu.co', 'Bachillerato', 'Estudiante'],
+    ['Biblioteca y Centro de Recursos', 'No clases', 'biblioteca@cem.edu.co', 'Biblioteca', 'Personal no clases'],
+    ['Secretaría Académica Ekirayá', 'No clases', 'secretaria@cem.edu.co', 'Administración', 'Personal no clases']
+  ];
+  userSheet.getRange(2, 1, initialUsers.length, 5).setValues(initialUsers);
+}
+
 function inicializarHojaUsuarios() {
-  obtenerOCrearHojaUsuarios();
+  const sh = obtenerOCrearHojaUsuarios();
+  if (sh.getLastRow() <= 2) {
+    sh.clear();
+    const headers = ['Nombres', 'Curso', 'Correo', 'Sección', 'Perfil'];
+    sh.appendRow(headers);
+    sh.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    poblarUsuariosInicialesEnHoja(sh);
+  }
 }
 
 function agregarUsuarioEnSheet(params) {
@@ -298,19 +285,36 @@ function agregarUsuarioEnSheet(params) {
   const data = userSheet.getDataRange().getDisplayValues();
   const headers = data[0].map(function(h) { return String(h).trim(); });
 
-  const correoNuevo = String(params.correo || params.email || '').trim().toLowerCase();
+  let rawRowMap = {};
+  if (params.rawRowJson) {
+    try {
+      rawRowMap = JSON.parse(params.rawRowJson);
+    } catch (e) {}
+  } else if (params.rawRow && typeof params.rawRow === 'object') {
+    rawRowMap = params.rawRow;
+  }
+
+  const correoNuevo = String(
+    params.correo || params.email || rawRowMap['Correo'] || rawRowMap['Correo institucional'] || ''
+  ).trim().toLowerCase();
   if (!correoNuevo) return;
 
   let correoColIdx = headers.findIndex(function(h) { return /correo|email|mail|cuenta/i.test(h); });
-  if (correoColIdx < 0) correoColIdx = 3;
+  if (correoColIdx < 0) correoColIdx = 2;
 
   const nuevaFila = headers.map(function(h) {
+    if (rawRowMap[h] !== undefined && String(rawRowMap[h]).trim() !== '') {
+      return String(rawRowMap[h]).trim();
+    }
+    if (params[h] !== undefined && String(params[h]).trim() !== '') {
+      return String(params[h]).trim();
+    }
     const k = h.toLowerCase();
-    if (k.includes('curso') || k.includes('grado')) return params.curso || 'General';
-    if (k.includes('sección') || k.includes('seccion')) return params.seccion || 'General';
-    if (k.includes('nombre')) return params.nombres || params.nombre || '';
     if (k.includes('correo') || k.includes('email') || k.includes('mail')) return correoNuevo;
-    if (k.includes('perfil') || k.includes('rol') || k.includes('admin')) return params.perfil || 'Estudiante';
+    if (k.includes('nombre') || k.includes('estudiante') || k.includes('usuario')) return params.nombres || params.nombre || '';
+    if (k.includes('curso') || k.includes('grado') || k.includes('nivel')) return params.curso || 'General';
+    if (k.includes('sección') || k.includes('seccion') || k.includes('dependencia') || k.includes('área')) return params.seccion || 'General';
+    if (k.includes('perfil') || k.includes('rol') || k.includes('admin') || k.includes('cargo')) return params.perfil || 'Estudiante';
     return '';
   });
 
@@ -487,14 +491,22 @@ function procesarSolicitud(params) {
   const repoData = leerHojaPorTitulos(repoSheet);
   const usersData = leerHojaPorTitulos(usersSheet);
 
-  return ContentService.createTextOutput(JSON.stringify({
+  const payload = JSON.stringify({
     folderId: ROOT_FOLDER_ID,
     syncedAt: new Date().toISOString(),
     headers: repoData.headers,
     rows: repoData.rows,
     usuariosHeaders: usersData.headers,
     usuariosRows: usersData.rows
-  })).setMimeType(ContentService.MimeType.JSON);
+  });
+
+  if (params.callback) {
+    return ContentService.createTextOutput(params.callback + '(' + payload + ');')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+
+  return ContentService.createTextOutput(payload)
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 function doGet(e) {
@@ -514,6 +526,192 @@ function doPost(e) {
   }
   return procesarSolicitud(params);
 }`;
+
+/** Extrae el ID de una hoja de Google Sheets desde su URL */
+function extractSpreadsheetId(url: string): string | null {
+  if (!url) return null;
+  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Lee una pestaña de Google Sheets desde el navegador usando Google Visualization API JSONP (<script>)
+ * Esto funciona incluso cuando el archivo está restringido al dominio institucional (@cem.edu.co) y evita cualquier bloqueo CORS.
+ */
+function fetchSheetTabViaBrowserJsonp(
+  sheetId: string,
+  options: { sheetName?: string; gid?: string }
+): Promise<{ headers: string[]; rows: Record<string, string>[] } | null> {
+  return new Promise((resolve) => {
+    const callbackName = `__ekirayaGvizCb_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+    const win = window as unknown as Record<string, unknown>;
+    const script = document.createElement('script');
+    let settled = false;
+
+    const cleanup = () => {
+      try {
+        delete win[callbackName];
+      } catch {
+        win[callbackName] = undefined;
+      }
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
+
+    const timer = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(null);
+    }, 6500);
+
+    win[callbackName] = (response: {
+      status?: string;
+      table?: {
+        cols?: Array<{ label?: string; id?: string }>;
+        rows?: Array<{ c?: Array<{ v?: unknown; f?: string } | null> }>;
+      };
+    }) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      cleanup();
+
+      try {
+        if (!response || response.status === 'error' || !response.table) {
+          resolve(null);
+          return;
+        }
+        const cols = response.table.cols || [];
+        const rawTableRows = response.table.rows || [];
+
+        let headers = cols.map((c) => String(c?.label || '').trim());
+        let startRowIdx = 0;
+
+        // Si gviz no puso las etiquetas en cols.label, tomar la primera fila como encabezados
+        if (headers.every((h) => !h) && rawTableRows.length > 0) {
+          const firstRowCells = rawTableRows[0]?.c || [];
+          headers = firstRowCells.map((cell, idx) =>
+            String(cell?.f ?? cell?.v ?? '').trim() || `Columna_${idx + 1}`
+          );
+          startRowIdx = 1;
+        } else {
+          headers = headers.map((h, idx) => h || `Columna_${idx + 1}`);
+        }
+
+        const rows: Record<string, string>[] = [];
+        for (let r = startRowIdx; r < rawTableRows.length; r++) {
+          const cells = rawTableRows[r]?.c || [];
+          const rowObj: Record<string, string> = {};
+          let hasValue = false;
+          headers.forEach((h, cIdx) => {
+            const cell = cells[cIdx];
+            const val = cell ? String(cell.f ?? cell.v ?? '').trim() : '';
+            if (val) hasValue = true;
+            rowObj[h] = val;
+          });
+          if (hasValue) {
+            rows.push(rowObj);
+          }
+        }
+
+        resolve({ headers, rows });
+      } catch {
+        resolve(null);
+      }
+    };
+
+    const params = new URLSearchParams({
+      tqx: `out:json;responseHandler:${callbackName}`,
+      headers: '1',
+      _t: String(Date.now()),
+    });
+    if (options.sheetName) {
+      params.set('sheet', options.sheetName);
+    } else if (options.gid) {
+      params.set('gid', options.gid);
+    }
+
+    script.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?${params.toString()}`;
+    script.async = true;
+    script.onerror = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      cleanup();
+      resolve(null);
+    };
+
+    document.body.appendChild(script);
+  });
+}
+
+/**
+ * Llama al Web App de Google Apps Script (/exec) mediante JSONP (<script>) o fetch desde el navegador
+ */
+function callAppsScriptViaBrowserJsonp(
+  scriptUrl: string,
+  queryParams: Record<string, string>
+): Promise<Record<string, unknown> | null> {
+  return new Promise((resolve) => {
+    const cleanUrl = (scriptUrl || '').trim();
+    if (!cleanUrl.includes('script.google.com')) {
+      resolve(null);
+      return;
+    }
+
+    const callbackName = `__ekirayaGasCb_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+    const win = window as unknown as Record<string, unknown>;
+    const script = document.createElement('script');
+    let settled = false;
+
+    const cleanup = () => {
+      try {
+        delete win[callbackName];
+      } catch {
+        win[callbackName] = undefined;
+      }
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
+
+    const timer = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(null);
+    }, 8000);
+
+    win[callbackName] = (data: Record<string, unknown>) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      cleanup();
+      resolve(data || null);
+    };
+
+    const sep = cleanUrl.includes('?') ? '&' : '?';
+    const qs = new URLSearchParams({
+      ...queryParams,
+      callback: callbackName,
+      _t: String(Date.now()),
+    });
+
+    script.src = `${cleanUrl}${sep}${qs.toString()}`;
+    script.async = true;
+    script.onerror = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      cleanup();
+      resolve(null);
+    };
+
+    document.body.appendChild(script);
+  });
+}
 
 /** Normaliza encabezados de columna para compararlos sin importar tildes ni mayúsculas */
 function normalizeHeaderKey(str: string): string {
@@ -663,6 +861,9 @@ function isUsersSheetData(headers: string[], rows: Record<string, string>[] = []
   const joined = normHeaders.join(' | ');
 
   if (
+    joined.includes('documento id') ||
+    joined.includes('palabras clave') ||
+    joined.includes('linea de investigacion') ||
     joined.includes('monografia') ||
     joined.includes('nombre del archivo') ||
     joined.includes('unidad academica') ||
@@ -699,6 +900,11 @@ function isMonographsSheetData(headers: string[], rows: Record<string, string>[]
 
   const joined = headers.map((h) => normalizeHeaderKey(h)).join(' | ');
   return (
+    joined.includes('documento id') ||
+    joined.includes('palabras clave') ||
+    joined.includes('linea de investigacion') ||
+    joined.includes('resumen') ||
+    joined.includes('asesor') ||
     joined.includes('monografia') ||
     joined.includes('titulo') ||
     joined.includes('archivo') ||
@@ -711,7 +917,7 @@ function isMonographsSheetData(headers: string[], rows: Record<string, string>[]
   );
 }
 
-/** Detecta automáticamente los títulos de columna en la hoja de Monografías */
+/** Detecta automáticamente los 18 títulos de columna en la hoja de Monografías */
 function autoDetectColumnMapping(headers: string[]): ColumnMapping {
   const findCol = (patterns: RegExp[], excludePatterns: RegExp[] = []): string => {
     for (const pattern of patterns) {
@@ -726,28 +932,26 @@ function autoDetectColumnMapping(headers: string[]): ColumnMapping {
   };
 
   return {
+    docIdCol: findCol([/^documento id$/, /^id documento$/, /^codigo$/, /^documento_id$/], [/drive/]),
     fileNameCol: findCol(
       [
         /^nombre del archivo$/,
         /nombre.*archivo/,
         /^archivo$/,
         /^file\s*name$/,
-        /^documento$/,
         /archivo/,
       ],
-      [/^id/, /url/, /enlace/, /link/]
+      [/^id/, /url/, /enlace/, /link/, /documento id/]
     ),
     titleCol: findCol(
       [
+        /^titulo$/,
         /^titulo de la monografia$/,
         /titulo.*monografia/,
-        /^titulo$/,
         /^monografia$/,
         /nombre.*monografia/,
         /nombre.*trabajo/,
         /proyecto/,
-        /investigacion/,
-        /tema/,
       ],
       [/^archivo$/]
     ),
@@ -758,44 +962,58 @@ function autoDetectColumnMapping(headers: string[]): ColumnMapping {
       /nombre.*apellido/,
       /^estudiante$/,
       /nombre.*estudiante/,
-      /autor.*estudiante/,
-      /estudiante.*autor/,
-      /apellidos/,
-      /nombres/,
     ]),
+    gradeCol: findCol([/^grado$/, /^curso$/, /grado/, /nivel/]),
     academicYearCol: findCol([
+      /^ano$/,
       /^ano lectivo$/,
       /ano.*lectivo/,
       /periodo.*lectivo/,
-      /^ano$/,
       /promocion/,
-      /cohorte/,
-      /fecha/,
     ]),
     subjectCol: findCol([
       /^asignatura$/,
       /asignatura/,
       /^materia$/,
-      /^area$/,
-      /disciplina/,
     ]),
-    academicUnitCol: findCol([
-      /^unidad academica$/,
-      /unidad.*academica/,
-      /^unidad$/,
-      /departamento/,
+    typeCol: findCol([/^tipo$/, /tipo.*documento/, /modalidad/]),
+    keywordsCol: findCol([/^palabras clave$/, /palabras.*clave/, /keywords/, /etiquetas/]),
+    abstractCol: findCol([/^resumen$/, /resumen/, /abstract/, /sintesis/]),
+    advisorsCol: findCol([/^asesor\(es\)$/, /^asesores$/, /^asesor$/, /asesor/, /director/, /tutor/]),
+    driveIdCol: findCol([
+      /^drive file id$/,
+      /drive.*file.*id/,
+      /^id del archivo$/,
+      /id.*archivo/,
+      /drive.*id/,
     ]),
     driveUrlCol: findCol([
+      /^url documento$/,
+      /url.*documento/,
       /enlace.*drive/,
       /url.*drive/,
       /^enlace$/,
       /^url$/,
       /^link$/,
-      /vista.*previa/,
-      /hipervinculo/,
-      /drive/,
     ]),
-    driveIdCol: findCol([/^id del archivo$/, /id.*archivo/, /drive.*id/, /^file.*id$/, /^id$/]),
+    visibilityCol: findCol([/^visibilidad$/, /visibilidad/, /acceso/]),
+    statusCol: findCol([/^estado$/, /estado/]),
+    registeredDateCol: findCol([/^fecha registro$/, /fecha.*registro/, /creacion/]),
+    updatedDateCol: findCol([/^fecha actualizacion$/, /fecha.*actualizacion/, /modificacion/]),
+    academicUnitCol: findCol([
+      /^area$/,
+      /area/,
+      /^unidad academica$/,
+      /unidad.*academica/,
+      /^unidad$/,
+      /departamento/,
+    ]),
+    researchLineCol: findCol([
+      /^linea de investigacion$/,
+      /linea.*investigacion/,
+      /^linea$/,
+      /sublinea/,
+    ]),
   };
 }
 
@@ -898,6 +1116,7 @@ function parseUsersSheetRows(
       isAdmin,
       createdInApp: false,
       syncedToSheet: true,
+      rawRow: { ...row },
     });
   }
 
@@ -908,13 +1127,40 @@ function parseUsersSheetRows(
   return parsedUsers;
 }
 
-/** Une la lista de usuarios leída de Google Sheets con los usuarios creados desde Cita Master */
+/** Obtiene el valor de una celda de usuario según el título exacto de la columna en Google Sheets */
+function getUserCellValue(user: AuthorizedSchoolUser, header: string): string {
+  if (user.rawRow) {
+    if (user.rawRow[header] !== undefined && String(user.rawRow[header]).trim() !== '') {
+      return String(user.rawRow[header]);
+    }
+    const normTarget = normalizeHeaderKey(header);
+    const matchingKey = Object.keys(user.rawRow).find(
+      (k) => normalizeHeaderKey(k) === normTarget
+    );
+    if (matchingKey && String(user.rawRow[matchingKey]).trim() !== '') {
+      return String(user.rawRow[matchingKey]);
+    }
+  }
+
+  const norm = normalizeHeaderKey(header);
+  if (/correo|email|e mail|mail|cuenta/.test(norm)) return user.correo;
+  if (/curso|grado|nivel/.test(norm)) return user.curso;
+  if (/seccion|dependencia|area/.test(norm)) return user.seccion;
+  if (/perfil|rol|cargo|tipo|estamento/.test(norm)) return user.perfil;
+  if (/nombre|apellido|estudiante|usuario/.test(norm)) return user.nombres;
+  return user.rawRow?.[header] || '';
+}
+
+/** Une la lista de usuarios leída de Google Sheets con la comunidad base de Ekirayá y usuarios creados en Cita Master */
 function mergeUsersLists(
   sheetUsers: AuthorizedSchoolUser[],
   existingAppUsers: AuthorizedSchoolUser[]
 ): AuthorizedSchoolUser[] {
   const map = new Map<string, AuthorizedSchoolUser>();
-  map.set('mebolanos@cem.edu.co', DEFAULT_AUTHORIZED_USERS[0]);
+
+  for (const defUser of DEFAULT_AUTHORIZED_USERS) {
+    map.set(defUser.correo.toLowerCase(), defUser);
+  }
 
   for (const u of existingAppUsers || []) {
     if (u && u.correo) {
@@ -923,18 +1169,37 @@ function mergeUsersLists(
   }
   for (const u of sheetUsers || []) {
     if (u && u.correo) {
-      map.set(u.correo.trim().toLowerCase(), {
+      const key = u.correo.trim().toLowerCase();
+      const existing = map.get(key);
+      map.set(key, {
         ...u,
-        correo: u.correo.trim().toLowerCase(),
+        correo: key,
+        isAdmin: Boolean(u.isAdmin || existing?.isAdmin || key === 'mebolanos@cem.edu.co'),
         createdInApp: false,
         syncedToSheet: true,
+        rawRow: u.rawRow ? { ...u.rawRow } : existing?.rawRow,
       });
     }
   }
   return Array.from(map.values());
 }
 
-/** Convierte las filas reales de la hoja del Repositorio en documentos incluyendo Unidad académica */
+function splitMultilineItems(raw: string): string[] {
+  return String(raw || '')
+    .split(/[\r\n]+/)
+    .map((s) => s.replace(/\.$/, '').trim())
+    .filter(Boolean);
+}
+
+function splitKeywords(raw: string): string[] {
+  return String(raw || '')
+    .replace(/[\r\n]+/g, ' ')
+    .split(/[,;]+/)
+    .map((s) => s.replace(/\.$/, '').trim())
+    .filter(Boolean);
+}
+
+/** Convierte las filas reales de la BD organizada en objetos MonographDocument completos */
 function mapSheetRowsToMonographs(
   rawRows: Record<string, string>[],
   mapping: ColumnMapping,
@@ -944,80 +1209,84 @@ function mapSheetRowsToMonographs(
     return [];
   }
 
+  const getCell = (row: Record<string, string>, colName: string, fallbackKeys: string[] = []): string => {
+    if (colName && row[colName] !== undefined) return String(row[colName]).trim();
+    for (const k of fallbackKeys) {
+      if (row[k] !== undefined) return String(row[k]).trim();
+      const foundKey = Object.keys(row).find(
+        (rk) => normalizeHeaderKey(rk) === normalizeHeaderKey(k)
+      );
+      if (foundKey && row[foundKey] !== undefined) return String(row[foundKey]).trim();
+    }
+    return '';
+  };
+
   return rawRows
     .map((row, idx) => {
-      let rawUrl = (mapping.driveUrlCol && row[mapping.driveUrlCol]) || '';
+      const documentoId =
+        getCell(row, mapping.docIdCol, ['documento_id', 'id']) || String(idx + 1);
+      const titleVal = getCell(row, mapping.titleCol, [
+        'titulo',
+        'Título de la monografía',
+        'Título',
+      ]);
+      const fileNameVal =
+        getCell(row, mapping.fileNameCol, ['Nombre del archivo', 'archivo']) ||
+        (titleVal ? `${documentoId}_${titleVal.slice(0, 45).replace(/\s+/g, '_')}.pdf` : '');
+
+      const authorVal =
+        getCell(row, mapping.authorCol, ['autor', 'Autor', 'Estudiante']) ||
+        'Estudiante Grado 11°';
+      const gradeVal = getCell(row, mapping.gradeCol, ['grado', 'Grado', 'curso']) || '11';
+      const academicYearVal =
+        getCell(row, mapping.academicYearCol, ['año', 'Año', 'Año lectivo']) || '2026';
+      const subjectVal =
+        getCell(row, mapping.subjectCol, ['asignatura', 'Asignatura']) || 'Proyecto de vida';
+      const docTypeVal =
+        getCell(row, mapping.typeCol, ['tipo', 'Tipo']) || 'Investigación';
+
+      const keywordsRaw = getCell(row, mapping.keywordsCol, [
+        'palabras_clave',
+        'Palabras clave',
+      ]);
+      const keywords = splitKeywords(keywordsRaw);
+
+      const abstractVal = getCell(row, mapping.abstractCol, ['resumen', 'Resumen']);
+      const advisorsRaw = getCell(row, mapping.advisorsCol, [
+        'Asesor(es)',
+        'Asesores',
+        'Asesor',
+      ]);
+      const advisors = splitMultilineItems(advisorsRaw);
+
+      const areaRaw =
+        getCell(row, mapping.academicUnitCol, ['Ärea', 'Área', 'Area', 'Unidad académica']) ||
+        'Ciencias y Humanidades';
+      const areaList = splitMultilineItems(areaRaw);
+      const academicUnitVal = areaList.join(' · ') || areaRaw;
+
+      const researchLineRaw = getCell(row, mapping.researchLineCol, [
+        'Linea de investigación',
+        'Línea de investigación',
+      ]);
+      const researchLineList = splitMultilineItems(researchLineRaw);
+      const researchLineVal = researchLineList.join(' · ') || researchLineRaw;
+
+      const visibilityVal =
+        getCell(row, mapping.visibilityCol, ['visibilidad', 'Visibilidad']) || 'Digital';
+      const statusVal =
+        getCell(row, mapping.statusCol, ['estado', 'Estado']) || 'Finalizado';
+      const registeredDateVal =
+        getCell(row, mapping.registeredDateCol, ['fecha_registro']) || '23 enero 2026';
+      const updatedDateVal =
+        getCell(row, mapping.updatedDateCol, ['fecha_actualizacion']) || '10-04-2026';
+
+      let rawUrl = getCell(row, mapping.driveUrlCol, ['url_documento', 'Enlace Drive']);
       if (!rawUrl && mapping.driveUrlCol && row[`${mapping.driveUrlCol}_url`]) {
         rawUrl = row[`${mapping.driveUrlCol}_url`];
       }
-      if (!rawUrl) {
-        for (const key of Object.keys(row)) {
-          const val = String(row[key] || '');
-          if (val.includes('drive.google.com') || val.includes('docs.google.com')) {
-            rawUrl = val;
-            break;
-          }
-        }
-      }
-
-      const rawIdCell = (mapping.driveIdCol && row[mapping.driveIdCol]) || '';
+      const rawIdCell = getCell(row, mapping.driveIdCol, ['drive_file_id', 'ID del archivo']);
       const extractedFileId = extractDriveFileId(rawIdCell) || extractDriveFileId(rawUrl);
-
-      let authorVal = (mapping.authorCol && row[mapping.authorCol]) || '';
-      const firstNameHeader = headers.find((h) =>
-        /^nombres?(?:_estudiante)?$/i.test(normalizeHeaderKey(h))
-      );
-      const lastNameHeader = headers.find((h) =>
-        /^apellidos?(?:_estudiante)?$/i.test(normalizeHeaderKey(h))
-      );
-      if (firstNameHeader && lastNameHeader && (row[firstNameHeader] || row[lastNameHeader])) {
-        const f = (row[firstNameHeader] || '').trim();
-        const l = (row[lastNameHeader] || '').trim();
-        authorVal = [f, l].filter(Boolean).join(' ');
-      }
-
-      let fileNameVal =
-        (mapping.fileNameCol && row[mapping.fileNameCol]) ||
-        (mapping.titleCol && row[mapping.titleCol]) ||
-        '';
-
-      let titleVal =
-        (mapping.titleCol && row[mapping.titleCol]) ||
-        fileNameVal.replace(/\.(pdf|docx|doc)$/i, '').replace(/[_-]+/g, ' ');
-
-      // Fallback inteligente si los títulos de columna personalizados no coincidieron con el mapeo inicial
-      if (!titleVal && !fileNameVal) {
-        const candidateValues = headers
-          .map((h) => String(row[h] || '').trim())
-          .filter(
-            (v) =>
-              v.length > 3 &&
-              !v.startsWith('http') &&
-              !v.includes('@') &&
-              !/^\d{4}(-\d{4})?$/.test(v)
-          );
-        if (candidateValues.length > 0) {
-          titleVal = candidateValues[0];
-          fileNameVal = candidateValues[0];
-        }
-      }
-
-      const academicUnitVal =
-        (mapping.academicUnitCol && row[mapping.academicUnitCol]) ||
-        (mapping.subjectCol && row[mapping.subjectCol]) ||
-        'Unidades Académicas';
-
-      const subjectVal =
-        (mapping.subjectCol && row[mapping.subjectCol]) ||
-        academicUnitVal ||
-        'Asignatura General';
-
-      const academicYearVal =
-        (mapping.academicYearCol && row[mapping.academicYearCol]) || '2025-2026';
-
-      let format: 'PDF' | 'Google Doc' | 'DOCX' | 'Archivo' = 'PDF';
-      if (/\.docx?$/i.test(fileNameVal)) format = 'DOCX';
-      else if (rawUrl.includes('docs.google.com/document')) format = 'Google Doc';
 
       const finalDriveUrl =
         rawUrl ||
@@ -1026,58 +1295,78 @@ function mapSheetRowsToMonographs(
           : DRIVE_ROOT_FOLDER_URL);
 
       return {
-        id: `sheet-row-${idx}-${extractedFileId || idx}`,
+        id: `mono-${documentoId}-${idx}`,
+        documentoId,
+        documentCode: documentoId || `MONO-${idx + 1}`,
         driveFileId: extractedFileId,
-        fileName: fileNameVal || titleVal,
-        title: titleVal,
-        author: authorVal || 'Estudiante Grado 11°',
+        fileName: fileNameVal,
+        title: titleVal || fileNameVal,
+        author: authorVal,
+        grade: gradeVal,
         academicYear: academicYearVal,
         subject: subjectVal,
+        docType: docTypeVal,
+        keywords,
+        keywordsRaw,
+        abstractText: abstractVal,
+        advisors,
+        advisorsRaw,
         academicUnit: academicUnitVal,
-        format,
+        areaList: areaList.length > 0 ? areaList : [academicUnitVal],
+        researchLine: researchLineVal,
+        researchLineList,
+        visibility: visibilityVal,
+        status: statusVal,
+        registeredDate: registeredDateVal,
+        updatedDate: updatedDateVal,
+        format: 'PDF' as const,
         driveUrl: finalDriveUrl,
         isSample: false,
         rawRow: row,
       };
     })
-    .filter((doc) => Boolean(doc.title.trim() || doc.fileName.trim()));
+    .filter((doc) => Boolean(doc.title.trim()));
 }
+
+const SAMPLE_THREE_MONOGRAPHS: MonographDocument[] = mapSheetRowsToMonographs(
+  DEFAULT_REPO_ROWS,
+  autoDetectColumnMapping(DEFAULT_REPO_HEADERS),
+  DEFAULT_REPO_HEADERS
+);
 
 export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   onCiteMonographInGestor,
   showToast,
 }) => {
-  // Datos del Repositorio (Monografías)
-  const [rawHeaders, setRawHeaders] = useState<string[]>([]);
-  const [rawRows, setRawRows] = useState<Record<string, string>[]>([]);
-  const [columnMapping, setColumnMapping] = useState<ColumnMapping>({
-    fileNameCol: '',
-    titleCol: '',
-    authorCol: '',
-    academicYearCol: '',
-    subjectCol: '',
-    academicUnitCol: '',
-    driveUrlCol: '',
-    driveIdCol: '',
-  });
+  // Datos del Repositorio inicializados con la nueva BD organizada de 20 monografías
+  const [rawHeaders, setRawHeaders] = useState<string[]>(DEFAULT_REPO_HEADERS);
+  const [rawRows, setRawRows] = useState<Record<string, string>[]>(DEFAULT_REPO_ROWS);
+  const [columnMapping, setColumnMapping] = useState<ColumnMapping>(() =>
+    autoDetectColumnMapping(DEFAULT_REPO_HEADERS)
+  );
 
-  // Permite alternar en cualquier momento entre las 3 Monografías de Muestra y las sincronizadas
   const [forceShowSamples, setForceShowSamples] = useState<boolean>(false);
 
-  // Datos de la hoja "usuarios"
+  // Datos y columnas de la hoja "usuarios" con los 37 integrantes de la comunidad Ekirayá
   const [authorizedUsers, setAuthorizedUsers] =
     useState<AuthorizedSchoolUser[]>(DEFAULT_AUTHORIZED_USERS);
+  const [usuariosHeaders, setUsuariosHeaders] = useState<string[]>(DEFAULT_USUARIOS_HEADERS);
   const [currentUser, setCurrentUser] = useState<AuthorizedSchoolUser | null>(null);
   const [loginEmailInput, setLoginEmailInput] = useState<string>('');
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // Filtros de búsqueda: Nombre del archivo, Título de la monografía, Autor, Año lectivo, Asignatura y Unidad académica
+  // Filtros reorganizados según las columnas de la nueva BD:
+  // Búsqueda general + Área + Línea de investigación + Asesor(es) + Autor + Año/Grado
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAcademicUnit, setSelectedAcademicUnit] = useState<string>('all');
+  const [selectedResearchLine, setSelectedResearchLine] = useState<string>('all');
+  const [selectedAdvisor, setSelectedAdvisor] = useState<string>('all');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('all');
   const [selectedAuthor, setSelectedAuthor] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'title' | 'author' | 'year' | 'file'>('title');
+  const [sortBy, setSortBy] = useState<'title' | 'author' | 'year' | 'id'>('id');
+  const [isInitializingUsersSheet, setIsInitializingUsersSheet] = useState<boolean>(false);
+  const [userProfileFilter, setUserProfileFilter] = useState<string>('all');
 
   // Paginación de la Vista Previa de 3 Monografías
   const [pageIndex, setPageIndex] = useState<number>(0);
@@ -1101,12 +1390,13 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   const [showQuickPasteModal, setShowQuickPasteModal] = useState<boolean>(false);
   const [quickPasteText, setQuickPasteText] = useState<string>('');
 
-  // Campos para crear usuario y enviarlo a la hoja "usuarios" de Google Sheets
-  const [newUserCourse, setNewUserCourse] = useState('');
-  const [newUserSection, setNewUserSection] = useState('');
-  const [newUserName, setNewUserName] = useState('');
-  const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserProfile, setNewUserProfile] = useState('Estudiante');
+  // Campos dinámicos para crear usuario y enviarlo con las columnas exactas de la hoja "usuarios"
+  const [newUserFieldValues, setNewUserFieldValues] = useState<Record<string, string>>({});
+  const [newUserIsAdminFlag, setNewUserIsAdminFlag] = useState<boolean>(false);
+  const [showEditColumns, setShowEditColumns] = useState<boolean>(false);
+  const [editingColumnsText, setEditingColumnsText] = useState<string>(
+    DEFAULT_USUARIOS_HEADERS.join(', ')
+  );
 
   /** Persiste toda la configuración en localStorage */
   const saveLocalRepoConfig = useCallback(
@@ -1120,6 +1410,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       rawRows: Record<string, string>[];
       columnMapping: ColumnMapping;
       authorizedUsers: AuthorizedSchoolUser[];
+      usuariosHeaders?: string[];
     }) => {
       try {
         localStorage.setItem(
@@ -1137,8 +1428,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   );
 
   /**
-   * Sincroniza monografías y hoja "usuarios" a través del backend Express (/api/repo/sync)
-   * con respaldo directo en el navegador.
+   * Sincroniza monografías y hoja "usuarios":
+   * 1) Primero lee desde el navegador vía JSONP (usa la sesión activa de Google @cem.edu.co si la hoja es privada del colegio)
+   * 2) Luego sincroniza con el backend Express (/api/repo/sync) y Google Apps Script (/exec)
    */
   const executeSyncWithSheets = useCallback(
     async (
@@ -1149,14 +1441,136 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       currentUsersList: AuthorizedSchoolUser[],
       options?: { silent?: boolean; triggerDriveScan?: boolean }
     ) => {
-      const cleanScript = targetScriptUrl.trim();
-      const cleanSheet = targetSheetUrl.trim();
+      let cleanScript = targetScriptUrl.trim();
+      let cleanSheet = targetSheetUrl.trim();
+
+      if (cleanSheet.includes('script.google.com') && !cleanScript) {
+        cleanScript = cleanSheet;
+      }
+      if (cleanScript.includes('/spreadsheets/d/') && !cleanSheet) {
+        cleanSheet = cleanScript;
+        cleanScript = '';
+      }
 
       setIsSyncing(true);
       setSheetAccessWarning(null);
 
       try {
-        // 1. Intentar sincronización desde el servidor Node.js (/api/repo/sync) — sin bloqueo CORS
+        let clientUsuariosHeaders: string[] = [];
+        let clientUsuariosRows: Record<string, string>[] = [];
+        let clientUsers: AuthorizedSchoolUser[] = [];
+        let clientRawHeaders: string[] = [];
+        let clientRawRows: Record<string, string>[] = [];
+
+        // PASO A: Lectura directa desde el navegador vía JSONP (funciona incluso con hojas restringidas a @cem.edu.co)
+        const sheetId = extractSpreadsheetId(cleanSheet || cleanScript);
+        const gidMatch = (cleanSheet || cleanScript).match(/[#&?]gid=([0-9]+)/);
+        const urlGid = gidMatch?.[1];
+
+        if (sheetId) {
+          for (const sheetCandidate of ['usuarios', 'Usuarios', 'USUARIOS']) {
+            const browserUsersTab = await fetchSheetTabViaBrowserJsonp(sheetId, {
+              sheetName: sheetCandidate,
+            });
+            if (
+              browserUsersTab &&
+              browserUsersTab.headers.length > 0 &&
+              isUsersSheetData(browserUsersTab.headers, browserUsersTab.rows)
+            ) {
+              clientUsuariosHeaders = browserUsersTab.headers;
+              clientUsuariosRows = browserUsersTab.rows;
+              clientUsers = parseUsersSheetRows(browserUsersTab.rows, browserUsersTab.headers);
+              break;
+            }
+          }
+
+          if (clientUsuariosHeaders.length === 0) {
+            const firstTab = await fetchSheetTabViaBrowserJsonp(
+              sheetId,
+              urlGid ? { gid: urlGid } : {}
+            );
+            if (firstTab && firstTab.headers.length > 0) {
+              if (isUsersSheetData(firstTab.headers, firstTab.rows)) {
+                clientUsuariosHeaders = firstTab.headers;
+                clientUsuariosRows = firstTab.rows;
+                clientUsers = parseUsersSheetRows(firstTab.rows, firstTab.headers);
+              } else if (isMonographsSheetData(firstTab.headers, firstTab.rows)) {
+                clientRawHeaders = firstTab.headers;
+                clientRawRows = firstTab.rows;
+              }
+            }
+          }
+
+          if (clientRawHeaders.length === 0) {
+            const candidateRepoTabs = Array.from(
+              new Set([
+                targetTabName.trim(),
+                'Repositorio',
+                'Monografías',
+                'Monografias',
+                'Unidades Académicas',
+              ])
+            ).filter(Boolean);
+
+            for (const candidateTab of candidateRepoTabs) {
+              const browserRepoTab = await fetchSheetTabViaBrowserJsonp(sheetId, {
+                sheetName: candidateTab,
+              });
+              if (
+                browserRepoTab &&
+                browserRepoTab.headers.length > 0 &&
+                isMonographsSheetData(browserRepoTab.headers, browserRepoTab.rows)
+              ) {
+                clientRawHeaders = browserRepoTab.headers;
+                clientRawRows = browserRepoTab.rows;
+                break;
+              }
+            }
+          }
+        }
+
+        // PASO B: Si hay URL Web App de Apps Script (/exec), consultar también vía JSONP desde el navegador
+        if (cleanScript && cleanScript.includes('script.google.com')) {
+          const jsonpExec = await callAppsScriptViaBrowserJsonp(cleanScript, {
+            token: targetToken.trim() || 'EKIRAYA-2026',
+            action: options?.triggerDriveScan ? 'syncDriveAndSheets' : 'readAll',
+          });
+          if (jsonpExec && !jsonpExec.error) {
+            const uHeaders: string[] = Array.isArray(jsonpExec.usersHeaders)
+              ? jsonpExec.usersHeaders.map(String)
+              : [];
+            const uRows: Record<string, string>[] = Array.isArray(jsonpExec.usersRows)
+              ? jsonpExec.usersRows
+              : Array.isArray(jsonpExec.users)
+                ? jsonpExec.users
+                : [];
+            if (uHeaders.length > 0 || uRows.length > 0) {
+              const effHeaders =
+                uHeaders.length > 0 ? uHeaders : Object.keys(uRows[0] || {});
+              clientUsuariosHeaders = effHeaders;
+              clientUsuariosRows = uRows;
+              clientUsers = parseUsersSheetRows(uRows, effHeaders);
+            }
+
+            const rHeaders: string[] = Array.isArray(jsonpExec.headers)
+              ? jsonpExec.headers.map(String)
+              : [];
+            const rRows: Record<string, string>[] = Array.isArray(jsonpExec.rows)
+              ? jsonpExec.rows
+              : [];
+            if (rHeaders.length > 0 && isMonographsSheetData(rHeaders, rRows)) {
+              clientRawHeaders = rHeaders;
+              clientRawRows = rRows;
+            }
+          }
+        }
+
+        const combinedClientUsers =
+          clientUsers.length > 0
+            ? mergeUsersLists(clientUsers, currentUsersList)
+            : currentUsersList;
+
+        // PASO C: Sincronizar con el servidor Node.js (/api/repo/sync)
         const serverResp = await fetch('/api/repo/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1166,7 +1580,11 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             accessToken: targetToken.trim(),
             repoTabName: targetTabName.trim() || 'Repositorio',
             triggerDriveScan: Boolean(options?.triggerDriveScan),
-            clientUsers: currentUsersList,
+            clientUsers: combinedClientUsers,
+            clientUsuariosHeaders,
+            clientUsuariosRows,
+            clientRawHeaders,
+            clientRawRows,
           }),
         });
 
@@ -1174,15 +1592,23 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           const data = await serverResp.json();
           if (data?.state) {
             const st = data.state;
-            const mergedUsers = mergeUsersLists(st.authorizedUsers || [], currentUsersList);
+            const mergedUsers = mergeUsersLists(st.authorizedUsers || [], combinedClientUsers);
             const incomingHeaders: string[] = Array.isArray(st.rawHeaders) ? st.rawHeaders : [];
             const incomingRows: Record<string, string>[] = Array.isArray(st.rawRows)
               ? st.rawRows
               : [];
+            const incomingUsuariosHeaders: string[] =
+              Array.isArray(st.usuariosHeaders) && st.usuariosHeaders.length > 0
+                ? st.usuariosHeaders
+                : clientUsuariosHeaders.length > 0
+                  ? clientUsuariosHeaders
+                  : usuariosHeaders;
 
             const validMonoData = isMonographsSheetData(incomingHeaders, incomingRows);
-            const finalHeaders = validMonoData ? incomingHeaders : [];
-            const finalRows = validMonoData ? incomingRows : [];
+            const finalHeaders =
+              validMonoData && incomingHeaders.length > 0 ? incomingHeaders : DEFAULT_REPO_HEADERS;
+            const finalRows =
+              validMonoData && incomingRows.length > 0 ? incomingRows : DEFAULT_REPO_ROWS;
             const detectedMapping =
               finalHeaders.length > 0 ? autoDetectColumnMapping(finalHeaders) : columnMapping;
 
@@ -1190,8 +1616,11 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             setRawRows(finalRows);
             setColumnMapping(detectedMapping);
             setAuthorizedUsers(mergedUsers);
+            setUsuariosHeaders(incomingUsuariosHeaders);
+            setEditingColumnsText(incomingUsuariosHeaders.join(', '));
             setLastSyncDate(st.lastSyncDate || new Date().toLocaleString('es-CO'));
-            if (data.sheetAccessWarning) {
+
+            if (data.sheetAccessWarning && clientUsuariosHeaders.length === 0 && clientRawHeaders.length === 0) {
               setSheetAccessWarning(String(data.sheetAccessWarning));
             }
             if (finalRows.length > 0) {
@@ -1224,18 +1653,19 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               rawRows: finalRows,
               columnMapping: detectedMapping,
               authorizedUsers: mergedUsers,
+              usuariosHeaders: incomingUsuariosHeaders,
             });
 
             if (!options?.silent) {
-              if (data.sheetAccessWarning) {
+              if (data.sheetAccessWarning && clientUsuariosHeaders.length === 0) {
                 showToast(data.sheetAccessWarning);
               } else if (finalRows.length > 0) {
                 showToast(
-                  `Sincronización exitosa: ${mergedUsers.length} usuarios y ${finalRows.length} monografías cargadas.`
+                  `Sincronización exitosa: ${mergedUsers.length} usuarios (${incomingUsuariosHeaders.join(' · ')}) y ${finalRows.length} monografías.`
                 );
               } else {
                 showToast(
-                  `Usuarios sincronizados (${mergedUsers.length}). Mostrando las 3 monografías de muestra en vista previa.`
+                  `Hoja "usuarios" sincronizada (${mergedUsers.length} usuarios · Columnas: ${incomingUsuariosHeaders.join(' · ')}).`
                 );
               }
             }
@@ -1248,7 +1678,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         setIsSyncing(false);
       }
     },
-    [columnMapping, saveLocalRepoConfig, showToast]
+    [columnMapping, saveLocalRepoConfig, showToast, usuariosHeaders]
   );
 
   // Recuperar y sanear toda la configuración previa desde todas las versiones de localStorage + estado del servidor
@@ -1260,6 +1690,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     let savedTab = 'Repositorio';
     let savedHeaders: string[] = [];
     let savedRows: Record<string, string>[] = [];
+    let savedUsuariosHeaders: string[] = DEFAULT_USUARIOS_HEADERS;
     let savedLastSync: string | null = null;
 
     try {
@@ -1283,14 +1714,18 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           if (parsed.repoTabName) savedTab = String(parsed.repoTabName);
           if (parsed.accessToken) savedToken = String(parsed.accessToken);
           if (parsed.lastSyncDate) savedLastSync = String(parsed.lastSyncDate);
+          if (Array.isArray(parsed.usuariosHeaders) && parsed.usuariosHeaders.length > 0) {
+            savedUsuariosHeaders = parsed.usuariosHeaders.map(String);
+          }
 
           if (Array.isArray(parsed.authorizedUsers) && parsed.authorizedUsers.length > 0) {
             accumulatedUsers = mergeUsersLists(parsed.authorizedUsers, accumulatedUsers);
           }
 
-          // Si en una versión previa la hoja "usuarios" quedó guardada por error dentro de rawRows, rescatar esos usuarios
+          // Si en una versión previa la hoja "usuarios" quedó guardada por error dentro de rawRows, rescatar esos usuarios y sus columnas
           if (Array.isArray(parsed.rawHeaders) && Array.isArray(parsed.rawRows)) {
             if (isUsersSheetData(parsed.rawHeaders, parsed.rawRows)) {
+              savedUsuariosHeaders = parsed.rawHeaders.map(String);
               const rescuedUsers = parseUsersSheetRows(parsed.rawRows, parsed.rawHeaders);
               accumulatedUsers = mergeUsersLists(rescuedUsers, accumulatedUsers);
             } else if (
@@ -1312,6 +1747,8 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       setAccessToken(savedToken);
       setLastSyncDate(savedLastSync);
       setAuthorizedUsers(accumulatedUsers);
+      setUsuariosHeaders(savedUsuariosHeaders);
+      setEditingColumnsText(savedUsuariosHeaders.join(', '));
 
       if (savedHeaders.length > 0 && savedRows.length > 0) {
         setRawHeaders(savedHeaders);
@@ -1481,30 +1918,96 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       rawRows,
       columnMapping: updated,
       authorizedUsers,
+      usuariosHeaders,
     });
   };
 
   /**
-   * Crea un usuario en Cita Master, lo persiste en el servidor y lo envía a la hoja "usuarios" de Google Sheets
+   * Crea un usuario en Cita Master usando exactamente las columnas de la hoja "usuarios"
+   * y lo envía a Google Sheets tanto desde el navegador (JSONP / GET) como desde el servidor (/api/repo/users)
    */
   const handleAddAuthorizedUserAndSyncToSheet = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanMail = newUserEmail.trim().toLowerCase();
-    if (!cleanMail || !cleanMail.includes('@') || !newUserName.trim()) {
-      showToast('Completa Nombre y Apellido y Correo institucional');
+
+    const rawRow: Record<string, string> = {};
+    usuariosHeaders.forEach((h) => {
+      rawRow[h] = (newUserFieldValues[h] || '').trim();
+    });
+
+    const findValByPattern = (patterns: RegExp[], fallback = ''): string => {
+      for (const p of patterns) {
+        const col = usuariosHeaders.find((h) => p.test(normalizeHeaderKey(h)));
+        if (col && rawRow[col]) return rawRow[col];
+      }
+      return fallback;
+    };
+
+    let cleanMail = findValByPattern(
+      [/correo/, /email/, /e mail/, /mail/, /cuenta/],
+      ''
+    ).toLowerCase();
+    if (!cleanMail) {
+      const anyEmailVal = Object.values(rawRow).find((v) => v.includes('@'));
+      if (anyEmailVal) cleanMail = anyEmailVal.trim().toLowerCase();
+    }
+
+    let cleanName = findValByPattern(
+      [/nombre/, /apellido/, /estudiante/, /usuario/],
+      ''
+    );
+    if (!cleanName) {
+      const firstNonEmpty = Object.values(rawRow).find((v) => v && !v.includes('@'));
+      if (firstNonEmpty) cleanName = firstNonEmpty.trim();
+    }
+
+    if (!cleanMail || !cleanMail.includes('@') || !cleanName) {
+      showToast('Completa al menos el Nombre y el Correo institucional (@) en las columnas.');
       return;
     }
 
-    const isAdminProfile = /admin/i.test(newUserProfile);
+    const cleanCourse = findValByPattern([/curso/, /grado/, /nivel/], 'General');
+    const cleanSection = findValByPattern([/seccion/, /dependencia/, /area/], 'General');
+    const rawPerfilVal = findValByPattern(
+      [/perfil/, /rol/, /cargo/, /tipo/, /estamento/],
+      ''
+    );
+
+    const isAdmin =
+      newUserIsAdminFlag ||
+      cleanMail === 'mebolanos@cem.edu.co' ||
+      /admin/i.test(rawPerfilVal) ||
+      /admin/i.test(cleanCourse) ||
+      /admin/i.test(cleanSection);
+
+    const effectivePerfil =
+      rawPerfilVal ||
+      (isAdmin
+        ? 'Administrador'
+        : /docente|profesor/i.test(cleanCourse) || /docente|profesor/i.test(cleanSection)
+          ? 'Docente'
+          : /no clases|apoyo|planta/i.test(cleanSection)
+            ? 'Personal no clases'
+            : 'Estudiante');
+
+    usuariosHeaders.forEach((h) => {
+      const norm = normalizeHeaderKey(h);
+      if (/correo|email|e mail|mail|cuenta/.test(norm)) {
+        rawRow[h] = cleanMail;
+      } else if (/perfil|rol|cargo|tipo|estamento/.test(norm) && !rawRow[h]) {
+        rawRow[h] = effectivePerfil;
+      }
+    });
+
     const newUser: AuthorizedSchoolUser = {
-      curso: newUserCourse.trim() || 'General',
-      seccion: newUserSection.trim() || 'General',
-      nombres: newUserName.trim(),
+      curso: cleanCourse,
+      seccion: cleanSection,
+      nombres: cleanName,
       correo: cleanMail,
-      perfil: newUserProfile.trim(),
-      isAdmin: isAdminProfile || cleanMail === 'mebolanos@cem.edu.co',
+      perfil: effectivePerfil,
+      isAdmin,
       createdInApp: true,
       syncedToSheet: false,
+      rawRow,
     };
 
     const updatedLocalUsers = [
@@ -1523,21 +2026,68 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       rawRows,
       columnMapping,
       authorizedUsers: updatedLocalUsers,
+      usuariosHeaders,
     });
 
-    setNewUserCourse('');
-    setNewUserSection('');
-    setNewUserName('');
-    setNewUserEmail('');
-    setNewUserProfile('Estudiante');
-
+    setNewUserFieldValues({});
+    setNewUserIsAdminFlag(false);
     setIsSavingUser(true);
+
     try {
+      let browserPushed = false;
+      const effectiveExec = (
+        appsScriptExecUrl ||
+        (connectionUrl.includes('script.google.com') ? connectionUrl : '')
+      ).trim();
+
+      // 1. Enviar desde el navegador vía JSONP y respaldo GET no-cors
+      if (effectiveExec && effectiveExec.includes('script.google.com')) {
+        const jsonpRes = await callAppsScriptViaBrowserJsonp(effectiveExec, {
+          action: 'addUser',
+          token: accessToken || 'EKIRAYA-2026',
+          curso: newUser.curso,
+          seccion: newUser.seccion,
+          nombres: newUser.nombres,
+          correo: newUser.correo,
+          perfil: newUser.perfil,
+          rowJson: JSON.stringify(rawRow),
+        });
+
+        if (jsonpRes && (jsonpRes.success || Array.isArray(jsonpRes.usersRows))) {
+          browserPushed = true;
+        } else {
+          try {
+            const sep = effectiveExec.includes('?') ? '&' : '?';
+            const qs = new URLSearchParams({
+              action: 'addUser',
+              token: accessToken || 'EKIRAYA-2026',
+              curso: newUser.curso,
+              seccion: newUser.seccion,
+              nombres: newUser.nombres,
+              correo: newUser.correo,
+              perfil: newUser.perfil,
+              rowJson: JSON.stringify(rawRow),
+              _t: String(Date.now()),
+            });
+            await fetch(`${effectiveExec}${sep}${qs.toString()}`, {
+              method: 'GET',
+              mode: 'no-cors',
+              cache: 'no-store',
+            });
+            browserPushed = true;
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      // 2. Enviar al servidor (/api/repo/users)
       const resp = await fetch('/api/repo/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user: newUser,
+          user: { ...newUser, syncedToSheet: browserPushed },
+          usuariosHeaders,
           appsScriptExecUrl,
           connectionUrl,
           accessToken,
@@ -1548,6 +2098,12 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         const data = await resp.json();
         if (data?.state?.authorizedUsers) {
           const merged = mergeUsersLists(data.state.authorizedUsers, updatedLocalUsers);
+          if (browserPushed) {
+            const idx = merged.findIndex((u) => u.correo.toLowerCase() === cleanMail);
+            if (idx >= 0) {
+              merged[idx] = { ...merged[idx], syncedToSheet: true, rawRow };
+            }
+          }
           setAuthorizedUsers(merged);
           saveLocalRepoConfig({
             appsScriptExecUrl,
@@ -1559,20 +2115,17 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             rawRows,
             columnMapping,
             authorizedUsers: merged,
+            usuariosHeaders,
           });
         }
 
-        if (data.pushedToSheet) {
+        if (data.pushedToSheet || browserPushed) {
           showToast(
             `¡Usuario "${newUser.nombres}" creado y sincronizado en la hoja "usuarios" de Google Sheets!`
           );
-        } else if (data.hasAppsScriptUrl) {
-          showToast(
-            `Usuario "${newUser.nombres}" activo en Cita Master y enviado a Apps Script. Verifica haber publicado una "Nueva versión" en Implementar > Gestionar implementaciones.`
-          );
         } else {
           showToast(
-            `Usuario "${newUser.nombres}" registrado y activo en Cita Master. Para que se escriba también en Google Sheets, pega la URL Web App (/exec) de Apps Script en el Campo A.`
+            `Usuario "${newUser.nombres}" activo en Cita Master. Conecta la URL Web App (/exec) de Apps Script en el Campo A o usa "Copiar fila para Sheets".`
           );
         }
       }
@@ -1596,6 +2149,8 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     if (isUsersSheetData(parsed.headers, parsed.rows)) {
       const importedUsers = parseUsersSheetRows(parsed.rows, parsed.headers);
       const merged = mergeUsersLists(importedUsers, authorizedUsers);
+      setUsuariosHeaders(parsed.headers);
+      setEditingColumnsText(parsed.headers.join(', '));
       setAuthorizedUsers(merged);
       const nowStr = new Date().toLocaleString('es-CO');
       setLastSyncDate(nowStr);
@@ -1609,14 +2164,16 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         rawRows,
         columnMapping,
         authorizedUsers: merged,
+        usuariosHeaders: parsed.headers,
       });
-      // Sincronizar cada usuario importado con el servidor
+      // Sincronizar cada usuario importado y las columnas exactas con el servidor
       for (const u of importedUsers) {
         fetch('/api/repo/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             user: u,
+            usuariosHeaders: parsed.headers,
             appsScriptExecUrl,
             connectionUrl,
             accessToken,
@@ -1625,7 +2182,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       }
       setShowQuickPasteModal(false);
       setQuickPasteText('');
-      showToast(`¡${importedUsers.length} usuarios importados y sincronizados correctamente!`);
+      showToast(
+        `¡${importedUsers.length} usuarios sincronizados con la tabla exacta de Sheets (${parsed.headers.join(' · ')})!`
+      );
     } else {
       const detected = autoDetectColumnMapping(parsed.headers);
       setRawHeaders(parsed.headers);
@@ -1644,6 +2203,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         rawRows: parsed.rows,
         columnMapping: detected,
         authorizedUsers,
+        usuariosHeaders,
       });
       setShowQuickPasteModal(false);
       setQuickPasteText('');
@@ -1679,14 +2239,153 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     setTimeout(() => setCopiedScript(false), 2200);
   };
 
-  // Listas dinámicas para los selectores de filtro
-  const academicUnits = useMemo(
-    () =>
-      Array.from(new Set(monographs.map((m) => m.academicUnit).filter(Boolean))).sort((a, b) =>
-        a.localeCompare(b, 'es')
-      ),
-    [monographs]
-  );
+  const handleApplyUsuariosHeaders = (nextCols: string[]) => {
+    const cleanCols = nextCols.map((c) => c.trim()).filter(Boolean);
+    if (cleanCols.length === 0) return;
+    setUsuariosHeaders(cleanCols);
+    setEditingColumnsText(cleanCols.join(', '));
+    setShowEditColumns(false);
+    saveLocalRepoConfig({
+      appsScriptExecUrl,
+      connectionUrl,
+      repoTabName,
+      accessToken,
+      lastSyncDate,
+      rawHeaders,
+      rawRows,
+      columnMapping,
+      authorizedUsers,
+      usuariosHeaders: cleanCols,
+    });
+    showToast(`Columnas de la hoja "usuarios" actualizadas: ${cleanCols.join(' · ')}`);
+  };
+
+  const handleCopyUsersTableForSheets = async () => {
+    const headerLine = usuariosHeaders.join('\t');
+    const rowLines = authorizedUsers.map((u) =>
+      usuariosHeaders.map((h) => getUserCellValue(u, h).replace(/\t|\r|\n/g, ' ')).join('\t')
+    );
+    const tsv = [headerLine, ...rowLines].join('\n');
+    try {
+      await navigator.clipboard.writeText(tsv);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = tsv;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    showToast(
+      'Tabla copiada en formato Google Sheets (TSV). Puedes pegarla directamente con Ctrl+V en tu hoja "usuarios".'
+    );
+  };
+
+  const handleDownloadUsersCsv = () => {
+    const escapeCsv = (val: string) => `"${String(val || '').replace(/"/g, '""')}"`;
+    const headerLine = usuariosHeaders.map(escapeCsv).join(',');
+    const rowLines = authorizedUsers.map((u) =>
+      usuariosHeaders.map((h) => escapeCsv(getUserCellValue(u, h))).join(',')
+    );
+    const csvContent = '\uFEFF' + [headerLine, ...rowLines].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'usuarios_colegio_ekiraya.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`Archivo CSV con ${authorizedUsers.length} usuarios descargado correctamente.`);
+  };
+
+  const handleInitializeUsersSheetInGoogleSheets = async () => {
+    setIsInitializingUsersSheet(true);
+    try {
+      let browserPushed = false;
+      const effectiveExec = (
+        appsScriptExecUrl ||
+        (connectionUrl.includes('script.google.com') ? connectionUrl : '')
+      ).trim();
+
+      if (effectiveExec && effectiveExec.includes('script.google.com')) {
+        const resJsonp = await callAppsScriptViaBrowserJsonp(effectiveExec, {
+          action: 'initUsersSheet',
+          token: accessToken || 'EKIRAYA-2026',
+        });
+        if (resJsonp && (resJsonp.success || Array.isArray(resJsonp.usersRows))) {
+          browserPushed = true;
+        }
+      }
+
+      const resp = await fetch('/api/repo/init-users-sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appsScriptExecUrl,
+          connectionUrl,
+          accessToken,
+        }),
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data?.state?.authorizedUsers) {
+          setAuthorizedUsers(data.state.authorizedUsers);
+        }
+        if (data?.pushedToSheet || browserPushed) {
+          showToast(
+            `¡Hoja "usuarios" creada y poblada en Google Sheets con los ${authorizedUsers.length} integrantes del colegio!`
+          );
+        } else {
+          showToast(
+            `Hoja "usuarios" lista con ${authorizedUsers.length} usuarios. Conecta la URL /exec o usa "Copiar tabla para Sheets" / "Descargar CSV".`
+          );
+        }
+      }
+    } catch {
+      showToast(`Hoja "usuarios" verificada con ${authorizedUsers.length} usuarios.`);
+    } finally {
+      setIsInitializingUsersSheet(false);
+    }
+  };
+
+  // Listas dinámicas reorganizadas según la nueva BD (Ärea, Linea de investigación, asignatura, Asesor(es), autor, año)
+  const academicUnits = useMemo(() => {
+    const set = new Set<string>();
+    monographs.forEach((m) => {
+      if (m.areaList && m.areaList.length > 0) {
+        m.areaList.forEach((a) => {
+          if (a.trim()) set.add(a.trim());
+        });
+      } else if (m.academicUnit?.trim()) {
+        set.add(m.academicUnit.trim());
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
+  }, [monographs]);
+
+  const researchLines = useMemo(() => {
+    const set = new Set<string>();
+    monographs
+      .filter(
+        (m) =>
+          selectedAcademicUnit === 'all' ||
+          m.areaList?.includes(selectedAcademicUnit) ||
+          m.academicUnit === selectedAcademicUnit
+      )
+      .forEach((m) => {
+        if (m.researchLineList && m.researchLineList.length > 0) {
+          m.researchLineList.forEach((rl) => {
+            if (rl.trim()) set.add(rl.trim());
+          });
+        } else if (m.researchLine?.trim()) {
+          set.add(m.researchLine.trim());
+        }
+      });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
+  }, [monographs, selectedAcademicUnit]);
 
   const subjects = useMemo(
     () =>
@@ -1695,7 +2394,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           monographs
             .filter(
               (m) =>
-                selectedAcademicUnit === 'all' || m.academicUnit === selectedAcademicUnit
+                selectedAcademicUnit === 'all' ||
+                m.areaList?.includes(selectedAcademicUnit) ||
+                m.academicUnit === selectedAcademicUnit
             )
             .map((m) => m.subject)
             .filter(Boolean)
@@ -1703,6 +2404,16 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       ).sort((a, b) => a.localeCompare(b, 'es')),
     [monographs, selectedAcademicUnit]
   );
+
+  const advisorsList = useMemo(() => {
+    const set = new Set<string>();
+    monographs.forEach((m) => {
+      (m.advisors || []).forEach((adv) => {
+        if (adv.trim()) set.add(adv.trim());
+      });
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
+  }, [monographs]);
 
   const academicYears = useMemo(
     () =>
@@ -1720,15 +2431,29 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     [monographs]
   );
 
-  // Búsqueda e indexación multicriterio
+  // Búsqueda e indexación multicriterio con todas las columnas de la nueva BD
   const filteredMonographs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
 
     return monographs
       .filter((m) => {
-        if (selectedAcademicUnit !== 'all' && m.academicUnit !== selectedAcademicUnit)
+        if (
+          selectedAcademicUnit !== 'all' &&
+          !m.areaList?.includes(selectedAcademicUnit) &&
+          m.academicUnit !== selectedAcademicUnit
+        ) {
           return false;
+        }
+        if (
+          selectedResearchLine !== 'all' &&
+          !m.researchLineList?.includes(selectedResearchLine) &&
+          m.researchLine !== selectedResearchLine
+        ) {
+          return false;
+        }
         if (selectedSubject !== 'all' && m.subject !== selectedSubject) return false;
+        if (selectedAdvisor !== 'all' && !(m.advisors || []).includes(selectedAdvisor))
+          return false;
         if (selectedAcademicYear !== 'all' && m.academicYear !== selectedAcademicYear)
           return false;
         if (selectedAuthor !== 'all' && m.author !== selectedAuthor) return false;
@@ -1736,12 +2461,19 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         if (!q) return true;
 
         const searchableFields = [
+          m.documentCode,
           m.fileName,
           m.title,
           m.author,
+          m.grade,
           m.academicYear,
           m.subject,
+          m.docType,
+          m.keywordsRaw,
+          m.abstractText,
+          m.advisorsRaw,
           m.academicUnit,
+          m.researchLine,
         ]
           .join(' ')
           .toLowerCase();
@@ -1749,7 +2481,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         return searchableFields.includes(q);
       })
       .sort((a, b) => {
-        if (sortBy === 'file') return a.fileName.localeCompare(b.fileName, 'es');
+        if (sortBy === 'id') return a.documentCode.localeCompare(b.documentCode, 'es');
         if (sortBy === 'author') return a.author.localeCompare(b.author, 'es');
         if (sortBy === 'year') return b.academicYear.localeCompare(a.academicYear, 'es');
         return a.title.localeCompare(b.title, 'es');
@@ -1758,7 +2490,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     monographs,
     searchQuery,
     selectedAcademicUnit,
+    selectedResearchLine,
     selectedSubject,
+    selectedAdvisor,
     selectedAcademicYear,
     selectedAuthor,
     sortBy,
@@ -1776,7 +2510,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   const resetFilters = () => {
     setSearchQuery('');
     setSelectedAcademicUnit('all');
+    setSelectedResearchLine('all');
     setSelectedSubject('all');
+    setSelectedAdvisor('all');
     setSelectedAcademicYear('all');
     setSelectedAuthor('all');
     setPageIndex(0);
@@ -1802,7 +2538,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               El acceso al repositorio está habilitado únicamente para los{' '}
               <strong>estudiantes, docentes, personal de no clases y administradores</strong>{' '}
               registrados en la hoja <code>usuarios</code> (
-              <em>Curso, Sección, Nombre y Apellido, Correo institucional, Perfil</em>).
+              <em>{usuariosHeaders.join(', ')}</em>).
             </p>
           </div>
 
@@ -1829,6 +2565,31 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 className="w-full rounded-xl border border-slate-300 py-2.5 px-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-600"
                 autoFocus
               />
+
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                <span className="text-slate-500 font-medium">Accesos de prueba rápidos:</span>
+                <button
+                  type="button"
+                  onClick={() => setLoginEmailInput('mebolanos@cem.edu.co')}
+                  className="px-2 py-0.5 rounded bg-violet-100 text-violet-900 hover:bg-violet-200 font-semibold"
+                >
+                  Admin (Mauricio Bolaños)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLoginEmailInput('nlondono@cem.edu.co')}
+                  className="px-2 py-0.5 rounded bg-blue-100 text-blue-900 hover:bg-blue-200 font-medium"
+                >
+                  Docente (Nicolás Londoño)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLoginEmailInput('smendoza@cem.edu.co')}
+                  className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 hover:bg-emerald-200 font-medium"
+                >
+                  Estudiante Taller 4 (Sofía Mendoza)
+                </button>
+              </div>
             </div>
 
             {loginError && (
@@ -1963,10 +2724,13 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-semibold bg-emerald-500/20 text-emerald-100 border border-emerald-400/40">
               <Unlock className="w-3.5 h-3.5 text-emerald-300" />
-              <span>Nombre y Apellido: {currentUser.nombres}</span>
+              <span>Nombres: {currentUser.nombres}</span>
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-white/10 text-violet-100">
               <strong>Curso:</strong> {currentUser.curso}
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-white/10 text-violet-100 font-mono">
+              <strong>Correo:</strong> {currentUser.correo}
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-white/10 text-violet-100">
               <strong>Sección:</strong> {currentUser.seccion}
@@ -1974,18 +2738,22 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             <span className="px-2.5 py-1 rounded-lg bg-white/10 text-violet-100">
               <strong>Perfil:</strong> {currentUser.perfil}
             </span>
-            <span className="px-2.5 py-1 rounded-lg bg-white/10 text-violet-100 font-mono">
-              {currentUser.correo}
-            </span>
           </div>
 
-          <div className="flex items-center gap-2 text-violet-200">
-            <Clock className="w-3.5 h-3.5 text-emerald-300" />
-            <span>
-              Sincronización automática cada 24h activa
-              {lastSyncDate ? ` · Última: ${lastSyncDate}` : ''}
-            </span>
-          </div>
+          {isAdmin ? (
+            <div className="flex items-center gap-2 text-violet-200">
+              <Clock className="w-3.5 h-3.5 text-emerald-300" />
+              <span>
+                Sincronización automática cada 24h activa
+                {lastSyncDate ? ` · Última: ${lastSyncDate}` : ''}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-violet-200">
+              <BookOpen className="w-3.5 h-3.5 text-violet-300" />
+              <span>Colegio Ekirayá · Catálogo Académico de Investigaciones</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -2133,7 +2901,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
               <span className="text-[11px] text-slate-500 flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                Sincronización automática cada 24h y manual respetando tus cambios en Google Sheets.
+                Sincronización automática cada 24h y manual respetando las columnas exactas de tu Google Sheets.
               </span>
 
               <button
@@ -2207,99 +2975,277 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             </div>
           )}
 
-          {/* 3. TABLA DE LA HOJA "USUARIOS" CON ESCRITURA DIRECTA EN GOOGLE SHEETS */}
+          {/* 3. TABLA DE LA HOJA "USUARIOS" ADAPTADA EXACTAMENTE A LAS COLUMNAS DE GOOGLE SHEETS */}
           <div className="bg-white rounded-xl border border-violet-200 p-5 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
-                <Users className="w-4 h-4 text-violet-700" />
-                <span>
-                  3. Hoja &ldquo;usuarios&rdquo; ({authorizedUsers.length} usuarios registrados)
-                </span>
-              </h3>
-              <span className="text-xs text-slate-500">
-                Columnas: Curso · Sección · Nombre y Apellido · Correo institucional · Perfil
-              </span>
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-violet-700" />
+                  <span>
+                    3. Hoja &ldquo;usuarios&rdquo; ({authorizedUsers.length} usuarios registrados)
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Columnas sincronizadas con tu Google Sheet:{' '}
+                  <strong className="text-violet-900">{usuariosHeaders.join(' · ')}</strong>
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleApplyUsuariosHeaders(['Nombres', 'Curso', 'Correo', 'Sección'])
+                  }
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
+                    usuariosHeaders.join('|').toLowerCase() === 'nombres|curso|correo|sección'
+                      ? 'bg-violet-700 text-white border-violet-700'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                  }`}
+                >
+                  4 cols: Nombres · Curso · Correo · Sección
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleApplyUsuariosHeaders([
+                      'Nombres',
+                      'Curso',
+                      'Correo',
+                      'Sección',
+                      'Perfil',
+                    ])
+                  }
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
+                    usuariosHeaders.join('|').toLowerCase() ===
+                    'nombres|curso|correo|sección|perfil'
+                      ? 'bg-violet-700 text-white border-violet-700'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                  }`}
+                >
+                  5 cols (+ Perfil)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowEditColumns(!showEditColumns)}
+                  className="px-2.5 py-1 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-900 border border-violet-200 text-[11px] font-semibold"
+                >
+                  {showEditColumns ? 'Cerrar editor de columnas' : 'Personalizar títulos de columna'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleInitializeUsersSheetInGoogleSheets}
+                  disabled={isInitializingUsersSheet}
+                  className="px-2.5 py-1 rounded-lg bg-violet-700 hover:bg-violet-800 text-white border border-violet-800 text-[11px] font-semibold inline-flex items-center gap-1 shadow-xs"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isInitializingUsersSheet ? 'animate-spin' : ''}`} />
+                  <span>
+                    {isInitializingUsersSheet
+                      ? 'Poblando en Google Sheets...'
+                      : 'Crear / Poblar Hoja "usuarios" en Sheets (37 usuarios)'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadUsersCsv}
+                  className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 text-[11px] font-semibold inline-flex items-center gap-1"
+                >
+                  <Download className="w-3 h-3" />
+                  <span>Descargar CSV ({authorizedUsers.length})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCopyUsersTableForSheets}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 text-[11px] font-semibold inline-flex items-center gap-1"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>Copiar tabla para Sheets</span>
+                </button>
+              </div>
             </div>
 
+            {showEditColumns && (
+              <div className="p-3.5 rounded-xl bg-violet-50/70 border border-violet-200 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 text-xs">
+                <span className="font-semibold text-violet-950 shrink-0">
+                  Títulos exactos de columna en tu hoja &ldquo;usuarios&rdquo; (separados por coma):
+                </span>
+                <input
+                  type="text"
+                  value={editingColumnsText}
+                  onChange={(e) => setEditingColumnsText(e.target.value)}
+                  placeholder="Nombres, Curso, Correo, Sección"
+                  className="flex-1 rounded-lg border border-violet-300 bg-white px-3 py-1.5 text-slate-900"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleApplyUsuariosHeaders(
+                      editingColumnsText.split(',').map((s) => s.trim())
+                    )
+                  }
+                  className="px-3.5 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-800 text-white font-semibold shrink-0"
+                >
+                  Aplicar columnas
+                </button>
+              </div>
+            )}
+
+            {/* FORMULARIO DINÁMICO QUE SOLICITA EXACTAMENTE LAS COLUMNAS DE LA HOJA "USUARIOS" */}
             <form
               onSubmit={handleAddAuthorizedUserAndSyncToSheet}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs"
+              className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3 text-xs"
             >
-              <input
-                type="text"
-                value={newUserCourse}
-                onChange={(e) => setNewUserCourse(e.target.value)}
-                placeholder="Curso (ej. 11°, Docente)"
-                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5"
-              />
-              <input
-                type="text"
-                value={newUserSection}
-                onChange={(e) => setNewUserSection(e.target.value)}
-                placeholder="Sección (ej. Bachillerato)"
-                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5"
-              />
-              <input
-                type="text"
-                value={newUserName}
-                onChange={(e) => setNewUserName(e.target.value)}
-                placeholder="Nombre y Apellido"
-                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5"
-              />
-              <input
-                type="email"
-                value={newUserEmail}
-                onChange={(e) => setNewUserEmail(e.target.value)}
-                placeholder="Correo institucional"
-                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5"
-              />
-              <select
-                value={newUserProfile}
-                onChange={(e) => setNewUserProfile(e.target.value)}
-                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5"
-              >
-                <option value="Estudiante">Estudiante</option>
-                <option value="Docente">Docente</option>
-                <option value="Personal no clases">Personal no clases</option>
-                <option value="Administrador">Administrador</option>
-              </select>
-              <button
-                type="submit"
-                disabled={isSavingUser}
-                className="px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-800 disabled:bg-slate-400 text-white font-semibold"
-              >
-                {isSavingUser ? 'Sincronizando...' : '+ Crear y Sincronizar'}
-              </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {usuariosHeaders.map((colHeader) => {
+                  const norm = normalizeHeaderKey(colHeader);
+                  const isEmailField = /correo|email|e mail|mail|cuenta/.test(norm);
+                  const isProfileField = /perfil|rol|cargo|tipo|estamento/.test(norm);
+
+                  return (
+                    <div key={colHeader} className="flex flex-col gap-1">
+                      <label className="font-semibold text-slate-700 text-[11px]">
+                        {colHeader}
+                      </label>
+                      {isProfileField ? (
+                        <select
+                          value={newUserFieldValues[colHeader] || ''}
+                          onChange={(e) =>
+                            setNewUserFieldValues((prev) => ({
+                              ...prev,
+                              [colHeader]: e.target.value,
+                            }))
+                          }
+                          className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-slate-900"
+                        >
+                          <option value="">Seleccionar {colHeader}...</option>
+                          <option value="Estudiante">Estudiante</option>
+                          <option value="Docente">Docente</option>
+                          <option value="Personal no clases">Personal no clases</option>
+                          <option value="Administrador">Administrador</option>
+                        </select>
+                      ) : (
+                        <input
+                          type={isEmailField ? 'email' : 'text'}
+                          value={newUserFieldValues[colHeader] || ''}
+                          onChange={(e) =>
+                            setNewUserFieldValues((prev) => ({
+                              ...prev,
+                              [colHeader]: e.target.value,
+                            }))
+                          }
+                          placeholder={
+                            isEmailField
+                              ? `${colHeader} (ej. usuario@cem.edu.co)`
+                              : /curso|grado/.test(norm)
+                                ? `${colHeader} (ej. 11°, Docente, No clases)`
+                                : /seccion|area/.test(norm)
+                                  ? `${colHeader} (ej. Bachillerato, Administrativa)`
+                                  : colHeader
+                          }
+                          className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-slate-900"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <label className="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={newUserIsAdminFlag}
+                    onChange={(e) => setNewUserIsAdminFlag(e.target.checked)}
+                    className="rounded border-slate-300 text-violet-700 focus:ring-violet-600"
+                  />
+                  <span>
+                    Otorgar permisos de <strong>Administrador</strong> a este usuario
+                  </span>
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={isSavingUser}
+                  className="px-4 py-2 rounded-lg bg-violet-700 hover:bg-violet-800 disabled:bg-slate-400 text-white font-semibold transition-colors"
+                >
+                  {isSavingUser
+                    ? 'Escribiendo en Google Sheets...'
+                    : '+ Crear Usuario y Escribir en Hoja "usuarios"'}
+                </button>
+              </div>
             </form>
 
-            <div className="overflow-x-auto max-h-56 border border-slate-200 rounded-xl">
+            {/* TABLA QUE MUESTRA EXACTAMENTE LAS MISMAS COLUMNAS DE LA HOJA "USUARIOS" EN SHEETS */}
+            <div className="overflow-x-auto max-h-64 border border-slate-200 rounded-xl">
               <table className="w-full text-left border-collapse text-xs">
                 <thead className="bg-slate-100 text-slate-700 sticky top-0">
                   <tr>
-                    <th className="py-2 px-3 font-semibold">Curso</th>
-                    <th className="py-2 px-3 font-semibold">Sección</th>
-                    <th className="py-2 px-3 font-semibold">Nombre y Apellido</th>
-                    <th className="py-2 px-3 font-semibold">Correo institucional</th>
-                    <th className="py-2 px-3 font-semibold">Perfil</th>
+                    {usuariosHeaders.map((colHeader) => (
+                      <th key={colHeader} className="py-2.5 px-3 font-semibold">
+                        {colHeader}
+                      </th>
+                    ))}
+                    <th className="py-2.5 px-3 font-semibold text-right">Acceso / Estado</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {authorizedUsers.map((u) => (
                     <tr key={u.correo} className="hover:bg-slate-50">
-                      <td className="py-2 px-3 text-slate-600">{u.curso}</td>
-                      <td className="py-2 px-3 text-slate-600">{u.seccion}</td>
-                      <td className="py-2 px-3 font-medium text-slate-900">{u.nombres}</td>
-                      <td className="py-2 px-3 font-mono text-slate-700">{u.correo}</td>
-                      <td className="py-2 px-3">
-                        {u.isAdmin ? (
-                          <span className="px-2 py-0.5 rounded bg-violet-100 text-violet-900 font-semibold">
-                            {u.perfil} (Admin)
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                            {u.perfil}
-                          </span>
-                        )}
+                      {usuariosHeaders.map((colHeader) => {
+                        const cellVal = getUserCellValue(u, colHeader);
+                        const isEmailCol = /correo|email|e mail|mail|cuenta/.test(
+                          normalizeHeaderKey(colHeader)
+                        );
+                        const isNameCol = /nombre|apellido|estudiante/.test(
+                          normalizeHeaderKey(colHeader)
+                        );
+                        return (
+                          <td
+                            key={colHeader}
+                            className={`py-2 px-3 ${
+                              isEmailCol
+                                ? 'font-mono text-slate-700'
+                                : isNameCol
+                                  ? 'font-medium text-slate-900'
+                                  : 'text-slate-600'
+                            }`}
+                          >
+                            {cellVal || '—'}
+                          </td>
+                        );
+                      })}
+                      <td className="py-2 px-3 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1.5">
+                          {u.isAdmin ? (
+                            <span className="px-2 py-0.5 rounded bg-violet-100 text-violet-900 font-semibold">
+                              Admin
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                              {u.perfil}
+                            </span>
+                          )}
+                          {u.syncedToSheet ? (
+                            <span
+                              title="Sincronizado con Google Sheets"
+                              className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold"
+                            >
+                              En Sheets
+                            </span>
+                          ) : (
+                            <span
+                              title="Creado en app · Conecta URL /exec o copia tabla a Sheets"
+                              className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold"
+                            >
+                              Local
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -2314,8 +3260,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
                 <Code2 className="w-4 h-4 text-violet-700" />
                 <span>
-                  4. Código Google Apps Script Actualizado (Recibe usuarios vía GET/POST + Trigger
-                  24h)
+                  4. Código Google Apps Script Actualizado (Respeta tus columnas de &ldquo;usuarios&rdquo; + Lectura/Escritura JSONP/POST + Trigger 24h)
                 </span>
               </div>
               <button
@@ -2344,10 +3289,56 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       )}
 
       {/* =========================================================================
-          FORMULARIO DE FILTRO Y BÚSQUEDA (INCLUYE UNIDAD ACADÉMICA)
+          FORMULARIO DE FILTRO Y BÚSQUEDA REORGANIZADO SEGÚN LA NUEVA BD ORGANIZADA
          ========================================================================= */}
       <section className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 space-y-4 shadow-2xs">
-        <div className="flex flex-col lg:flex-row gap-3">
+        {/* Chips de acceso rápido por Área */}
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            Filtrar por Área Académica (Base de Datos):
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedAcademicUnit('all');
+                setPageIndex(0);
+              }}
+              className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                selectedAcademicUnit === 'all'
+                  ? 'bg-violet-700 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              Todas las áreas ({monographs.length})
+            </button>
+            {academicUnits.map((area) => {
+              const count = monographs.filter(
+                (m) => m.areaList?.includes(area) || m.academicUnit === area
+              ).length;
+              return (
+                <button
+                  key={area}
+                  type="button"
+                  onClick={() => {
+                    setSelectedAcademicUnit(area);
+                    setPageIndex(0);
+                  }}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                    selectedAcademicUnit === area
+                      ? 'bg-violet-700 text-white shadow-xs'
+                      : 'bg-violet-50 hover:bg-violet-100 text-violet-900 border border-violet-200/60'
+                  }`}
+                >
+                  {area} ({count})
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Buscador general multicriterio */}
+        <div className="flex flex-col lg:flex-row gap-3 pt-1">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
@@ -2357,7 +3348,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 setSearchQuery(e.target.value);
                 setPageIndex(0);
               }}
-              placeholder="Buscar por nombre del archivo, título de la monografía, autor, año lectivo, asignatura o unidad académica..."
+              placeholder="Buscar por ID (MONO-2025-001), título, autor, palabras clave, asesor, área o resumen..."
               className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600 bg-slate-50/60 focus:bg-white"
             />
             {searchQuery && (
@@ -2384,34 +3375,33 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               id="repoSortSelect"
               value={sortBy}
               onChange={(e) =>
-                setSortBy(e.target.value as 'title' | 'author' | 'year' | 'file')
+                setSortBy(e.target.value as 'title' | 'author' | 'year' | 'id')
               }
               className="rounded-xl border border-slate-300 bg-white py-2 px-3 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
             >
+              <option value="id">ID de Documento (MONO-2025-...)</option>
               <option value="title">Título de la monografía (A - Z)</option>
-              <option value="file">Nombre del archivo (A - Z)</option>
               <option value="author">Autor (A - Z)</option>
               <option value="year">Año lectivo (Más reciente)</option>
             </select>
           </div>
         </div>
 
-        {/* Selectores por Unidad académica, Asignatura, Año lectivo y Autor */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+        {/* 6 Selectores organizados: Área, Línea de investigación, Asignatura, Asesor(es), Autor y Año */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 pt-1">
           <div>
-            <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
-              Unidad Académica
+            <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+              1. Área (Ärea)
             </label>
             <select
               value={selectedAcademicUnit}
               onChange={(e) => {
                 setSelectedAcademicUnit(e.target.value);
-                setSelectedSubject('all');
                 setPageIndex(0);
               }}
-              className="w-full rounded-xl border border-slate-300 bg-white py-2 px-3 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
+              className="w-full rounded-xl border border-slate-300 bg-white py-1.5 px-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
             >
-              <option value="all">Todas las unidades ({academicUnits.length})</option>
+              <option value="all">Todas ({academicUnits.length})</option>
               {academicUnits.map((unit) => (
                 <option key={unit} value={unit}>
                   {unit}
@@ -2421,8 +3411,29 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
-              Asignatura
+            <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+              2. Línea Investig.
+            </label>
+            <select
+              value={selectedResearchLine}
+              onChange={(e) => {
+                setSelectedResearchLine(e.target.value);
+                setPageIndex(0);
+              }}
+              className="w-full rounded-xl border border-slate-300 bg-white py-1.5 px-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
+            >
+              <option value="all">Todas ({researchLines.length})</option>
+              {researchLines.map((rl) => (
+                <option key={rl} value={rl}>
+                  {rl}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+              3. Asignatura
             </label>
             <select
               value={selectedSubject}
@@ -2430,9 +3441,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 setSelectedSubject(e.target.value);
                 setPageIndex(0);
               }}
-              className="w-full rounded-xl border border-slate-300 bg-white py-2 px-3 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
+              className="w-full rounded-xl border border-slate-300 bg-white py-1.5 px-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
             >
-              <option value="all">Todas las asignaturas ({subjects.length})</option>
+              <option value="all">Todas ({subjects.length})</option>
               {subjects.map((subj) => (
                 <option key={subj} value={subj}>
                   {subj}
@@ -2442,29 +3453,29 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
-              Año Lectivo
+            <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+              4. Asesor(es)
             </label>
             <select
-              value={selectedAcademicYear}
+              value={selectedAdvisor}
               onChange={(e) => {
-                setSelectedAcademicYear(e.target.value);
+                setSelectedAdvisor(e.target.value);
                 setPageIndex(0);
               }}
-              className="w-full rounded-xl border border-slate-300 bg-white py-2 px-3 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
+              className="w-full rounded-xl border border-slate-300 bg-white py-1.5 px-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
             >
-              <option value="all">Todos los años lectivos ({academicYears.length})</option>
-              {academicYears.map((yr) => (
-                <option key={yr} value={yr}>
-                  {yr}
+              <option value="all">Todos ({advisorsList.length})</option>
+              {advisorsList.map((adv) => (
+                <option key={adv} value={adv}>
+                  {adv}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
-              Autor / Estudiante
+            <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+              5. Autor / Estudiante
             </label>
             <select
               value={selectedAuthor}
@@ -2472,12 +3483,33 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 setSelectedAuthor(e.target.value);
                 setPageIndex(0);
               }}
-              className="w-full rounded-xl border border-slate-300 bg-white py-2 px-3 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
+              className="w-full rounded-xl border border-slate-300 bg-white py-1.5 px-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
             >
-              <option value="all">Todos los autores ({authors.length})</option>
+              <option value="all">Todos ({authors.length})</option>
               {authors.map((auth) => (
                 <option key={auth} value={auth}>
                   {auth}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+              6. Año / Grado
+            </label>
+            <select
+              value={selectedAcademicYear}
+              onChange={(e) => {
+                setSelectedAcademicYear(e.target.value);
+                setPageIndex(0);
+              }}
+              className="w-full rounded-xl border border-slate-300 bg-white py-1.5 px-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
+            >
+              <option value="all">Todos ({academicYears.length})</option>
+              {academicYears.map((yr) => (
+                <option key={yr} value={yr}>
+                  {yr}
                 </option>
               ))}
             </select>
@@ -2489,7 +3521,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             <Filter className="w-3.5 h-3.5 text-violet-700" />
             <span>
               Mostrando <strong>{threePreviewMonographs.length}</strong> en vista previa (de{' '}
-              <strong>{filteredMonographs.length}</strong> monografías)
+              <strong>{filteredMonographs.length}</strong> monografías de la BD organizada)
             </span>
           </div>
 
@@ -2511,7 +3543,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
             {(searchQuery ||
               selectedAcademicUnit !== 'all' ||
+              selectedResearchLine !== 'all' ||
               selectedSubject !== 'all' ||
+              selectedAdvisor !== 'all' ||
               selectedAcademicYear !== 'all' ||
               selectedAuthor !== 'all') && (
               <button
@@ -2660,18 +3694,23 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                     <div className="space-y-3">
                       <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px]">
-                        <span className="inline-flex items-center gap-1 font-semibold text-violet-900 bg-violet-50 px-2.5 py-0.5 rounded-md border border-violet-200">
-                          <Building2 className="w-3 h-3 text-violet-700" />
-                          <span>{doc.academicUnit}</span>
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-mono text-[10px] font-bold text-violet-900 bg-violet-100/90 px-2 py-0.5 rounded-md border border-violet-200">
+                            {doc.documentCode || 'MONO'}
+                          </span>
+                          <span className="inline-flex items-center gap-1 font-semibold text-violet-900 bg-violet-50 px-2.5 py-0.5 rounded-md border border-violet-200">
+                            <Building2 className="w-3 h-3 text-violet-700" />
+                            <span>{doc.academicUnit}</span>
+                          </span>
+                        </div>
                         <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold">
-                          Año lectivo: {doc.academicYear}
+                          {doc.grade || 'Taller 4'} · {doc.academicYear}
                         </span>
                       </div>
 
                       <div>
-                        <div className="text-[10px] font-semibold text-slate-400 uppercase">
-                          Título de la monografía
+                        <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                          {doc.researchLine ? `Línea: ${doc.researchLine}` : 'Título de la monografía'}
                         </div>
                         <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-snug mt-0.5">
                           {doc.title}
@@ -2686,19 +3725,39 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                           </span>
                         </div>
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-slate-500">Autor:</span>
+                          <span className="text-slate-500">Autor(a):</span>
                           <span className="font-semibold text-slate-900 flex items-center gap-1 text-right">
                             <GraduationCap className="w-3.5 h-3.5 text-violet-700 shrink-0" />
                             <span>{doc.author}</span>
                           </span>
                         </div>
-                        <div className="pt-1 border-t border-slate-200/70">
-                          <span className="text-slate-500 block mb-0.5">Nombre del archivo:</span>
-                          <span className="font-mono text-[11px] text-slate-700 flex items-center gap-1 break-all">
-                            <FileText className="w-3 h-3 text-violet-700 shrink-0" />
-                            <span>{doc.fileName}</span>
-                          </span>
-                        </div>
+                        {doc.advisorsRaw && (
+                          <div className="flex items-center justify-between gap-2 pt-0.5">
+                            <span className="text-slate-500">Asesor(es):</span>
+                            <span className="font-medium text-slate-800 text-right">
+                              {doc.advisorsRaw}
+                            </span>
+                          </div>
+                        )}
+                        {doc.keywords && doc.keywords.length > 0 && (
+                          <div className="pt-1.5 border-t border-slate-200/70">
+                            <div className="flex flex-wrap items-center gap-1">
+                              {doc.keywords.slice(0, 3).map((kw, i) => (
+                                <span
+                                  key={i}
+                                  className="px-1.5 py-0.5 rounded bg-white text-slate-700 border border-slate-200 text-[10px]"
+                                >
+                                  {kw}
+                                </span>
+                              ))}
+                              {doc.keywords.length > 3 && (
+                                <span className="text-[10px] text-slate-400">
+                                  +{doc.keywords.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -2842,10 +3901,41 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             </div>
 
             <div className="p-3 bg-slate-100 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-700">
-              <div>
-                <strong>Autor:</strong> {previewDoc.author} · <strong>Unidad académica:</strong>{' '}
-                {previewDoc.academicUnit} · <strong>Asignatura:</strong> {previewDoc.subject} ·{' '}
-                <strong>Año lectivo:</strong> {previewDoc.academicYear}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-[11px] font-bold text-violet-900 bg-violet-100 px-2 py-0.5 rounded border border-violet-200">
+                  {previewDoc.documentCode || 'MONO'}
+                </span>
+                <span>
+                  <strong>Autor(a):</strong> {previewDoc.author}
+                </span>
+                <span aria-hidden="true">·</span>
+                <span>
+                  <strong>Área:</strong> {previewDoc.academicUnit}
+                </span>
+                {previewDoc.researchLine && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>
+                      <strong>Línea:</strong> {previewDoc.researchLine}
+                    </span>
+                  </>
+                )}
+                <span aria-hidden="true">·</span>
+                <span>
+                  <strong>Asignatura:</strong> {previewDoc.subject}
+                </span>
+                {previewDoc.advisorsRaw && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>
+                      <strong>Asesor(es):</strong> {previewDoc.advisorsRaw}
+                    </span>
+                  </>
+                )}
+                <span aria-hidden="true">·</span>
+                <span>
+                  <strong>Grado/Año:</strong> {previewDoc.grade || 'Taller 4'} · {previewDoc.academicYear}
+                </span>
               </div>
               <span className="font-mono text-[11px] text-violet-800 bg-violet-50 px-2 py-0.5 rounded border border-violet-200">
                 {previewDoc.fileName}
@@ -2854,20 +3944,49 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
             <div className="flex-1 bg-slate-100 relative overflow-y-auto">
               {buildSingleDocPreviewUrl(previewDoc.driveFileId, previewDoc.driveUrl) ? (
-                <iframe
-                  title={`Vista previa de ${previewDoc.fileName}`}
-                  src={buildSingleDocPreviewUrl(previewDoc.driveFileId, previewDoc.driveUrl)!}
-                  className="w-full h-full border-0"
-                  allow="autoplay"
-                />
+                <div className="w-full h-full flex flex-col">
+                  {previewDoc.abstractText && (
+                    <div className="p-4 bg-white border-b border-slate-200 text-xs text-slate-700 space-y-1.5 shrink-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-violet-950 uppercase tracking-wide text-[11px]">
+                          Resumen de la Monografía ({previewDoc.academicUnit} — {previewDoc.subject})
+                        </span>
+                        {previewDoc.keywords && previewDoc.keywords.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1">
+                            {previewDoc.keywords.map((kw, i) => (
+                              <span
+                                key={i}
+                                className="px-1.5 py-0.5 rounded bg-violet-50 text-violet-800 border border-violet-200 text-[10px]"
+                              >
+                                #{kw}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <p className="leading-relaxed line-clamp-3">{previewDoc.abstractText}</p>
+                    </div>
+                  )}
+                  <iframe
+                    title={`Vista previa de ${previewDoc.fileName}`}
+                    src={buildSingleDocPreviewUrl(previewDoc.driveFileId, previewDoc.driveUrl)!}
+                    className="w-full flex-1 border-0"
+                    allow="autoplay"
+                  />
+                </div>
               ) : (
                 <div className="max-w-3xl mx-auto my-6 bg-white rounded-2xl border border-slate-300 shadow-sm p-6 sm:p-10 space-y-6">
                   <div className="text-center border-b border-slate-200 pb-6 space-y-2">
-                    <div className="text-xs font-bold uppercase tracking-widest text-violet-800">
-                      Colegio Ekirayá Educación Montessori · Monografía de Grado 11°
+                    <div className="flex justify-center gap-2">
+                      <span className="font-mono text-xs font-bold text-violet-900 bg-violet-100 px-2.5 py-0.5 rounded-full border border-violet-200">
+                        {previewDoc.documentCode}
+                      </span>
+                      <span className="text-xs font-bold uppercase tracking-widest text-violet-800 py-0.5">
+                        Colegio Ekirayá · Grado {previewDoc.grade || '11°'}
+                      </span>
                     </div>
                     <div className="text-xs font-semibold text-emerald-700">
-                      Unidad Académica: {previewDoc.academicUnit} · Asignatura:{' '}
+                      Área: {previewDoc.academicUnit} {previewDoc.researchLine ? `(Línea: ${previewDoc.researchLine})` : ''} · Asignatura:{' '}
                       {previewDoc.subject}
                     </div>
                     <h4 className="text-lg sm:text-xl font-bold text-slate-900 pt-2">
@@ -2875,40 +3994,37 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                     </h4>
                     <p className="text-xs sm:text-sm text-slate-600 pt-1">
                       <strong>Autor(a):</strong> {previewDoc.author} ·{' '}
-                      <strong>Año lectivo:</strong> {previewDoc.academicYear}
+                      <strong>Asesor(es):</strong> {previewDoc.advisorsRaw || 'Equipo docente'} ·{' '}
+                      <strong>Año:</strong> {previewDoc.academicYear}
                     </p>
                   </div>
 
                   <div className="space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed">
                     <div>
-                      <h5 className="font-bold text-slate-900 uppercase tracking-wide text-xs mb-1">
-                        1. Resumen Ejecutivo
+                      <h5 className="font-bold text-slate-900 uppercase tracking-wide text-xs mb-1.5">
+                        1. Resumen de la Investigación
                       </h5>
-                      <p>
+                      <p className="text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200">
                         {previewDoc.abstractText ||
                           `Documento monográfico perteneciente a la unidad académica ${previewDoc.academicUnit} en el área de ${previewDoc.subject}.`}
                       </p>
                     </div>
 
-                    {previewDoc.methodologyText && (
-                      <div>
-                        <h5 className="font-bold text-slate-900 uppercase tracking-wide text-xs mb-1">
-                          2. Diseño Metodológico
-                        </h5>
-                        <p>{previewDoc.methodologyText}</p>
-                      </div>
-                    )}
-
-                    {previewDoc.referencesSample && previewDoc.referencesSample.length > 0 && (
+                    {previewDoc.keywords && previewDoc.keywords.length > 0 && (
                       <div>
                         <h5 className="font-bold text-slate-900 uppercase tracking-wide text-xs mb-1.5">
-                          3. Referencias Bibliográficas Destacadas (APA 7.ª Edición)
+                          2. Palabras Clave
                         </h5>
-                        <ul className="space-y-2 pl-5 list-disc text-xs text-slate-600">
-                          {previewDoc.referencesSample.map((ref, i) => (
-                            <li key={i}>{ref}</li>
+                        <div className="flex flex-wrap gap-1.5">
+                          {previewDoc.keywords.map((kw, i) => (
+                            <span
+                              key={i}
+                              className="px-2 py-1 rounded-lg bg-violet-50 text-violet-900 border border-violet-200 text-xs font-medium"
+                            >
+                              #{kw}
+                            </span>
                           ))}
-                        </ul>
+                        </div>
                       </div>
                     )}
                   </div>
