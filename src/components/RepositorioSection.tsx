@@ -16,6 +16,7 @@ import {
   X,
   BookOpen,
   UserCheck,
+  UserPlus,
   AlertCircle,
   Database,
   Code2,
@@ -144,7 +145,7 @@ export const APPS_SCRIPT_CODE = `/**
  */
 
 const ROOT_FOLDER_ID = '1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC';
-const REPO_SHEET_NAME = 'Hoja 1';
+const REPO_SHEET_NAME = 'repositorio';
 const USERS_SHEET_NAME = 'usuarios';
 const INSTITUTIONAL_TOKEN = 'EKIRAYA-2026';
 
@@ -175,24 +176,27 @@ function obtenerHojaRepositorio(ss, tabNameParam) {
     const custom = ss.getSheetByName(tabNameParam);
     if (custom) return custom;
   }
-  const allSheets = ss.getSheets();
-  const usersSh = ss.getSheetByName('usuarios') || ss.getSheetByName('Usuarios');
-  const usersName = usersSh ? usersSh.getName().toLowerCase() : 'usuarios';
+  // 1. Buscar explícitamente la hoja "repositorio" o "Repositorio"
+  const repoSheet = ss.getSheetByName('repositorio') || ss.getSheetByName('Repositorio') || ss.getSheetByName('REPOSITORIO');
+  if (repoSheet) return repoSheet;
 
-  // 1. Si existe una hoja llamada "Hoja 1", "Sheet 1", "Hoja1" o "Sheet1"
+  // 2. Si existe una hoja llamada "Hoja 1", "Sheet 1", "Hoja1" o "Sheet1"
+  const allSheets = ss.getSheets();
   for (let i = 0; i < allSheets.length; i++) {
     const name = allSheets[i].getName().trim().toLowerCase();
-    if (name === 'hoja 1' || name === 'sheet 1' || name === 'hoja1' || name === 'sheet1') {
+    if (name === 'hoja 1' || name === 'sheet 1' || name === 'hoja1' || name === 'sheet1' || name === 'monografías' || name === 'monografias') {
       return allSheets[i];
     }
   }
 
-  // 2. Si la primera hoja no es la hoja de usuarios, tomar la primera hoja del libro
+  // 3. Si la primera hoja no es la hoja de usuarios, tomar la primera hoja del libro
+  const usersSh = ss.getSheetByName('usuarios') || ss.getSheetByName('Usuarios');
+  const usersName = usersSh ? usersSh.getName().toLowerCase() : 'usuarios';
   if (allSheets.length > 0 && allSheets[0].getName().toLowerCase() !== usersName) {
     return allSheets[0];
   }
 
-  // 3. Buscar cualquier otra hoja que no sea usuarios
+  // 4. Buscar cualquier otra hoja que no sea usuarios
   for (let j = 0; j < allSheets.length; j++) {
     const n = allSheets[j].getName().trim().toLowerCase();
     if (n !== usersName && allSheets[j].getLastRow() > 0) {
@@ -369,18 +373,27 @@ function sincronizarUnidadesAcademicas() {
   let sheet = obtenerHojaRepositorio(ss, null);
 
   const expectedHeaders = [
-    'Nombre del archivo',
-    'Título de la monografía',
-    'Autor',
-    'Año lectivo',
-    'Asignatura',
-    'Unidad académica',
-    'ID del archivo',
-    'Enlace Drive'
+    'documento_id',
+    'titulo',
+    'autor',
+    'grado',
+    'año',
+    'Unidad Académica',
+    'Linea de investigación',
+    'tipo',
+    'palabras_clave',
+    'resumen',
+    'Asesor(es)',
+    'drive_file_id',
+    'url_documento',
+    'visibilidad',
+    'estado',
+    'fecha_registro',
+    'fecha_actualizacion'
   ];
 
   if (!sheet) {
-    sheet = ss.insertSheet('Hoja 1');
+    sheet = ss.insertSheet('repositorio');
   }
 
   if (sheet.getLastRow() === 0) {
@@ -391,9 +404,9 @@ function sincronizarUnidadesAcademicas() {
   const repoData = sheet.getDataRange().getDisplayValues();
   const repoHeaders = repoData[0].map(function(h) { return String(h).trim(); });
 
-  let idColIdx = repoHeaders.findIndex(function(h) { return /^id|id del archivo|id_archivo/i.test(h); });
-  let urlColIdx = repoHeaders.findIndex(function(h) { return /enlace|url|link|drive/i.test(h); });
-  let nameColIdx = repoHeaders.findIndex(function(h) { return /nombre del archivo|archivo|file/i.test(h); });
+  let idColIdx = repoHeaders.findIndex(function(h) { return /^id|id del archivo|id_archivo|documento_id|drive_file_id/i.test(h); });
+  let urlColIdx = repoHeaders.findIndex(function(h) { return /enlace|url|link|drive|url_documento/i.test(h); });
+  let nameColIdx = repoHeaders.findIndex(function(h) { return /nombre del archivo|archivo|file|titulo/i.test(h); });
 
   const existingKeys = new Set();
   for (let i = 1; i < repoData.length; i++) {
@@ -422,25 +435,36 @@ function recorrerCarpetasDrive(folder, pathParts, sheet, headers, existingKeys) 
     if (existingKeys.has(fileId) || existingKeys.has(fileUrl) || existingKeys.has(fileName)) continue;
 
     const cleanTitle = fileName
-      .replace(/\\.(pdf|docx|doc)$/i, '')
+      .replace(/\.(pdf|docx|doc)$/i, '')
       .replace(/[_-]+/g, ' ')
       .trim();
 
     const unidadAcademica = pathParts.length > 0 ? pathParts[0] : folder.getName();
-    const asignatura = pathParts.length > 1 ? pathParts[1] : unidadAcademica;
+    const lineaInvestigacion = pathParts.length > 1 ? pathParts[1] : unidadAcademica;
     const autor = pathParts.length > 0 ? pathParts[pathParts.length - 1] : 'Estudiante Grado 11';
     const anioLectivo = String(new Date(file.getDateCreated()).getFullYear());
+    const randomId = String(Math.floor(1000 + Math.random() * 9000));
 
     const newRow = headers.map(function(headerName) {
       const h = headerName.toLowerCase();
+      if (h === 'documento_id' || h === 'id') return randomId;
+      if (h === 'titulo' || h.includes('título')) return cleanTitle;
+      if (h === 'autor' || h.includes('estudiante')) return autor;
+      if (h === 'grado') return '11';
+      if (h === 'año' || h === 'ano' || h.includes('lectivo') || h.includes('fecha')) return anioLectivo;
+      if (h === 'unidad académica' || h.includes('unidad') || h === 'area') return unidadAcademica;
+      if (h === 'linea de investigación' || h.includes('linea')) return lineaInvestigacion;
+      if (h === 'tipo') return 'Investigación';
+      if (h === 'palabras_clave' || h.includes('palabras')) return cleanTitle.split(' ').slice(0, 5).join(', ');
+      if (h === 'resumen') return 'Trabajo monográfico desarrollado en la unidad académica ' + unidadAcademica + ' del Colegio Ekirayá.';
+      if (h === 'asesor(es)' || h.includes('asesor')) return 'Docente Ekirayá';
+      if (h === 'drive_file_id' || h.includes('file_id') || h === 'id del archivo') return fileId;
+      if (h === 'url_documento' || h.includes('url') || h.includes('enlace') || h.includes('drive')) return fileUrl;
+      if (h === 'visibilidad') return 'Digital';
+      if (h === 'estado') return 'Finalizado';
+      if (h === 'fecha_registro') return '23 enero 2026';
+      if (h === 'fecha_actualizacion') return '10-04-2026';
       if (h.includes('archivo') && !h.includes('id')) return fileName;
-      if (h.includes('título') || h.includes('titulo') || h.includes('monografía') || h.includes('monografia')) return cleanTitle;
-      if (h.includes('autor') || h.includes('estudiante')) return autor;
-      if (h.includes('año') || h.includes('ano') || h.includes('lectivo') || h.includes('fecha')) return anioLectivo;
-      if (h.includes('asignatura') || h.includes('materia') || h.includes('área') || h.includes('area')) return asignatura;
-      if (h.includes('unidad')) return unidadAcademica;
-      if (h.includes('id')) return fileId;
-      if (h.includes('enlace') || h.includes('url') || h.includes('link') || h.includes('drive')) return fileUrl;
       return '';
     });
 
@@ -495,13 +519,19 @@ function procesarSolicitud(params) {
 
   if (params.action === 'addUser') {
     agregarUsuarioEnSheet(params);
+    // Sincronización bidireccional automática de monografías al crear usuario
+    try {
+      sincronizarUnidadesAcademicas();
+    } catch (err) {
+      // Continuar con la respuesta
+    }
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let usersSheet = obtenerOCrearHojaUsuarios();
   let repoSheet = obtenerHojaRepositorio(ss, params.sheet || params.tab || params.repoTabName);
 
-  if (params.action === 'syncDrive') {
+  if (params.action === 'syncDrive' || params.action === 'syncDriveAndSheets') {
     try {
       sincronizarUnidadesAcademicas();
       repoSheet = obtenerHojaRepositorio(ss, params.sheet || params.tab || params.repoTabName);
@@ -1383,16 +1413,20 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   const [loginEmailInput, setLoginEmailInput] = useState<string>('');
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // Filtros reorganizados según las columnas de la nueva BD:
-  // Búsqueda general + Área + Línea de investigación + Asesor(es) + Autor + Año/Grado
+  // Filtros construidos directamente sobre las 17 columnas de la hoja "repositorio":
+  // documento_id, titulo, autor, grado, año, Unidad Académica, Linea de investigación, tipo, palabras_clave, resumen, Asesor(es), drive_file_id, url_documento, visibilidad, estado, fecha_registro, fecha_actualizacion
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAcademicUnit, setSelectedAcademicUnit] = useState<string>('all');
   const [selectedResearchLine, setSelectedResearchLine] = useState<string>('all');
   const [selectedAdvisor, setSelectedAdvisor] = useState<string>('all');
-  const [selectedSubject, setSelectedSubject] = useState<string>('all');
-  const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('all');
   const [selectedAuthor, setSelectedAuthor] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'title' | 'author' | 'year' | 'id'>('id');
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('all');
+  const [selectedDocType, setSelectedDocType] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'id' | 'title' | 'author' | 'unit' | 'year'>('id');
+  const [previewMode, setPreviewMode] = useState<'featured3' | 'filtered' | 'reader'>('featured3');
+  const [readerActiveDocId, setReaderActiveDocId] = useState<string>('2262');
+  const [showColumnsExplainer, setShowColumnsExplainer] = useState<boolean>(true);
   const [isInitializingUsersSheet, setIsInitializingUsersSheet] = useState<boolean>(false);
   const [userProfileFilter, setUserProfileFilter] = useState<string>('all');
 
@@ -1406,7 +1440,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   const [showAdminPanel, setShowAdminPanel] = useState<boolean>(true);
   const [appsScriptExecUrl, setAppsScriptExecUrl] = useState<string>('');
   const [connectionUrl, setConnectionUrl] = useState<string>('');
-  const [repoTabName, setRepoTabName] = useState<string>('Hoja 1');
+  const [repoTabName, setRepoTabName] = useState<string>('repositorio');
   const [accessToken, setAccessToken] = useState<string>('EKIRAYA-2026');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [isSavingUser, setIsSavingUser] = useState<boolean>(false);
@@ -1425,6 +1459,15 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   const [editingColumnsText, setEditingColumnsText] = useState<string>(
     DEFAULT_USUARIOS_HEADERS.join(', ')
   );
+
+  // Registro y creación de usuario desde la app (alimenta en ambas direcciones)
+  const [showCreateUserModal, setShowCreateUserModal] = useState<boolean>(false);
+  const [registerName, setRegisterName] = useState<string>('');
+  const [registerEmail, setRegisterEmail] = useState<string>('');
+  const [registerCurso, setRegisterCurso] = useState<string>('11°');
+  const [registerSeccion, setRegisterSeccion] = useState<string>('Bachillerato');
+  const [registerPerfil, setRegisterPerfil] = useState<string>('Estudiante');
+  const [isRegisteringUser, setIsRegisteringUser] = useState<boolean>(false);
 
   /** Persiste toda la configuración en localStorage */
   const saveLocalRepoConfig = useCallback(
@@ -1540,12 +1583,14 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           if (clientRawHeaders.length === 0) {
             const candidateRepoTabs = Array.from(
               new Set([
+                targetTabName.trim(),
+                'repositorio',
+                'Repositorio',
+                'REPOSITORIO',
                 'Hoja 1',
                 'Sheet 1',
                 'Hoja1',
                 'Sheet1',
-                targetTabName.trim(),
-                'Repositorio',
                 'Monografías',
                 'Monografias',
                 'Unidades Académicas',
@@ -1729,7 +1774,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     let savedScriptUrl = '';
     let savedSheetUrl = '';
     let savedToken = 'EKIRAYA-2026';
-    let savedTab = 'Hoja 1';
+    let savedTab = 'repositorio';
     let savedHeaders: string[] = [];
     let savedRows: Record<string, string>[] = [];
     let savedUsuariosHeaders: string[] = DEFAULT_USUARIOS_HEADERS;
@@ -2170,11 +2215,113 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             `Usuario "${newUser.nombres}" activo en Cita Master. Conecta la URL Web App (/exec) de Apps Script en el Campo A o usa "Copiar fila para Sheets".`
           );
         }
+
+        // Sincronización bidireccional automática del repositorio y Drive al crear usuario
+        executeSyncWithSheets(
+          appsScriptExecUrl,
+          connectionUrl,
+          accessToken,
+          repoTabName,
+          updatedLocalUsers,
+          { triggerDriveScan: true, silent: true }
+        );
       }
     } catch {
       showToast(`Usuario "${newUser.nombres}" guardado y habilitado en Cita Master.`);
     } finally {
       setIsSavingUser(false);
+    }
+  };
+
+  /**
+   * Registro y creación de usuario desde la app (desde el login o modal):
+   * Guarda el usuario en la hoja "usuarios", lo habilita en la sesión,
+   * y desencadena la sincronización bidireccional de la hoja "repositorio" y Google Drive.
+   */
+  const handleRegisterAndLoginNewUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanMail = registerEmail.trim().toLowerCase();
+    const cleanName = registerName.trim();
+
+    if (!cleanMail || !cleanName) {
+      showToast('Por favor diligencia el nombre completo y correo institucional.');
+      return;
+    }
+
+    setIsRegisteringUser(true);
+
+    const isAdmin = /admin|rector|directivo|coordinad/i.test(registerPerfil);
+    const rawRow: Record<string, string> = {
+      Nombres: cleanName,
+      Curso: registerCurso.trim() || '11°',
+      Correo: cleanMail,
+      Sección: registerSeccion.trim() || 'Bachillerato',
+      Perfil: registerPerfil.trim() || 'Estudiante',
+    };
+
+    const newUser: AuthorizedSchoolUser = {
+      curso: registerCurso.trim() || '11°',
+      seccion: registerSeccion.trim() || 'Bachillerato',
+      nombres: cleanName,
+      correo: cleanMail,
+      perfil: registerPerfil.trim() || 'Estudiante',
+      isAdmin,
+      createdInApp: true,
+      syncedToSheet: false,
+      rawRow,
+    };
+
+    const updatedUsers = [
+      ...authorizedUsers.filter((u) => u.correo.toLowerCase() !== cleanMail),
+      newUser,
+    ];
+    setAuthorizedUsers(updatedUsers);
+    setCurrentUser(newUser);
+    setShowCreateUserModal(false);
+    setLoginError(null);
+
+    saveLocalRepoConfig({
+      appsScriptExecUrl,
+      connectionUrl,
+      repoTabName,
+      accessToken,
+      lastSyncDate: new Date().toLocaleString('es-CO'),
+      rawHeaders,
+      rawRows,
+      columnMapping,
+      authorizedUsers: updatedUsers,
+      usuariosHeaders,
+    });
+
+    showToast(`¡Usuario "${cleanName}" creado! Sincronizando repositorio en ambas direcciones...`);
+
+    try {
+      // 1. Enviar al backend /api/repo/users
+      await fetch('/api/repo/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user: newUser,
+          usuariosHeaders,
+          appsScriptExecUrl,
+          connectionUrl,
+          accessToken,
+        }),
+      });
+
+      // 2. Sincronización bidireccional inmediata con la hoja "repositorio" y Drive
+      await executeSyncWithSheets(
+        appsScriptExecUrl,
+        connectionUrl,
+        accessToken,
+        repoTabName,
+        updatedUsers,
+        { triggerDriveScan: true }
+      );
+    } catch {
+      // ignore
+    } finally {
+      setIsRegisteringUser(false);
     }
   };
 
@@ -2429,22 +2576,16 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
   }, [monographs, selectedAcademicUnit]);
 
-  const subjects = useMemo(
+  const docTypesList = useMemo(
     () =>
       Array.from(
         new Set(
           monographs
-            .filter(
-              (m) =>
-                selectedAcademicUnit === 'all' ||
-                m.areaList?.includes(selectedAcademicUnit) ||
-                m.academicUnit === selectedAcademicUnit
-            )
-            .map((m) => m.subject)
+            .map((m) => m.docType)
             .filter(Boolean)
         )
       ).sort((a, b) => a.localeCompare(b, 'es')),
-    [monographs, selectedAcademicUnit]
+    [monographs]
   );
 
   const advisorsList = useMemo(() => {
@@ -2473,7 +2614,17 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     [monographs]
   );
 
-  // Búsqueda e indexación multicriterio con todas las columnas de la nueva BD
+  // 3 Ejemplos destacados representativos de distintas unidades académicas verificadas en la hoja "repositorio"
+  const featuredThreeMonographs = useMemo(() => {
+    const targetIds = ['2262', '2530', '2945'];
+    const found = targetIds
+      .map((id) => monographs.find((m) => m.documentoId === id))
+      .filter(Boolean) as MonographDocument[];
+    if (found.length === 3) return found;
+    return monographs.slice(0, 3);
+  }, [monographs]);
+
+  // Búsqueda e indexación multicriterio con todas las 17 columnas de la hoja "repositorio"
   const filteredMonographs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
 
@@ -2493,29 +2644,32 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         ) {
           return false;
         }
-        if (selectedSubject !== 'all' && m.subject !== selectedSubject) return false;
         if (selectedAdvisor !== 'all' && !(m.advisors || []).includes(selectedAdvisor))
           return false;
         if (selectedAcademicYear !== 'all' && m.academicYear !== selectedAcademicYear)
           return false;
         if (selectedAuthor !== 'all' && m.author !== selectedAuthor) return false;
+        if (selectedDocType !== 'all' && m.docType !== selectedDocType) return false;
+        if (selectedStatus !== 'all' && m.status !== selectedStatus) return false;
 
         if (!q) return true;
 
         const searchableFields = [
+          m.documentoId,
           m.documentCode,
           m.fileName,
           m.title,
           m.author,
           m.grade,
           m.academicYear,
-          m.subject,
           m.docType,
           m.keywordsRaw,
           m.abstractText,
           m.advisorsRaw,
           m.academicUnit,
           m.researchLine,
+          m.status,
+          m.visibility,
         ]
           .join(' ')
           .toLowerCase();
@@ -2523,8 +2677,14 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         return searchableFields.includes(q);
       })
       .sort((a, b) => {
-        if (sortBy === 'id') return a.documentCode.localeCompare(b.documentCode, 'es');
+        if (sortBy === 'id') {
+          const numA = parseInt(a.documentoId, 10);
+          const numB = parseInt(b.documentoId, 10);
+          if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+          return a.documentoId.localeCompare(b.documentoId, 'es');
+        }
         if (sortBy === 'author') return a.author.localeCompare(b.author, 'es');
+        if (sortBy === 'unit') return a.academicUnit.localeCompare(b.academicUnit, 'es');
         if (sortBy === 'year') return b.academicYear.localeCompare(a.academicYear, 'es');
         return a.title.localeCompare(b.title, 'es');
       });
@@ -2533,18 +2693,31 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     searchQuery,
     selectedAcademicUnit,
     selectedResearchLine,
-    selectedSubject,
     selectedAdvisor,
     selectedAcademicYear,
     selectedAuthor,
+    selectedDocType,
+    selectedStatus,
     sortBy,
   ]);
 
   // Vista Previa de 3 Monografías por página
   const ITEMS_PER_VIEW = 3;
-  const totalPages = Math.max(1, Math.ceil(filteredMonographs.length / ITEMS_PER_VIEW));
+  const isDefaultView =
+    previewMode === 'featured3' &&
+    !searchQuery &&
+    selectedAcademicUnit === 'all' &&
+    selectedResearchLine === 'all' &&
+    selectedAdvisor === 'all' &&
+    selectedAuthor === 'all' &&
+    selectedAcademicYear === 'all' &&
+    selectedDocType === 'all';
+
+  const activeMonographList = isDefaultView ? featuredThreeMonographs : filteredMonographs;
+
+  const totalPages = Math.max(1, Math.ceil(activeMonographList.length / ITEMS_PER_VIEW));
   const safePageIndex = Math.min(pageIndex, totalPages - 1);
-  const threePreviewMonographs = filteredMonographs.slice(
+  const threePreviewMonographs = activeMonographList.slice(
     safePageIndex * ITEMS_PER_VIEW,
     safePageIndex * ITEMS_PER_VIEW + ITEMS_PER_VIEW
   );
@@ -2553,10 +2726,13 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     setSearchQuery('');
     setSelectedAcademicUnit('all');
     setSelectedResearchLine('all');
-    setSelectedSubject('all');
     setSelectedAdvisor('all');
-    setSelectedAcademicYear('all');
     setSelectedAuthor('all');
+    setSelectedAcademicYear('all');
+    setSelectedDocType('all');
+    setSelectedStatus('all');
+    setSortBy('id');
+    setPreviewMode('featured3');
     setPageIndex(0);
   };
 
@@ -2635,9 +2811,22 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             </div>
 
             {loginError && (
-              <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                <span>{loginError}</span>
+              <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <span>{loginError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRegisterEmail(loginEmailInput || '');
+                    setShowCreateUserModal(true);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-800 text-white font-semibold flex items-center gap-1.5 transition-colors cursor-pointer text-xs"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Crear usuario ahora y sincronizar</span>
+                </button>
               </div>
             )}
 
@@ -2646,9 +2835,17 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 <span>
                   Usuarios autorizados activos: <strong className="text-slate-800">{authorizedUsers.length}</strong>
                 </span>
-                <span className="text-slate-500">
-                  Admin inicial: <code className="text-violet-700 bg-violet-50 px-1 py-0.5 rounded font-mono text-[10px]">mebolanos@cem.edu.co</code>
-                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRegisterEmail(loginEmailInput || '');
+                    setShowCreateUserModal(true);
+                  }}
+                  className="text-violet-700 hover:text-violet-950 font-bold underline flex items-center gap-1 cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Crear nuevo usuario desde la app</span>
+                </button>
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full">
@@ -2661,18 +2858,19 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                       accessToken,
                       repoTabName,
                       authorizedUsers,
-                      { triggerDriveScan: false }
+                      { triggerDriveScan: true }
                     )
                   }
                   disabled={isSyncing}
-                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-slate-200 shrink-0"
+                  title="Sincronizar ahora manualmente en ambas direcciones"
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-slate-200 shrink-0 cursor-pointer"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span>Sincronizar usuarios</span>
+                  <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar ahora'}</span>
                 </button>
                 <button
                   type="submit"
-                  className="w-full sm:flex-1 px-5 py-2.5 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-xs"
+                  className="w-full sm:flex-1 px-5 py-2.5 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer"
                 >
                   <UserCheck className="w-4 h-4 shrink-0" />
                   <span className="truncate">Ingresar al Repositorio</span>
@@ -2749,7 +2947,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                   <span>
-                    {isSyncing ? 'Sincronizando...' : 'Sincronizar Ahora con Sheets'}
+                    {isSyncing ? 'Sincronizando...' : 'Sincronizar ahora'}
                   </span>
                 </button>
               </>
@@ -3357,19 +3555,79 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       )}
 
       {/* =========================================================================
-          FORMULARIO DE FILTRO Y BÚSQUEDA REORGANIZADO SEGÚN LA NUEVA BD ORGANIZADA
+          VERIFICACIÓN DE COLUMNAS DE LA HOJA "repositorio" & FILTRO MULTICRITERIO
          ========================================================================= */}
       <section className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 space-y-4 shadow-2xs">
-        {/* Chips de acceso rápido por Área */}
+        {/* Cabecera de verificación de las 17 columnas de la hoja "repositorio" */}
+        <div className="bg-gradient-to-r from-violet-50 via-purple-50 to-emerald-50 rounded-xl p-3.5 border border-violet-200/80">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Database className="w-4 h-4 text-violet-700 shrink-0" />
+              <span className="text-xs font-bold text-slate-900">
+                Estructura Verificada de la Hoja &ldquo;repositorio&rdquo; (17 Columnas Indexadas)
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowColumnsExplainer(!showColumnsExplainer)}
+              className="text-[11px] font-semibold text-violet-700 hover:text-violet-950 underline"
+            >
+              {showColumnsExplainer ? 'Ocultar detalle de columnas' : 'Ver detalle de columnas'}
+            </button>
+          </div>
+
+          {showColumnsExplainer && (
+            <div className="mt-2.5 pt-2.5 border-t border-violet-200/60 text-[11px] text-slate-700 space-y-2">
+              <p className="leading-relaxed">
+                El filtro y la búsqueda han sido construidos mapeando exactamente cada columna de la hoja <strong>repositorio</strong>:
+              </p>
+              <div className="flex flex-wrap gap-1 font-mono text-[10px]">
+                {[
+                  'documento_id',
+                  'titulo',
+                  'autor',
+                  'grado',
+                  'año',
+                  'Unidad Académica',
+                  'Linea de investigación',
+                  'tipo',
+                  'palabras_clave',
+                  'resumen',
+                  'Asesor(es)',
+                  'drive_file_id',
+                  'url_documento',
+                  'visibilidad',
+                  'estado',
+                  'fecha_registro',
+                  'fecha_actualizacion',
+                ].map((col) => (
+                  <span
+                    key={col}
+                    className="px-2 py-0.5 rounded bg-white text-violet-900 border border-violet-200 shadow-2xs font-semibold"
+                  >
+                    {col}
+                  </span>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-500 italic">
+                * Sincronización en ambas direcciones: cualquier documento nuevo en Drive o registrado en la app se incorpora a esta hoja al pulsar &ldquo;Sincronizar ahora&rdquo;.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Chips de acceso rápido por Unidad Académica */}
         <div className="space-y-1.5">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-            Filtrar por Área Académica (Base de Datos):
+          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <Building2 className="w-3.5 h-3.5 text-violet-600" />
+            <span>Filtrar por Unidad Académica (Columna &ldquo;Unidad Académica&rdquo;):</span>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
               onClick={() => {
                 setSelectedAcademicUnit('all');
+                setPreviewMode('filtered');
                 setPageIndex(0);
               }}
               className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
@@ -3390,6 +3648,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   type="button"
                   onClick={() => {
                     setSelectedAcademicUnit(area);
+                    setPreviewMode('filtered');
                     setPageIndex(0);
                   }}
                   className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
@@ -3405,8 +3664,8 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           </div>
         </div>
 
-        {/* Buscador general multicriterio */}
-        <div className="flex flex-col lg:flex-row gap-3 pt-1">
+        {/* Buscador general multicriterio + Botón "Sincronizar ahora" + Selector de orden */}
+        <div className="flex flex-col lg:flex-row gap-2.5 pt-1">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
@@ -3414,10 +3673,11 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
+                setPreviewMode('filtered');
                 setPageIndex(0);
               }}
-              placeholder="Buscar por ID (MONO-2025-001), título, autor, palabras clave, asesor, área o resumen..."
-              className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-600 bg-slate-50/60 focus:bg-white"
+              placeholder="Buscar en la hoja repositorio por ID, título, autor, palabras clave, asesor, unidad académica o resumen..."
+              className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-violet-600 bg-slate-50/60 focus:bg-white"
             />
             {searchQuery && (
               <button
@@ -3434,37 +3694,60 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             )}
           </div>
 
+          {/* BOTÓN "SINCRONIZAR AHORA" - Sincronización manual en ambas direcciones */}
+          <button
+            type="button"
+            onClick={() =>
+              executeSyncWithSheets(
+                appsScriptExecUrl,
+                connectionUrl,
+                accessToken,
+                repoTabName,
+                authorizedUsers,
+                { triggerDriveScan: true }
+              )
+            }
+            disabled={isSyncing}
+            title="Sincronizar ahora bidireccionalmente con la hoja 'repositorio' y Google Drive"
+            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-xs shrink-0 cursor-pointer"
+          >
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar ahora'}</span>
+          </button>
+
           <div className="flex items-center gap-2 shrink-0">
             <SlidersHorizontal className="w-4 h-4 text-violet-700 shrink-0" />
-            <label htmlFor="repoSortSelect" className="text-xs font-semibold text-slate-600">
+            <label htmlFor="repoSortSelect" className="text-xs font-semibold text-slate-600 whitespace-nowrap">
               Ordenar por:
             </label>
             <select
               id="repoSortSelect"
               value={sortBy}
               onChange={(e) =>
-                setSortBy(e.target.value as 'title' | 'author' | 'year' | 'id')
+                setSortBy(e.target.value as 'title' | 'author' | 'year' | 'id' | 'unit')
               }
               className="rounded-xl border border-slate-300 bg-white py-2 px-3 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
             >
-              <option value="id">ID de Documento (MONO-2025-...)</option>
+              <option value="id">ID de Documento (2262, 2530...)</option>
               <option value="title">Título de la monografía (A - Z)</option>
-              <option value="author">Autor (A - Z)</option>
+              <option value="author">Autor / Estudiante (A - Z)</option>
+              <option value="unit">Unidad Académica</option>
               <option value="year">Año lectivo (Más reciente)</option>
             </select>
           </div>
         </div>
 
-        {/* 6 Selectores organizados: Área, Línea de investigación, Asignatura, Asesor(es), Autor y Año */}
+        {/* 6 Selectores construidos con las columnas de la hoja "repositorio" */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 pt-1">
           <div>
             <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
-              1. Área (Ärea)
+              1. Unidad Académica
             </label>
             <select
               value={selectedAcademicUnit}
               onChange={(e) => {
                 setSelectedAcademicUnit(e.target.value);
+                setPreviewMode('filtered');
                 setPageIndex(0);
               }}
               className="w-full rounded-xl border border-slate-300 bg-white py-1.5 px-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
@@ -3480,12 +3763,13 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
           <div>
             <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
-              2. Línea Investig.
+              2. Línea de investig.
             </label>
             <select
               value={selectedResearchLine}
               onChange={(e) => {
                 setSelectedResearchLine(e.target.value);
+                setPreviewMode('filtered');
                 setPageIndex(0);
               }}
               className="w-full rounded-xl border border-slate-300 bg-white py-1.5 px-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
@@ -3501,20 +3785,21 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
           <div>
             <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
-              3. Asignatura
+              3. Tipo de Documento
             </label>
             <select
-              value={selectedSubject}
+              value={selectedDocType}
               onChange={(e) => {
-                setSelectedSubject(e.target.value);
+                setSelectedDocType(e.target.value);
+                setPreviewMode('filtered');
                 setPageIndex(0);
               }}
               className="w-full rounded-xl border border-slate-300 bg-white py-1.5 px-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
             >
-              <option value="all">Todas ({subjects.length})</option>
-              {subjects.map((subj) => (
-                <option key={subj} value={subj}>
-                  {subj}
+              <option value="all">Todos ({docTypesList.length})</option>
+              {docTypesList.map((dt) => (
+                <option key={dt} value={dt}>
+                  {dt}
                 </option>
               ))}
             </select>
@@ -3528,6 +3813,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               value={selectedAdvisor}
               onChange={(e) => {
                 setSelectedAdvisor(e.target.value);
+                setPreviewMode('filtered');
                 setPageIndex(0);
               }}
               className="w-full rounded-xl border border-slate-300 bg-white py-1.5 px-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
@@ -3549,6 +3835,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               value={selectedAuthor}
               onChange={(e) => {
                 setSelectedAuthor(e.target.value);
+                setPreviewMode('filtered');
                 setPageIndex(0);
               }}
               className="w-full rounded-xl border border-slate-300 bg-white py-1.5 px-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
@@ -3564,58 +3851,90 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
           <div>
             <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
-              6. Año / Grado
+              6. Año y Grado
             </label>
             <select
               value={selectedAcademicYear}
               onChange={(e) => {
                 setSelectedAcademicYear(e.target.value);
+                setPreviewMode('filtered');
                 setPageIndex(0);
               }}
               className="w-full rounded-xl border border-slate-300 bg-white py-1.5 px-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
             >
-              <option value="all">Todos ({academicYears.length})</option>
+              <option value="all">Todos los años ({academicYears.length})</option>
               {academicYears.map((yr) => (
                 <option key={yr} value={yr}>
-                  {yr}
+                  {yr} (Grado 11°)
                 </option>
               ))}
             </select>
           </div>
         </div>
 
+        {/* Resumen de resultados y botones de navegación */}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs text-slate-600">
           <div className="flex items-center gap-2">
             <Filter className="w-3.5 h-3.5 text-violet-700" />
             <span>
-              Mostrando <strong>{threePreviewMonographs.length}</strong> en vista previa (de{' '}
-              <strong>{filteredMonographs.length}</strong> monografías de la BD organizada)
+              Mostrando <strong>{threePreviewMonographs.length}</strong> documentos en pantalla (de{' '}
+              <strong>{activeMonographList.length}</strong> de la hoja <em>repositorio</em>)
             </span>
           </div>
 
           <div className="flex items-center gap-3">
-            {syncedMonographs.length > 0 && (
+            {/* Pestañas para conmutar entre los 3 Ejemplos Destacados, el catálogo completo y el lector en pantalla */}
+            <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-semibold">
               <button
                 type="button"
                 onClick={() => {
-                  setForceShowSamples(!forceShowSamples);
+                  setPreviewMode('featured3');
                   setPageIndex(0);
                 }}
-                className="text-violet-700 hover:text-violet-950 font-semibold underline"
+                className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                  previewMode === 'featured3'
+                    ? 'bg-violet-700 text-white shadow-2xs'
+                    : 'text-slate-700 hover:text-slate-900'
+                }`}
               >
-                {forceShowSamples
-                  ? `Ver monografías sincronizadas (${syncedMonographs.length})`
-                  : 'Ver las 3 monografías de muestra'}
+                ⭐ 3 Ejemplos en Tarjetas
               </button>
-            )}
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewMode('reader');
+                }}
+                className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                  previewMode === 'reader'
+                    ? 'bg-violet-700 text-white shadow-2xs'
+                    : 'text-slate-700 hover:text-slate-900'
+                }`}
+              >
+                📖 Lector en Pantalla (3 Ejemplos)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewMode('filtered');
+                  setPageIndex(0);
+                }}
+                className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                  previewMode === 'filtered'
+                    ? 'bg-violet-700 text-white shadow-2xs'
+                    : 'text-slate-700 hover:text-slate-900'
+                }`}
+              >
+                📑 Ver Todas ({filteredMonographs.length})
+              </button>
+            </div>
 
             {(searchQuery ||
               selectedAcademicUnit !== 'all' ||
               selectedResearchLine !== 'all' ||
-              selectedSubject !== 'all' ||
               selectedAdvisor !== 'all' ||
               selectedAcademicYear !== 'all' ||
-              selectedAuthor !== 'all') && (
+              selectedAuthor !== 'all' ||
+              selectedDocType !== 'all') && (
               <button
                 type="button"
                 onClick={resetFilters}
@@ -3629,24 +3948,23 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       </section>
 
       {/* =========================================================================
-          VISTA PREVIA DE 3 MONOGRAFÍAS (MUESTRA O SINCRONIZADAS DE SHEETS)
+          VISTA PREVIA EN PANTALLA DE TRES EJEMPLOS DE LOS DOCUMENTOS
          ========================================================================= */}
-      {filteredMonographs.length === 0 ? (
+      {threePreviewMonographs.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center space-y-3">
           <BookOpen className="w-10 h-10 text-slate-400 mx-auto" />
           <h3 className="text-base font-bold text-slate-900">
             No se encontraron monografías con esos criterios de búsqueda
           </h3>
           <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto">
-            Intenta buscar por otro nombre de archivo, título de monografía, autor, año lectivo,
-            asignatura o unidad académica.
+            Intenta buscar por otro ID de documento, título de monografía, autor, año lectivo o unidad académica.
           </p>
           <button
             type="button"
             onClick={resetFilters}
             className="px-4 py-2 rounded-xl bg-violet-700 text-white text-xs font-semibold hover:bg-violet-800 transition-colors"
           >
-            Mostrar todas las monografías ({monographs.length})
+            Ver los 3 ejemplos destacados ({featuredThreeMonographs.length})
           </button>
         </div>
       ) : (
@@ -3655,22 +3973,16 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                  Vista Previa de 3 Monografías ({threePreviewMonographs.length} de{' '}
-                  {filteredMonographs.length})
+                  {previewMode === 'featured3'
+                    ? 'Vista Previa en Pantalla: 3 Ejemplos Destacados de la Hoja "repositorio"'
+                    : `Vista Previa de Monografías (${threePreviewMonographs.length} de ${filteredMonographs.length})`}
                 </h2>
-                {isShowingSamples ? (
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-900 border border-amber-300">
-                    3 Monografías de Muestra Activas
-                  </span>
-                ) : (
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300">
-                    Sincronizadas desde Google Sheets
-                  </span>
-                )}
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                  {previewMode === 'featured3' ? '⭐ 3 Ejemplos Verificados' : 'Paginado de 3 en 3'}
+                </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Visualización simultánea de 3 monografías con su unidad académica, asignatura,
-                autor y año lectivo.
+                Visualización simultánea de 3 monografías con su unidad académica, línea de investigación, autor, asesor y resumen.
               </p>
             </div>
 
@@ -3680,7 +3992,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   type="button"
                   onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
                   disabled={safePageIndex === 0}
-                  className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-violet-50 disabled:opacity-40 flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-violet-50 disabled:opacity-40 flex items-center gap-1 cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   <span>Anteriores 3</span>
@@ -3692,7 +4004,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   type="button"
                   onClick={() => setPageIndex((p) => Math.min(totalPages - 1, p + 1))}
                   disabled={safePageIndex >= totalPages - 1}
-                  className="px-3 py-1.5 rounded-xl bg-violet-700 text-white text-xs font-semibold hover:bg-violet-800 disabled:opacity-40 flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-xl bg-violet-700 text-white text-xs font-semibold hover:bg-violet-800 disabled:opacity-40 flex items-center gap-1 cursor-pointer"
                 >
                   <span>Siguientes 3</span>
                   <ChevronRight className="w-4 h-4" />
@@ -3701,8 +4013,202 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            {threePreviewMonographs.map((doc) => {
+          {/* VISTA PREVIA EN PANTALLA: LECTOR COMPLETO DE LOS 3 EJEMPLOS O CUADRÍCULA DE 3 MONOGRAFÍAS */}
+          {previewMode === 'reader' ? (
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="p-4 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <span className="text-xs sm:text-sm font-bold">
+                    Lector Interactivo en Pantalla · 3 Ejemplos Verificados de la Hoja &ldquo;repositorio&rdquo;
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {featuredThreeMonographs.map((m, idx) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setReaderActiveDocId(m.documentoId)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        (readerActiveDocId === m.documentoId || (!readerActiveDocId && idx === 0))
+                          ? 'bg-violet-600 text-white shadow-xs'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                      }`}
+                    >
+                      <span className="font-mono text-[10px] text-amber-300 font-bold">#{m.documentoId}</span>
+                      <span className="truncate max-w-[140px] sm:max-w-[200px]">{m.title}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {(() => {
+                const readerDoc =
+                  monographs.find((m) => m.documentoId === readerActiveDocId) ||
+                  featuredThreeMonographs[0];
+                const readerPreviewUrl = readerDoc
+                  ? buildSingleDocPreviewUrl(readerDoc.driveFileId, readerDoc.driveUrl)
+                  : null;
+
+                if (!readerDoc) return null;
+
+                return (
+                  <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[580px]">
+                    <div className="lg:col-span-5 p-6 bg-slate-50/70 border-r border-slate-200 flex flex-col justify-between space-y-4">
+                      <div className="space-y-3.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-violet-100 text-violet-900 border border-violet-200">
+                            Documento ID: #{readerDoc.documentoId}
+                          </span>
+                          <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-900 font-semibold text-xs border border-emerald-300">
+                            {readerDoc.status || 'Finalizado'} · {readerDoc.visibility || 'Digital'}
+                          </span>
+                        </div>
+
+                        <div>
+                          <div className="text-xs font-bold text-violet-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                            <Building2 className="w-3.5 h-3.5" />
+                            <span>{readerDoc.academicUnit}</span>
+                            <span aria-hidden="true">·</span>
+                            <span>Grado {readerDoc.grade || '11°'} ({readerDoc.academicYear})</span>
+                          </div>
+                          <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">
+                            {readerDoc.title}
+                          </h3>
+                        </div>
+
+                        {readerDoc.researchLine && (
+                          <div className="p-2.5 rounded-xl bg-violet-50 text-violet-900 border border-violet-200/80 text-xs">
+                            <span className="text-[10px] font-bold text-violet-700 uppercase block mb-0.5">
+                              Línea de investigación:
+                            </span>
+                            <span className="font-medium">{readerDoc.researchLine}</span>
+                          </div>
+                        )}
+
+                        <div className="space-y-1.5 p-3 rounded-xl bg-white border border-slate-200 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500">Autor / Estudiante:</span>
+                            <strong className="text-slate-900 flex items-center gap-1">
+                              <GraduationCap className="w-3.5 h-3.5 text-violet-700" />
+                              <span>{readerDoc.author}</span>
+                            </strong>
+                          </div>
+                          {readerDoc.advisorsRaw && (
+                            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                              <span className="text-slate-500">Asesor(es):</span>
+                              <span className="font-medium text-slate-800">{readerDoc.advisorsRaw}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                            <span className="text-slate-500">Tipo de Documento:</span>
+                            <span className="font-medium text-slate-800">{readerDoc.docType}</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                            Resumen de la Investigación:
+                          </span>
+                          <p className="text-xs text-slate-700 line-relaxed bg-white p-3.5 rounded-xl border border-slate-200 italic max-h-48 overflow-y-auto">
+                            &ldquo;{readerDoc.abstractText}&rdquo;
+                          </p>
+                        </div>
+
+                        {readerDoc.keywords && readerDoc.keywords.length > 0 && (
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                              Palabras Clave (Clic para filtrar):
+                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {readerDoc.keywords.map((kw, i) => (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => {
+                                    setSearchQuery(kw);
+                                    setPreviewMode('filtered');
+                                    setPageIndex(0);
+                                  }}
+                                  className="px-2 py-0.5 rounded-md bg-white hover:bg-violet-100 text-slate-700 hover:text-violet-900 border border-slate-200 text-xs font-medium transition-colors cursor-pointer"
+                                >
+                                  #{kw}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-200 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleCiteMonograph(readerDoc)}
+                          className="flex-1 px-4 py-2 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Citar en Gestor (APA 7)</span>
+                        </button>
+                        <a
+                          href={readerDoc.driveUrl || (readerDoc.driveFileId ? `https://drive.google.com/file/d/${readerDoc.driveFileId}/view` : DRIVE_ROOT_FOLDER_URL)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-300 transition-colors"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Abrir en Drive</span>
+                        </a>
+                      </div>
+                    </div>
+
+                    <div className="lg:col-span-7 bg-slate-900 flex flex-col justify-between relative min-h-[580px]">
+                      <div className="p-3 bg-slate-950 text-white flex items-center justify-between text-xs px-4 border-b border-slate-800">
+                        <span className="font-semibold text-slate-300 truncate max-w-md">
+                          Vista previa en pantalla: {readerDoc.title}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewDoc(readerDoc)}
+                          className="px-3 py-1 rounded-lg bg-violet-700 hover:bg-violet-600 text-white text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Pantalla Completa</span>
+                        </button>
+                      </div>
+
+                      <div className="flex-1 w-full relative">
+                        {readerPreviewUrl ? (
+                          <iframe
+                            src={readerPreviewUrl}
+                            title={`Visor en pantalla de ${readerDoc.title}`}
+                            className="w-full h-full min-h-[540px] border-0 bg-white"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center text-white space-y-3">
+                            <BookOpen className="w-12 h-12 text-violet-400 mx-auto" />
+                            <h4 className="text-base font-bold">{readerDoc.title}</h4>
+                            <a
+                              href={readerDoc.driveUrl || DRIVE_ROOT_FOLDER_URL}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-4 py-2 rounded-xl bg-violet-700 hover:bg-violet-600 text-white text-xs font-semibold inline-flex items-center gap-2"
+                            >
+                              <span>Abrir documento en Google Drive</span>
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          ) : (
+            /* GRID CON LA VISTA PREVIA EN PANTALLA DE TRES EJEMPLOS DE LOS DOCUMENTOS */
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              {threePreviewMonographs.map((doc, idx) => {
               const singlePreviewUrl = buildSingleDocPreviewUrl(
                 doc.driveFileId,
                 doc.driveUrl
@@ -3713,85 +4219,95 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   key={doc.id}
                   className="bg-white rounded-2xl border border-slate-200 hover:border-violet-300 overflow-hidden flex flex-col justify-between shadow-2xs transition-all"
                 >
-                  {/* VISOR DE VISTA PREVIA DE LA MONOGRAFÍA */}
-                  <div className="relative h-64 bg-slate-100 border-b border-slate-200 overflow-hidden">
-                    {singlePreviewUrl ? (
-                      <iframe
-                        title={`Vista previa de ${doc.title}`}
-                        src={singlePreviewUrl}
-                        className="w-full h-full border-0 bg-white"
-                      />
-                    ) : (
-                      <div className="w-full h-full p-4 bg-gradient-to-b from-slate-100 to-slate-200/70 flex flex-col justify-between">
-                        {/* Hoja simulada de vista previa académica */}
-                        <div className="bg-white rounded-xl border border-slate-300 shadow-xs p-3.5 h-full flex flex-col justify-between overflow-hidden">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-violet-800">
-                              Colegio Ekirayá · Grado 11°
-                            </span>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-violet-100 text-violet-900">
-                              {doc.format}
-                            </span>
-                          </div>
+                  {/* PORTADA ACADÉMICA / VISTA PREVIA EN PANTALLA */}
+                  <div className="relative p-5 bg-gradient-to-br from-violet-900 via-indigo-900 to-slate-900 text-white flex flex-col justify-between min-h-[170px] border-b border-violet-800/40">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-violet-200 flex items-center gap-1">
+                        <GraduationCap className="w-3.5 h-3.5 text-amber-300" />
+                        <span>Colegio Ekirayá · Taller 4 (11°)</span>
+                      </span>
+                      <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/20 text-white border border-white/30">
+                        ID: {doc.documentoId}
+                      </span>
+                    </div>
 
-                          <div className="space-y-1.5 my-auto py-1">
-                            <div className="text-[10px] font-semibold text-emerald-800">
-                              {doc.academicUnit} · {doc.subject}
-                            </div>
-                            <h4 className="text-xs font-bold text-slate-900 line-clamp-2 leading-snug">
-                              {doc.title}
-                            </h4>
-                            <p className="text-[11px] text-slate-600 line-clamp-3 leading-relaxed">
-                              {doc.abstractText ||
-                                `Trabajo monográfico de investigación desarrollado en la asignatura ${doc.subject} (${doc.academicUnit}) durante el año lectivo ${doc.academicYear}.`}
-                            </p>
-                          </div>
-
-                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
-                            <span className="font-semibold text-slate-700 truncate">
-                              {doc.author}
-                            </span>
-                            <span className="font-mono shrink-0">{doc.academicYear}</span>
-                          </div>
-                        </div>
+                    <div className="my-2 space-y-1">
+                      <div className="text-[11px] font-semibold text-emerald-300 flex items-center gap-1">
+                        <Building2 className="w-3 h-3 text-emerald-300" />
+                        <span>{doc.academicUnit}</span>
                       </div>
-                    )}
+                      <h3 className="text-xs sm:text-sm font-bold text-white line-clamp-2 leading-snug">
+                        {doc.title}
+                      </h3>
+                    </div>
+
+                    <div className="pt-2 border-t border-white/15 flex items-center justify-between text-[10px] text-violet-200">
+                      <span className="font-semibold text-white truncate max-w-[170px]">
+                        {doc.author}
+                      </span>
+                      <span className="font-mono text-violet-300">{doc.academicYear} · {doc.status}</span>
+                    </div>
                   </div>
 
-                  {/* METADATOS DE LA MONOGRAFÍA */}
+                  {/* VENTANA DE VISTA PREVIA DEL DOCUMENTO EN PANTALLA */}
+                  <div className="relative bg-slate-900 border-b border-slate-200 h-52 overflow-hidden group">
+                    {singlePreviewUrl ? (
+                      <iframe
+                        src={singlePreviewUrl}
+                        title={`Vista previa en pantalla de ${doc.title}`}
+                        className="w-full h-full border-0 bg-white"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-slate-950 text-white">
+                        <FileText className="w-8 h-8 text-violet-400 mb-1" />
+                        <span className="text-xs font-bold line-clamp-1">{doc.title}</span>
+                        <span className="text-[10px] text-slate-400">
+                          ID: {doc.documentoId} · {doc.academicUnit}
+                        </span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setPreviewDoc(doc)}
+                      className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-slate-950/85 hover:bg-slate-950 text-white text-[11px] font-semibold flex items-center gap-1.5 backdrop-blur-xs transition-colors shadow-xs cursor-pointer border border-white/20"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Ampliar visor</span>
+                    </button>
+                  </div>
+
+                  {/* METADATOS Y RESUMEN DETALLADO DEL DOCUMENTO */}
                   <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                     <div className="space-y-3">
                       <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px]">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-mono text-[10px] font-bold text-violet-900 bg-violet-100/90 px-2 py-0.5 rounded-md border border-violet-200">
-                            {doc.documentCode || 'MONO'}
-                          </span>
-                          <span className="inline-flex items-center gap-1 font-semibold text-violet-900 bg-violet-50 px-2.5 py-0.5 rounded-md border border-violet-200">
-                            <Building2 className="w-3 h-3 text-violet-700" />
-                            <span>{doc.academicUnit}</span>
-                          </span>
-                        </div>
-                        <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold">
-                          {doc.grade || 'Taller 4'} · {doc.academicYear}
+                        <span className="inline-flex items-center gap-1 font-semibold text-violet-900 bg-violet-50 px-2.5 py-0.5 rounded-md border border-violet-200">
+                          <Building2 className="w-3 h-3 text-violet-700" />
+                          <span>{doc.academicUnit}</span>
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold text-[10px]">
+                          Grado {doc.grade || '11'} · {doc.academicYear}
                         </span>
                       </div>
 
-                      <div>
-                        <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
-                          {doc.researchLine ? `Línea: ${doc.researchLine}` : 'Título de la monografía'}
+                      {doc.researchLine && (
+                        <div className="text-[10px] font-semibold text-violet-800 bg-violet-50/70 p-2 rounded-lg border border-violet-100">
+                          <span className="text-slate-500 uppercase block text-[9px] mb-0.5">Línea de investigación:</span>
+                          <span className="line-clamp-2">{doc.researchLine}</span>
                         </div>
-                        <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-snug mt-0.5">
-                          {doc.title}
-                        </h3>
+                      )}
+
+                      {/* Resumen / Abstract de la monografía */}
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                          Resumen del Proyecto:
+                        </span>
+                        <p className="text-[11px] text-slate-700 line-clamp-4 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-200/70 italic">
+                          &ldquo;{doc.abstractText || `Investigación desarrollada en el Colegio Ekirayá en la unidad de ${doc.academicUnit}.`}&rdquo;
+                        </p>
                       </div>
 
                       <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-slate-500">Asignatura:</span>
-                          <span className="font-semibold text-slate-800 text-right">
-                            {doc.subject}
-                          </span>
-                        </div>
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-slate-500">Autor(a):</span>
                           <span className="font-semibold text-slate-900 flex items-center gap-1 text-right">
@@ -3809,14 +4325,22 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                         )}
                         {doc.keywords && doc.keywords.length > 0 && (
                           <div className="pt-1.5 border-t border-slate-200/70">
+                            <div className="text-[10px] text-slate-500 mb-1">Palabras clave:</div>
                             <div className="flex flex-wrap items-center gap-1">
                               {doc.keywords.slice(0, 3).map((kw, i) => (
-                                <span
+                                <button
                                   key={i}
-                                  className="px-1.5 py-0.5 rounded bg-white text-slate-700 border border-slate-200 text-[10px]"
+                                  type="button"
+                                  onClick={() => {
+                                    setSearchQuery(kw);
+                                    setPreviewMode('filtered');
+                                    setPageIndex(0);
+                                  }}
+                                  title={`Filtrar por palabra clave: ${kw}`}
+                                  className="px-1.5 py-0.5 rounded bg-white hover:bg-violet-100 text-slate-700 hover:text-violet-900 border border-slate-200 text-[10px] transition-colors cursor-pointer"
                                 >
-                                  {kw}
-                                </span>
+                                  #{kw}
+                                </button>
                               ))}
                               {doc.keywords.length > 3 && (
                                 <span className="text-[10px] text-slate-400">
@@ -3829,20 +4353,31 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                       </div>
                     </div>
 
+                    {/* Botones de acción del documento */}
                     <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                       <button
                         type="button"
                         onClick={() => setPreviewDoc(doc)}
-                        className="px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5 transition-colors"
+                        className="px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>Ampliar Vista Previa</span>
                       </button>
 
+                      <a
+                        href={doc.driveUrl || (doc.driveFileId ? `https://drive.google.com/file/d/${doc.driveFileId}/view` : DRIVE_ROOT_FOLDER_URL)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 flex items-center gap-1.5 transition-colors border border-slate-200"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-slate-600" />
+                        <span>Ver Drive</span>
+                      </a>
+
                       <button
                         type="button"
                         onClick={() => handleCiteMonograph(doc)}
-                        className="px-3 py-2 rounded-xl text-xs font-semibold bg-violet-700 hover:bg-violet-800 text-white flex items-center gap-1.5 transition-colors shadow-2xs"
+                        className="px-3 py-2 rounded-xl text-xs font-semibold bg-violet-700 hover:bg-violet-800 text-white flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
                       >
                         <Sparkles className="w-3.5 h-3.5" />
                         <span>Citar en Gestor</span>
@@ -3853,6 +4388,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               );
             })}
           </div>
+          )}
         </section>
       )}
 
@@ -3908,6 +4444,127 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 Importar y Sincronizar Ahora
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL DE CREACIÓN DE USUARIO DESDE LA APP (SINCRONIZACIÓN BIDIRECCIONAL)
+         ========================================================================= */}
+      {showCreateUserModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-violet-700" />
+                <h3 className="text-base font-bold text-slate-900">
+                  Crear Usuario en el Sistema
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateUserModal(false)}
+                className="p-1 rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Al crear un usuario desde la app, este se registrará en la hoja <strong>usuarios</strong> y se alimentará la hoja <strong>repositorio</strong> en ambas direcciones según los documentos encontrados en Google Drive.
+            </p>
+
+            <form onSubmit={handleRegisterAndLoginNewUser} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nombre y Apellido *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={registerName}
+                  onChange={(e) => setRegisterName(e.target.value)}
+                  placeholder="Ej. Sofía Mendoza"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-600 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Correo institucional (@cem.edu.co) *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={registerEmail}
+                  onChange={(e) => setRegisterEmail(e.target.value)}
+                  placeholder="nombre@cem.edu.co"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-600 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Curso / Grado
+                  </label>
+                  <input
+                    type="text"
+                    value={registerCurso}
+                    onChange={(e) => setRegisterCurso(e.target.value)}
+                    placeholder="11°"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-600 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Sección
+                  </label>
+                  <input
+                    type="text"
+                    value={registerSeccion}
+                    onChange={(e) => setRegisterSeccion(e.target.value)}
+                    placeholder="Bachillerato"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Perfil en el Colegio
+                </label>
+                <select
+                  value={registerPerfil}
+                  onChange={(e) => setRegisterPerfil(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-600 focus:outline-none bg-white"
+                >
+                  <option value="Estudiante">Estudiante</option>
+                  <option value="Docente">Docente</option>
+                  <option value="Directivo">Directivo</option>
+                  <option value="Coordinador">Coordinador</option>
+                  <option value="Administrador">Administrador</option>
+                </select>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateUserModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isRegisteringUser}
+                  className="px-4 py-2 rounded-xl bg-violet-700 hover:bg-violet-800 disabled:bg-slate-300 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRegisteringUser ? 'animate-spin' : ''}`} />
+                  <span>{isRegisteringUser ? 'Guardando y sincronizando...' : 'Crear usuario y sincronizar ahora'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

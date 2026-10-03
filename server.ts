@@ -350,7 +350,7 @@ function loadPersistedState(): PersistedRepoState {
       return {
         appsScriptExecUrl: parsed.appsScriptExecUrl || '',
         connectionUrl: parsed.connectionUrl || '',
-        repoTabName: parsed.repoTabName || 'Hoja 1',
+        repoTabName: parsed.repoTabName || 'repositorio',
         accessToken: parsed.accessToken || 'EKIRAYA-2026',
         lastSyncDate: parsed.lastSyncDate || new Date().toLocaleString('es-CO'),
         lastSyncTimestamp: parsed.lastSyncTimestamp || Date.now(),
@@ -399,6 +399,8 @@ async function pushUserToAppsScriptFromServer(
   updatedUsers: AuthorizedSchoolUser[] | null;
   usuariosHeaders?: string[];
   usuariosRows?: Record<string, string>[];
+  repoHeaders?: string[];
+  repoRows?: Record<string, string>[];
 }> {
   const cleanUrl = (scriptUrl || '').trim();
   if (!cleanUrl || !cleanUrl.includes('script.google.com')) {
@@ -457,6 +459,8 @@ async function pushUserToAppsScriptFromServer(
             updatedUsers: parsed,
             usuariosHeaders: json.usuariosHeaders,
             usuariosRows: json.usuariosRows,
+            repoHeaders: Array.isArray(json?.headers) ? json.headers : undefined,
+            repoRows: Array.isArray(json?.rows) ? json.rows : undefined,
           };
         }
       } catch {
@@ -499,6 +503,8 @@ async function pushUserToAppsScriptFromServer(
             updatedUsers: parsed,
             usuariosHeaders: json.usuariosHeaders,
             usuariosRows: json.usuariosRows,
+            repoHeaders: Array.isArray(json?.headers) ? json.headers : undefined,
+            repoRows: Array.isArray(json?.rows) ? json.rows : undefined,
           };
         }
       } catch {
@@ -584,6 +590,8 @@ async function startServer() {
       let remoteUsers: AuthorizedSchoolUser[] | null = null;
       let nextUserHeaders = activeUserHeaders;
       let nextUserRows = state.usuariosRows || [];
+      let nextRawHeaders = state.rawHeaders;
+      let nextRawRows = state.rawRows;
 
       if (effectiveScriptUrl) {
         const pushResult = await pushUserToAppsScriptFromServer(
@@ -598,6 +606,10 @@ async function startServer() {
         }
         if (pushResult.usuariosRows) {
           nextUserRows = pushResult.usuariosRows;
+        }
+        if (pushResult.repoHeaders && pushResult.repoRows && pushResult.repoHeaders.length > 0) {
+          nextRawHeaders = pushResult.repoHeaders;
+          nextRawRows = pushResult.repoRows;
         }
         if (pushedToSheet) {
           newUser.syncedToSheet = true;
@@ -621,6 +633,8 @@ async function startServer() {
         accessToken: effectiveToken,
         usuariosHeaders: nextUserHeaders,
         usuariosRows: nextUserRows,
+        rawHeaders: nextRawHeaders,
+        rawRows: nextRawRows,
         authorizedUsers: finalUsers,
         lastSyncDate: new Date().toLocaleString('es-CO'),
         lastSyncTimestamp: Date.now(),
@@ -757,7 +771,7 @@ async function startServer() {
         accessToken !== undefined ? accessToken : currentState.accessToken || 'EKIRAYA-2026'
       ).trim();
       const tabName = String(
-        repoTabName !== undefined ? repoTabName : currentState.repoTabName || 'Hoja 1'
+        repoTabName !== undefined ? repoTabName : currentState.repoTabName || 'repositorio'
       ).trim();
 
       const effectiveScriptUrl = rawScriptInput.includes('script.google.com')
@@ -972,20 +986,22 @@ async function startServer() {
           }
         }
 
-        // 3. Buscar explícitamente la hoja de Monografías ("Hoja 1", "Sheet 1", etc.)
+        // 3. Buscar explícitamente la hoja de Monografías ("repositorio", "Repositorio", "Hoja 1", etc.)
         if (rows.length === 0) {
           const repoTabCandidates = Array.from(
             new Set([
+              tabName || 'repositorio',
+              'repositorio',
+              'Repositorio',
+              'REPOSITORIO',
               'Hoja 1',
               'Sheet 1',
               'Hoja1',
               'Sheet1',
-              tabName || 'Hoja 1',
-              'Repositorio',
-              'Unidades académicas',
-              'Unidades Académicas',
               'Monografías',
               'Monografias',
+              'Unidades académicas',
+              'Unidades Académicas',
               'Metadata Repositorio Eki',
             ])
           );
