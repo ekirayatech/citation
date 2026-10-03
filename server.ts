@@ -393,7 +393,8 @@ function savePersistedState(state: PersistedRepoState): void {
 async function pushUserToAppsScriptFromServer(
   scriptUrl: string,
   token: string,
-  user: AuthorizedSchoolUser
+  user: AuthorizedSchoolUser,
+  originalEmail?: string
 ): Promise<{
   pushed: boolean;
   updatedUsers: AuthorizedSchoolUser[] | null;
@@ -427,6 +428,7 @@ async function pushUserToAppsScriptFromServer(
     nombre: user.nombres,
     correo: user.correo,
     email: user.correo,
+    originalEmail: (originalEmail || user.correo).trim().toLowerCase(),
     perfil: user.perfil || 'Estudiante',
     rol: user.perfil || 'Estudiante',
     rawRowJson: JSON.stringify(user.rawRow || {}),
@@ -487,6 +489,7 @@ async function pushUserToAppsScriptFromServer(
         seccion: user.seccion || 'General',
         nombres: user.nombres,
         correo: user.correo,
+        originalEmail: (originalEmail || user.correo).trim().toLowerCase(),
         perfil: user.perfil || 'Estudiante',
         rawRow: user.rawRow || {},
       }),
@@ -516,6 +519,35 @@ async function pushUserToAppsScriptFromServer(
   }
 
   return { pushed: false, updatedUsers: null };
+}
+
+async function deleteUserFromAppsScript(
+  scriptUrl: string,
+  token: string,
+  email: string
+): Promise<boolean> {
+  const cleanUrl = (scriptUrl || '').trim();
+  if (!cleanUrl || !cleanUrl.includes('script.google.com')) return false;
+
+  const separator = cleanUrl.includes('?') ? '&' : '?';
+  const query = new URLSearchParams({
+    action: 'deleteUser',
+    token: (token || 'EKIRAYA-2026').trim(),
+    correo: email,
+    email: email,
+    _t: String(Date.now()),
+  });
+
+  try {
+    const resp = await fetch(`${cleanUrl}${separator}${query.toString()}`, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: { Accept: 'application/json, text/plain, */*' },
+    });
+    return resp.ok;
+  } catch {
+    return false;
+  }
 }
 
 async function startServer() {
@@ -656,7 +688,197 @@ async function startServer() {
     }
   });
 
-  // 2B. Crear / Poblar toda la hoja "usuarios" en Google Sheets en un clic
+  // 2B. Actualizar la información de un usuario y sincronizar con Google Sheets
+  app.put('/api/repo/users', async (req, res) => {
+    try {
+      const state = loadPersistedState();
+      const { user, originalEmail, appsScriptExecUrl, connectionUrl, accessToken, usuariosHeaders } =
+        req.body || {};
+
+      if (!user || !user.correo || !user.nombres) {
+        res.status(400).json({ error: 'Nombre y correo son obligatorios' });
+        return;
+      }
+
+      const cleanEmail = String(user.correo).trim().toLowerCase();
+      const origEmail = String(originalEmail || cleanEmail).trim().toLowerCase();
+      const cleanProfile = String(user.perfil || 'Estudiante').trim();
+      const isAdmin =
+        cleanEmail === 'mebolanos@cem.edu.co' ||
+        /admin|administrador|coordinador|directivo/i.test(cleanProfile) ||
+        Boolean(user.isAdmin);
+
+      const activeUserHeaders: string[] =
+        Array.isArray(usuariosHeaders) && usuariosHeaders.length > 0
+          ? usuariosHeaders
+          : state.usuariosHeaders || DEFAULT_USUARIOS_HEADERS;
+
+      const builtRawRow: Record<string, string> = { ...(user.rawRow || {}) };
+      for (const h of activeUserHeaders) {
+        const norm = normalizeHeaderKey(h);
+        if (/correo|email|mail|cuenta/.test(norm)) builtRawRow[h] = cleanEmail;
+        else if (/nombre|estudiante|usuario/.test(norm))
+          builtRawRow[h] = String(user.nombres).trim();
+        else if (/curso|grado|nivel/.test(norm))
+          builtRawRow[h] = String(user.curso || 'General').trim();
+        else if (/seccion|dependencia|area/.test(norm))
+          builtRawRow[h] = String(user.seccion || 'General').trim();
+        else if (/perfil|rol|admin|estamento|cargo/.test(norm)) builtRawRow[h] = cleanProfile;
+      }
+
+      const updatedUser: AuthorizedSchoolUser = {
+        curso: String(user.curso || 'General').trim(),
+        seccion: String(user.seccion || 'General').trim(),
+        nombres: String(user.nombres).trim(),
+        correo: cleanEmail,
+        perfil: cleanProfile,
+        isAdmin,
+        createdInApp: Boolean(user.createdInApp),
+        syncedToSheet: false,
+        rawRow: builtRawRow,
+      };
+
+      const effectiveScriptUrl =
+        String(appsScriptExecUrl || state.appsScriptExecUrl || '').includes('script.google.com')
+          ? String(appsScriptExecUrl || state.appsScriptExecUrl).trim()
+          : String(connectionUrl || state.connectionUrl || '').includes('script.google.com')
+          ? String(connectionUrl || state.connectionUrl).trim()
+          : '';
+
+      const effectiveToken = String(accessToken || state.accessToken || 'EKIRAYA-2026').trim();
+
+      let pushedToSheet = false;
+      let remoteUsers: AuthorizedSchoolUser[] | null = null;
+      let nextUserHeaders = activeUserHeaders;
+      let nextUserRows = state.usuariosRows || [];
+      let nextRawHeaders = state.rawHeaders;
+      let nextRawRows = state.rawRows;
+
+      if (effectiveScriptUrl) {
+        // Si el correo cambió, eliminamos el correo anterior en Google Sheets
+        if (origEmail && origEmail !== cleanEmail) {
+          await deleteUserFromAppsScript(effectiveScriptUrl, effectiveToken, origEmail);
+        }
+        const pushResult = await pushUserToAppsScriptFromServer(
+          effectiveScriptUrl,
+          effectiveToken,
+          updatedUser
+        );
+        pushedToSheet = pushResult.pushed;
+        remoteUsers = pushResult.updatedUsers;
+        if (pushResult.usuariosHeaders && pushResult.usuariosHeaders.length > 0) {
+          nextUserHeaders = pushResult.usuariosHeaders;
+        }
+        if (pushResult.usuariosRows) {
+          nextUserRows = pushResult.usuariosRows;
+        }
+        if (pushResult.repoHeaders && pushResult.repoRows && pushResult.repoHeaders.length > 0) {
+          nextRawHeaders = pushResult.repoHeaders;
+          nextRawRows = pushResult.repoRows;
+        }
+        if (pushedToSheet) {
+          updatedUser.syncedToSheet = true;
+        }
+      }
+
+      const updatedLocal = [
+        ...state.authorizedUsers.filter(
+          (u) => u.correo.toLowerCase() !== origEmail && u.correo.toLowerCase() !== cleanEmail
+        ),
+        updatedUser,
+      ];
+
+      const finalUsers = remoteUsers
+        ? mergeUsersLists(remoteUsers, updatedLocal)
+        : mergeUsersLists([], updatedLocal);
+
+      const nextState: PersistedRepoState = {
+        ...state,
+        appsScriptExecUrl: effectiveScriptUrl || state.appsScriptExecUrl,
+        connectionUrl: String(connectionUrl || state.connectionUrl || '').trim(),
+        accessToken: effectiveToken,
+        usuariosHeaders: nextUserHeaders,
+        usuariosRows: nextUserRows,
+        rawHeaders: nextRawHeaders,
+        rawRows: nextRawRows,
+        authorizedUsers: finalUsers,
+        lastSyncDate: new Date().toLocaleString('es-CO'),
+        lastSyncTimestamp: Date.now(),
+      };
+
+      savePersistedState(nextState);
+
+      res.json({
+        ok: true,
+        pushedToSheet,
+        user: updatedUser,
+        state: nextState,
+      });
+    } catch (err) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : 'Error actualizando información de usuario',
+      });
+    }
+  });
+
+  // 2C. Eliminar un usuario de Cita Master y sincronizar la eliminación con Google Sheets
+  app.delete('/api/repo/users', async (req, res) => {
+    try {
+      const state = loadPersistedState();
+      const { email, correo, appsScriptExecUrl, connectionUrl, accessToken } =
+        req.body || req.query || {};
+
+      const cleanEmail = String(email || correo || '').trim().toLowerCase();
+      if (!cleanEmail) {
+        res.status(400).json({ error: 'Correo de usuario a eliminar es obligatorio' });
+        return;
+      }
+
+      const effectiveScriptUrl =
+        String(appsScriptExecUrl || state.appsScriptExecUrl || '').includes('script.google.com')
+          ? String(appsScriptExecUrl || state.appsScriptExecUrl).trim()
+          : String(connectionUrl || state.connectionUrl || '').includes('script.google.com')
+          ? String(connectionUrl || state.connectionUrl).trim()
+          : '';
+
+      const effectiveToken = String(accessToken || state.accessToken || 'EKIRAYA-2026').trim();
+
+      let deletedFromSheet = false;
+      if (effectiveScriptUrl) {
+        deletedFromSheet = await deleteUserFromAppsScript(
+          effectiveScriptUrl,
+          effectiveToken,
+          cleanEmail
+        );
+      }
+
+      const updatedUsers = state.authorizedUsers.filter(
+        (u) => u.correo.toLowerCase() !== cleanEmail
+      );
+
+      const nextState: PersistedRepoState = {
+        ...state,
+        authorizedUsers: updatedUsers,
+        lastSyncDate: new Date().toLocaleString('es-CO'),
+        lastSyncTimestamp: Date.now(),
+      };
+
+      savePersistedState(nextState);
+
+      res.json({
+        ok: true,
+        deletedFromSheet,
+        authorizedUsers: updatedUsers,
+        state: nextState,
+      });
+    } catch (err) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : 'Error eliminando usuario',
+      });
+    }
+  });
+
+  // 2D. Crear / Poblar toda la hoja "usuarios" en Google Sheets en un clic
   app.post('/api/repo/init-users-sheet', async (req, res) => {
     try {
       const state = loadPersistedState();
