@@ -398,7 +398,7 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
   return (
     <div className="space-y-8">
       {/* Banner Institucional de Presentación */}
-      <div className="bg-gradient-to-br from-[#2E1065] via-[#4C1D95] to-[#1E1B4B] text-white rounded-2xl p-6 sm:p-8 border border-violet-800/40 shadow-sm relative overflow-hidden">
+      <div className="bg-gradient-to-br from-[#44345c] via-[#664d88] to-[#533e6f] text-white rounded-2xl p-6 sm:p-8 border border-violet-800/40 shadow-sm relative overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
           <div className="max-w-3xl space-y-3">
             <div className="flex items-center gap-2 text-xs text-violet-200 font-medium">

@@ -61,7 +61,7 @@ export const Apa2026Section: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Encabezado Principal de la Pestaña Normas APA 2026 */}
-      <div className="bg-gradient-to-r from-[#4C1D95] via-[#5B21B6] to-[#6D28D9] rounded-2xl p-6 sm:p-8 text-white shadow-sm">
+      <div className="bg-gradient-to-r from-[#533e6f] via-[#664d88] to-[#735697] rounded-2xl p-6 sm:p-8 text-white shadow-sm">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-2 max-w-3xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-violet-100 text-xs font-semibold">

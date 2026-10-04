@@ -7,6 +7,8 @@ import {
   CheckCircle2,
   FileCheck2,
   FolderGit2,
+  Menu,
+  X,
 } from 'lucide-react';
 import {
   CitationFormData,
@@ -41,6 +43,7 @@ export default function App() {
   const [savedReferences, setSavedReferences] = useState<SavedReference[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [logoFailed, setLogoFailed] = useState<boolean>(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   // Load saved references from localStorage (including legacy key migration)
   useEffect(() => {
@@ -113,11 +116,13 @@ export default function App() {
       setFormData((prev) => ({ ...prev, style: presetStyle }));
     }
     setActiveTab('gestor');
+    setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSwitchTab = (tab: ActiveTab) => {
     setActiveTab(tab);
+    setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -130,6 +135,7 @@ export default function App() {
       ...exampleData,
     });
     setActiveTab('gestor');
+    setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     showToast(`Cargado en el Gestor: ${label}`);
   };
@@ -147,142 +153,198 @@ export default function App() {
     setSavedReferences([]);
   };
 
+  const navItems: { id: ActiveTab; label: string; icon: React.ReactNode; count?: number }[] = [
+    { id: 'teoria', label: 'Guía Teórica', icon: <BookOpen className="w-4 h-4 shrink-0" /> },
+    { id: 'apa2026', label: 'Normas APA 2026', icon: <FileCheck2 className="w-4 h-4 shrink-0" /> },
+    {
+      id: 'gestor',
+      label: 'Gestor',
+      icon: <Sparkles className="w-4 h-4 shrink-0" />,
+      count: savedReferences.length,
+    },
+    { id: 'repositorio', label: 'Repositorio', icon: <FolderGit2 className="w-4 h-4 shrink-0" /> },
+    { id: 'universitarios', label: 'Universitarios', icon: <GraduationCap className="w-4 h-4 shrink-0" /> },
+    { id: 'taller', label: 'Ejercicios', icon: <ClipboardList className="w-4 h-4 shrink-0" /> },
+  ];
+
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAFC] text-[#0F172A]">
-      {/* Top Navigation Bar following the 3-Zone Contract */}
-      <header className="sticky top-0 z-40 bg-[#4C1D95] text-white border-b border-violet-800 shadow-sm">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-2.5 lg:py-2 min-h-[3.75rem] flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 lg:gap-3">
-          {/* Zone 1: Brand Title */}
-          <div className="flex items-center justify-between gap-2 min-w-0 w-full lg:w-auto">
+      {/* Top Navigation Bar — Con color institucional #664d88, mayor tamaño visual y totalmente responsive */}
+      <header className="sticky top-0 z-40 bg-[#664d88] text-white border-b border-[#533e6f] shadow-md transition-all">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3.5 sm:py-4 lg:py-4.5 min-h-[4.75rem] lg:min-h-[5.5rem] flex flex-col justify-center">
+          <div className="flex items-center justify-between gap-3 lg:gap-6">
+            {/* Zone 1: Identidad Institucional y Logotipo */}
             <button
               type="button"
               onClick={() => handleSwitchTab('teoria')}
-              className="flex items-center gap-2 sm:gap-2.5 text-left focus:outline-none group min-w-0 flex-1 lg:flex-initial"
+              className="flex items-center gap-2.5 sm:gap-3.5 text-left focus:outline-none group min-w-0 flex-1 lg:flex-initial"
+              title="Ir al inicio - Colegio Ekirayá Cita Master"
             >
               {!logoFailed ? (
-                <img
-                  src="https://colegioekiraya.edu.co/wp-content/uploads/2024/09/LOGO-CEM-COLOR-02.png"
-                  alt="Logo Colegio Ekirayá"
-                  referrerPolicy="no-referrer"
-                  onError={() => setLogoFailed(true)}
-                  className="h-8 sm:h-9 w-auto object-contain bg-white px-1.5 py-0.5 rounded-lg shadow-xs shrink-0"
-                />
+                <div className="bg-white/95 p-1.5 sm:p-2 rounded-xl shadow-xs ring-1 ring-white/30 shrink-0 transition-transform group-hover:scale-105">
+                  <img
+                    src="https://colegioekiraya.edu.co/wp-content/uploads/2024/09/LOGO-CEM-COLOR-02.png"
+                    alt="Logo Colegio Ekirayá"
+                    referrerPolicy="no-referrer"
+                    onError={() => setLogoFailed(true)}
+                    className="h-9 sm:h-11 lg:h-13 w-auto object-contain"
+                  />
+                </div>
               ) : (
-                <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-white text-violet-900 flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
-                  CE
+                <div className="h-9 w-9 sm:h-11 sm:w-11 lg:h-13 lg:w-13 rounded-xl bg-white text-[#664d88] flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs shrink-0 ring-1 ring-white/30">
+                  CEM
                 </div>
               )}
-              <span className="font-display text-sm sm:text-base lg:text-lg font-semibold tracking-tight text-white truncate max-w-[190px] sm:max-w-xs md:max-w-none">
-                Colegio Ekirayá · Cita Master
-              </span>
+              <div className="min-w-0">
+                <span className="font-display text-base sm:text-lg lg:text-xl font-bold tracking-tight text-white block truncate leading-tight group-hover:text-amber-200 transition-colors">
+                  Colegio Ekirayá · Cita Master
+                </span>
+                <span className="text-[11px] sm:text-xs text-violet-200/90 font-medium tracking-normal hidden xs:block truncate mt-0.5">
+                  Portal Académico &amp; Gestor Bibliográfico · Educación Montessori
+                </span>
+              </div>
             </button>
 
-            <button
-              type="button"
-              onClick={() => handleSwitchTab('gestor')}
-              className="lg:hidden px-2.5 py-1 text-xs font-semibold bg-violet-800 hover:bg-violet-700 text-white border border-violet-500/50 rounded-lg transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap shadow-xs"
+            {/* Zone 2 (Desktop): Pestañas de Navegación con altura visual generosa */}
+            <nav
+              aria-label="Navegación principal"
+              className="hidden lg:flex items-center gap-1.5 xl:gap-2"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-              <span>Nueva Cita</span>
-            </button>
+              {navItems.map((item) => {
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleSwitchTab(item.id)}
+                    className={`px-3.5 py-2 rounded-xl text-xs xl:text-sm font-semibold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
+                      isActive
+                        ? 'bg-white text-[#664d88] shadow-sm ring-1 ring-black/5'
+                        : 'text-white/85 hover:text-white hover:bg-white/15'
+                    }`}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                    {item.count !== undefined && item.count > 0 && (
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                          isActive
+                            ? 'bg-[#664d88] text-white'
+                            : 'bg-white/20 text-white'
+                        }`}
+                      >
+                        {item.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+
+            {/* Zone 3: Botón de Acción Principal y Toggle Móvil */}
+            <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleSwitchTab('gestor')}
+                className="px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-bold bg-amber-400 hover:bg-amber-300 text-slate-900 rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 shadow-xs hover:shadow-md hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
+              >
+                <Sparkles className="w-4 h-4 text-amber-900 shrink-0" />
+                <span className="hidden sm:inline">Nueva Cita</span>
+                <span className="sm:hidden">Citar</span>
+              </button>
+
+              {/* Botón de Menú Móvil */}
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden p-2 rounded-xl text-white hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/40 transition-colors"
+                aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+                aria-expanded={mobileMenuOpen}
+              >
+                {mobileMenuOpen ? (
+                  <X className="w-5 h-5 text-white" />
+                ) : (
+                  <Menu className="w-5 h-5 text-white" />
+                )}
+              </button>
+            </div>
           </div>
 
-          {/* Zone 2: Navigation Links */}
-          <nav
-            aria-label="Navegación principal"
-            className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar py-0.5 w-full lg:w-auto min-w-0 flex-nowrap sm:flex-wrap"
-          >
-            <button
-              type="button"
-              onClick={() => handleSwitchTab('teoria')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
-                activeTab === 'teoria'
-                  ? 'bg-white text-violet-950 font-semibold shadow-xs'
-                  : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
-              }`}
+          {/* Barra de navegación secundaria en móviles: Desplazamiento horizontal fluido (1-tap access) */}
+          <div className="lg:hidden mt-2.5 pt-2 border-t border-white/15">
+            <nav
+              aria-label="Navegación móvil rápida"
+              className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 -mx-1 px-1 scroll-smooth"
             >
-              <BookOpen className="w-3.5 h-3.5 shrink-0" />
-              <span>Guía Teórica</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSwitchTab('apa2026')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
-                activeTab === 'apa2026'
-                  ? 'bg-white text-violet-950 font-semibold shadow-xs'
-                  : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
-              }`}
-            >
-              <FileCheck2 className="w-3.5 h-3.5 shrink-0" />
-              <span>Normas APA 2026</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSwitchTab('gestor')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
-                activeTab === 'gestor'
-                  ? 'bg-white text-violet-950 font-semibold shadow-xs'
-                  : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5 shrink-0" />
-              <span>Gestor ({savedReferences.length})</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSwitchTab('repositorio')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
-                activeTab === 'repositorio'
-                  ? 'bg-white text-violet-950 font-semibold shadow-xs'
-                  : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
-              }`}
-            >
-              <FolderGit2 className="w-3.5 h-3.5 shrink-0" />
-              <span>Repositorio</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSwitchTab('universitarios')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
-                activeTab === 'universitarios'
-                  ? 'bg-white text-violet-950 font-semibold shadow-xs'
-                  : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
-              }`}
-            >
-              <GraduationCap className="w-3.5 h-3.5 shrink-0" />
-              <span>Universitarios</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSwitchTab('taller')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
-                activeTab === 'taller'
-                  ? 'bg-white text-violet-950 font-semibold shadow-xs'
-                  : 'bg-violet-900/40 sm:bg-transparent text-violet-100 hover:bg-violet-800/70 hover:text-white'
-              }`}
-            >
-              <ClipboardList className="w-3.5 h-3.5 shrink-0" />
-              <span>Ejercicios</span>
-            </button>
-          </nav>
-
-          {/* Zone 3: Primary Action */}
-          <div className="hidden lg:flex items-center shrink-0">
-            <button
-              type="button"
-              onClick={() => handleSwitchTab('gestor')}
-              className="px-3 py-1.5 text-xs font-semibold bg-violet-800 hover:bg-violet-700 text-white border border-violet-500/50 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs whitespace-nowrap"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-              <span>Nueva Cita</span>
-            </button>
+              {navItems.map((item) => {
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleSwitchTab(item.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
+                      isActive
+                        ? 'bg-white text-[#664d88] shadow-xs'
+                        : 'bg-white/10 text-white/90 hover:bg-white/20'
+                    }`}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                    {item.count !== undefined && item.count > 0 && (
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                          isActive
+                            ? 'bg-[#664d88] text-white'
+                            : 'bg-white/25 text-white'
+                        }`}
+                      >
+                        {item.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
         </div>
+
+        {/* Menú Desplegable Completo en Móviles (al pulsar el ícono de menú) */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden border-t border-[#533e6f] bg-[#533e6f] px-4 py-3 space-y-1.5 shadow-lg animate-in slide-in-from-top-2 duration-150">
+            {navItems.map((item) => {
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleSwitchTab(item.id)}
+                  className={`w-full px-3.5 py-2.5 rounded-xl text-left text-sm font-semibold transition-colors flex items-center justify-between ${
+                    isActive
+                      ? 'bg-white text-[#664d88] shadow-xs'
+                      : 'text-white hover:bg-white/10'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </div>
+                  {item.count !== undefined && item.count > 0 && (
+                    <span
+                      className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                        isActive
+                          ? 'bg-[#664d88] text-white'
+                          : 'bg-white/20 text-white'
+                      }`}
+                    >
+                      {item.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </header>
 
       {/* Main Content Container */}

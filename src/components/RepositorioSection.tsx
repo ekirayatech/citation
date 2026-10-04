@@ -3486,7 +3486,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   if (!currentUser) {
     return (
       <div className="max-w-2xl mx-auto my-6 space-y-6">
-        <div className="bg-gradient-to-br from-[#2E1065] via-[#4C1D95] to-[#1E1B4B] rounded-2xl p-6 sm:p-8 text-white border border-violet-800/40 shadow-md space-y-5">
+        <div className="bg-gradient-to-br from-[#44345c] via-[#664d88] to-[#533e6f] rounded-2xl p-6 sm:p-8 text-white border border-violet-800/40 shadow-md space-y-5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-violet-100 text-xs font-semibold">
             <Lock className="w-3.5 h-3.5 text-amber-300" />
             <span>Acceso Exclusivo · Hoja &ldquo;usuarios&rdquo; Colegio Ekirayá</span>
@@ -3623,7 +3623,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   return (
     <div className="space-y-6">
       {/* ENCABEZADO DEL REPOSITORIO CON PERFIL VALIDADO DESDE LA HOJA "USUARIOS" */}
-      <div className="bg-gradient-to-br from-[#2E1065] via-[#4C1D95] to-[#1E1B4B] rounded-2xl p-6 sm:p-8 text-white border border-violet-800/40 shadow-sm">
+      <div className="bg-gradient-to-br from-[#44345c] via-[#664d88] to-[#533e6f] rounded-2xl p-6 sm:p-8 text-white border border-violet-800/40 shadow-sm">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-2.5 max-w-3xl">
             <div className="inline-flex flex-wrap items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-violet-100 text-xs font-semibold">
@@ -5568,7 +5568,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       {previewDoc && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6">
           <div className="bg-white rounded-2xl border border-slate-200 max-w-5xl w-full h-[88vh] flex flex-col overflow-hidden shadow-2xl">
-            <div className="p-4 bg-[#4C1D95] text-white flex flex-wrap items-center justify-between gap-3">
+            <div className="p-4 bg-[#664d88] text-white flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-[11px] text-violet-200">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-300 shrink-0" />

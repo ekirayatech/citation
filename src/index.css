@@ -1,5 +1,35 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-purple: #664d88;
+  --color-brand-purple-dark: #533e6f;
+  --color-brand-purple-light: #7e63a3;
+
+  --color-violet-50: #f7f5fa;
+  --color-violet-100: #eee9f3;
+  --color-violet-200: #ddd4e7;
+  --color-violet-300: #c5b6d5;
+  --color-violet-400: #a48fc0;
+  --color-violet-500: #8267a5;
+  --color-violet-600: #735697;
+  --color-violet-700: #664d88;
+  --color-violet-800: #533e6f;
+  --color-violet-900: #44345c;
+  --color-violet-950: #2a1e3b;
+
+  --color-purple-50: #f7f5fa;
+  --color-purple-100: #eee9f3;
+  --color-purple-200: #ddd4e7;
+  --color-purple-300: #c5b6d5;
+  --color-purple-400: #a48fc0;
+  --color-purple-500: #8267a5;
+  --color-purple-600: #735697;
+  --color-purple-700: #664d88;
+  --color-purple-800: #533e6f;
+  --color-purple-900: #44345c;
+  --color-purple-950: #2a1e3b;
+}
+
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -15,6 +45,18 @@
     font-family: 'JetBrains Mono', monospace;
     font-variant-numeric: tabular-nums;
   }
+}
+
+.bg-ekiraya {
+  background-color: #664d88;
+}
+
+.text-ekiraya {
+  color: #664d88;
+}
+
+.border-ekiraya {
+  border-color: #664d88;
 }
 
 .hanging-indent {
