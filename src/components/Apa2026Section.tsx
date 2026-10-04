@@ -83,11 +83,11 @@ export const Apa2026Section: React.FC = () => {
             <div className="font-semibold text-white">Contenido de esta sección:</div>
             <div className="text-violet-100">• 1. Formato general, portada y niveles de títulos</div>
             <div className="text-violet-100">• 2. Tablas, figuras y lista de chequeo interactiva</div>
-            <div className="text-violet-100">• 5. Adaptaciones oficiales al español</div>
+            <div className="text-violet-100">• 3. Adaptaciones oficiales al español</div>
           </div>
         </div>
 
-        {/* Sub-navegación de los Apartados 1, 2 y 5 */}
+        {/* Sub-navegación de los Apartados 1, 2 y 3 */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-6 pt-5 border-t border-white/15">
           {[
             {
@@ -104,7 +104,7 @@ export const Apa2026Section: React.FC = () => {
             },
             {
               id: 'adaptaciones_es' as SubModuleId,
-              label: '5. Adaptaciones al Español',
+              label: '3. Adaptaciones al Español',
               sub: 'Conectores, mayúsculas, fechas y ordinales',
               icon: Globe2,
             },
@@ -599,16 +599,16 @@ export const Apa2026Section: React.FC = () => {
         </div>
       )}
 
-      {/* APARTADO 5: ADAPTACIONES AL ESPAÑOL */}
+      {/* APARTADO 3: ADAPTACIONES AL ESPAÑOL */}
       {activeSubModule === 'adaptaciones_es' && (
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 space-y-6">
             <div className="border-b border-slate-200 pb-4">
               <span className="text-xs font-semibold text-violet-700 uppercase tracking-wider">
-                Apartado 5 · Diferencias Idiomáticas Inglés vs. Español
+                Apartado 3 · Diferencias Idiomáticas Inglés vs. Español
               </span>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
-                5. Adaptaciones de las Normas APA al Español
+                3. Adaptaciones de las Normas APA al Español
               </h2>
               <p className="text-sm text-slate-600 mt-1">
                 Como el manual original de la APA se publica en inglés, al redactar trabajos
