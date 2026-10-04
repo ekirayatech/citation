@@ -3653,7 +3653,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   onClick={() => setShowAdminPanel(!showAdminPanel)}
                   className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-xs ${
                     showAdminPanel
-                      ? 'bg-amber-400 text-slate-950'
+                      ? 'bg-[#f8c62e] text-slate-950 font-bold shadow-sm'
                       : 'bg-white text-violet-950 hover:bg-violet-50'
                   }`}
                 >

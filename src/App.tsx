@@ -196,7 +196,7 @@ export default function App() {
                 </div>
               )}
               <div className="min-w-0">
-                <span className="font-display text-base sm:text-lg lg:text-xl font-bold tracking-tight text-white block truncate leading-tight group-hover:text-amber-200 transition-colors">
+                <span className="font-display text-base sm:text-lg lg:text-xl font-bold tracking-tight text-white block truncate leading-tight group-hover:text-[#f8c62e] transition-colors">
                   Colegio Ekirayá · Cita Master
                 </span>
                 <span className="text-[11px] sm:text-xs text-violet-200/90 font-medium tracking-normal hidden xs:block truncate mt-0.5">
@@ -246,9 +246,9 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => handleSwitchTab('gestor')}
-                className="px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-bold bg-amber-400 hover:bg-amber-300 text-slate-900 rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 shadow-xs hover:shadow-md hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
+                className="px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-bold bg-[#f8c62e] hover:bg-[#e8b524] text-slate-950 border border-[#f8c62e] rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 shadow-xs hover:shadow-md hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
               >
-                <Sparkles className="w-4 h-4 text-amber-900 shrink-0" />
+                <Sparkles className="w-4 h-4 text-amber-950 shrink-0" />
                 <span className="hidden sm:inline">Nueva Cita</span>
                 <span className="sm:hidden">Citar</span>
               </button>

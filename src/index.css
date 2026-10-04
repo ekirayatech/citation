@@ -28,6 +28,35 @@
   --color-purple-800: #533e6f;
   --color-purple-900: #44345c;
   --color-purple-950: #2a1e3b;
+
+  --color-brand-yellow: #f8c62e;
+  --color-brand-yellow-hover: #e5b320;
+  --color-brand-yellow-dark: #b8860b;
+  --color-ekiraya-yellow: #f8c62e;
+
+  --color-amber-50: #fefbf0;
+  --color-amber-100: #fdf4d6;
+  --color-amber-200: #fbe9ac;
+  --color-amber-300: #f9dc79;
+  --color-amber-400: #f8c62e;
+  --color-amber-500: #f0b315;
+  --color-amber-600: #d4950e;
+  --color-amber-700: #a86c0e;
+  --color-amber-800: #875412;
+  --color-amber-900: #704513;
+  --color-amber-950: #412406;
+
+  --color-yellow-50: #fefbf0;
+  --color-yellow-100: #fdf4d6;
+  --color-yellow-200: #fbe9ac;
+  --color-yellow-300: #f9dc79;
+  --color-yellow-400: #f8c62e;
+  --color-yellow-500: #f0b315;
+  --color-yellow-600: #d4950e;
+  --color-yellow-700: #a86c0e;
+  --color-yellow-800: #875412;
+  --color-yellow-900: #704513;
+  --color-yellow-950: #412406;
 }
 
 @layer base {
@@ -57,6 +86,18 @@
 
 .border-ekiraya {
   border-color: #664d88;
+}
+
+.bg-ekiraya-yellow {
+  background-color: #f8c62e;
+}
+
+.text-ekiraya-yellow {
+  color: #f8c62e;
+}
+
+.border-ekiraya-yellow {
+  border-color: #f8c62e;
 }
 
 .hanging-indent {
