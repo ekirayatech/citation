@@ -307,32 +307,51 @@ function mergeUsersLists(
   sheetUsers: AuthorizedSchoolUser[],
   existingUsers: AuthorizedSchoolUser[]
 ): AuthorizedSchoolUser[] {
-  const map = new Map<string, AuthorizedSchoolUser>();
+  // Si recibimos usuarios directamente de Google Sheets, la hoja es la fuente autorizada de la verdad
+  if (sheetUsers && sheetUsers.length > 0) {
+    const map = new Map<string, AuthorizedSchoolUser>();
 
+    // Mauricio Bolaños (admin institucional) siempre preservado
+    map.set(DEFAULT_ADMIN_USER.correo.toLowerCase(), DEFAULT_ADMIN_USER);
+
+    // Los usuarios leídos de Google Sheets tienen prioridad absoluta (reflejan altas, bajas y ediciones en la hoja)
+    for (const u of sheetUsers) {
+      if (u && u.correo) {
+        const key = u.correo.trim().toLowerCase();
+        map.set(key, {
+          ...u,
+          correo: key,
+          isAdmin: Boolean(u.isAdmin || key === 'mebolanos@cem.edu.co'),
+          createdInApp: false,
+          syncedToSheet: true,
+          rawRow: u.rawRow ? { ...u.rawRow } : undefined,
+        });
+      }
+    }
+
+    // Mantener usuarios creados localmente en la app que aún estén en tránsito de sincronización
+    for (const u of existingUsers || []) {
+      if (u && u.correo && u.createdInApp && !u.syncedToSheet) {
+        const key = u.correo.trim().toLowerCase();
+        if (!map.has(key)) {
+          map.set(key, u);
+        }
+      }
+    }
+
+    return Array.from(map.values());
+  }
+
+  // Fallback cuando aún no se ha conectado ni leído la hoja "usuarios" de Google Sheets
+  const map = new Map<string, AuthorizedSchoolUser>();
   for (const defUser of DEFAULT_AUTHORIZED_USERS) {
     map.set(defUser.correo.toLowerCase(), defUser);
   }
-
   for (const u of existingUsers || []) {
     if (u && u.correo) {
       map.set(u.correo.trim().toLowerCase(), u);
     }
   }
-
-  for (const u of sheetUsers || []) {
-    if (u && u.correo) {
-      const existing = map.get(u.correo.trim().toLowerCase());
-      map.set(u.correo.trim().toLowerCase(), {
-        ...existing,
-        ...u,
-        correo: u.correo.trim().toLowerCase(),
-        createdInApp: false,
-        syncedToSheet: true,
-        rawRow: u.rawRow || existing?.rawRow,
-      });
-    }
-  }
-
   return Array.from(map.values());
 }
 
@@ -346,6 +365,20 @@ function loadPersistedState(): PersistedRepoState {
         parsed.rawRows.length > 0 &&
         Array.isArray(parsed.rawHeaders) &&
         isMonographsSheetData(parsed.rawHeaders, parsed.rawRows);
+
+      const parsedUsers = Array.isArray(parsed.authorizedUsers) ? parsed.authorizedUsers : [];
+      let effectiveUsers: AuthorizedSchoolUser[];
+      if (Array.isArray(parsed.usuariosRows) && parsed.usuariosRows.length > 0) {
+        const fromRows = parseUsersSheetRows(
+          parsed.usuariosRows,
+          parsed.usuariosHeaders || DEFAULT_USUARIOS_HEADERS
+        );
+        effectiveUsers = mergeUsersLists(fromRows, parsedUsers);
+      } else if (parsedUsers.some((u: AuthorizedSchoolUser) => u && u.syncedToSheet)) {
+        effectiveUsers = mergeUsersLists(parsedUsers, []);
+      } else {
+        effectiveUsers = mergeUsersLists([], parsedUsers.length > 0 ? parsedUsers : DEFAULT_AUTHORIZED_USERS);
+      }
 
       return {
         appsScriptExecUrl: parsed.appsScriptExecUrl || '',
@@ -361,7 +394,7 @@ function loadPersistedState(): PersistedRepoState {
             ? parsed.usuariosHeaders
             : DEFAULT_USUARIOS_HEADERS,
         usuariosRows: Array.isArray(parsed.usuariosRows) ? parsed.usuariosRows : [],
-        authorizedUsers: mergeUsersLists([], parsed.authorizedUsers || DEFAULT_AUTHORIZED_USERS),
+        authorizedUsers: effectiveUsers,
       };
     }
   } catch {
@@ -370,7 +403,7 @@ function loadPersistedState(): PersistedRepoState {
   return {
     appsScriptExecUrl: '',
     connectionUrl: '',
-    repoTabName: 'Hoja 1',
+    repoTabName: 'repositorio',
     accessToken: 'EKIRAYA-2026',
     lastSyncDate: new Date().toLocaleString('es-CO'),
     lastSyncTimestamp: Date.now(),
@@ -550,9 +583,46 @@ async function deleteUserFromAppsScript(
   }
 }
 
+const sseClients = new Set<express.Response>();
+
+function broadcastStateUpdate(state: PersistedRepoState, eventType = 'STATE_UPDATE'): void {
+  const payload = JSON.stringify({ type: eventType, state, timestamp: Date.now() });
+  for (const client of sseClients) {
+    try {
+      client.write(`data: ${payload}\n\n`);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
+
+function saveAndBroadcastPersistedState(state: PersistedRepoState, eventType = 'STATE_UPDATE'): void {
+  savePersistedState(state);
+  broadcastStateUpdate(state, eventType);
+}
+
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: '5mb' }));
+
+  // 0. Stream SSE para sincronización en tiempo real entre múltiples terminales
+  app.get('/api/repo/events', (_req, res) => {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    });
+
+    const state = loadPersistedState();
+    res.write(`data: ${JSON.stringify({ type: 'INIT', state, timestamp: Date.now() })}\n\n`);
+
+    sseClients.add(res);
+
+    _req.on('close', () => {
+      sseClients.delete(res);
+    });
+  });
 
   // 1. Obtener el estado actual del repositorio y usuarios
   app.get('/api/repo/state', (_req, res) => {
@@ -672,7 +742,7 @@ async function startServer() {
         lastSyncTimestamp: Date.now(),
       };
 
-      savePersistedState(nextState);
+      saveAndBroadcastPersistedState(nextState);
 
       res.json({
         ok: true,
@@ -806,7 +876,7 @@ async function startServer() {
         lastSyncTimestamp: Date.now(),
       };
 
-      savePersistedState(nextState);
+      saveAndBroadcastPersistedState(nextState);
 
       res.json({
         ok: true,
@@ -863,7 +933,7 @@ async function startServer() {
         lastSyncTimestamp: Date.now(),
       };
 
-      savePersistedState(nextState);
+      saveAndBroadcastPersistedState(nextState);
 
       res.json({
         ok: true,
@@ -950,7 +1020,7 @@ async function startServer() {
         lastSyncTimestamp: Date.now(),
       };
 
-      savePersistedState(nextState);
+      saveAndBroadcastPersistedState(nextState);
 
       res.json({
         ok: true,
@@ -966,88 +1036,105 @@ async function startServer() {
     }
   });
 
-  // 3. Sincronización completa desde el servidor (Drive <-> Google Sheets <-> Cita Master)
-  app.post('/api/repo/sync', async (req, res) => {
-    try {
-      const currentState = loadPersistedState();
-      const {
-        appsScriptExecUrl,
-        connectionUrl,
-        accessToken,
-        repoTabName,
-        triggerDriveScan,
-        clientUsers,
-        clientUsuariosHeaders,
-        clientUsuariosRows,
-        clientRawHeaders,
-        clientRawRows,
-      } = req.body || {};
+  interface ServerSyncParams {
+    appsScriptExecUrl?: string;
+    connectionUrl?: string;
+    accessToken?: string;
+    repoTabName?: string;
+    triggerDriveScan?: boolean;
+    clientUsers?: AuthorizedSchoolUser[];
+    clientUsuariosHeaders?: string[];
+    clientUsuariosRows?: Record<string, string>[];
+    clientRawHeaders?: string[];
+    clientRawRows?: Record<string, string>[];
+  }
 
-      const rawScriptInput = String(
-        appsScriptExecUrl !== undefined ? appsScriptExecUrl : currentState.appsScriptExecUrl
-      ).trim();
-      const rawSheetInput = String(
-        connectionUrl !== undefined ? connectionUrl : currentState.connectionUrl
-      ).trim();
-      const token = String(
-        accessToken !== undefined ? accessToken : currentState.accessToken || 'EKIRAYA-2026'
-      ).trim();
-      const tabName = String(
-        repoTabName !== undefined ? repoTabName : currentState.repoTabName || 'repositorio'
-      ).trim();
+  async function executeServerSyncLogic(params: ServerSyncParams = {}) {
+    const currentState = loadPersistedState();
+    const {
+      appsScriptExecUrl,
+      connectionUrl,
+      accessToken,
+      repoTabName,
+      triggerDriveScan,
+      clientUsers,
+      clientUsuariosHeaders,
+      clientUsuariosRows,
+      clientRawHeaders,
+      clientRawRows,
+    } = params;
 
-      const effectiveScriptUrl = rawScriptInput.includes('script.google.com')
-        ? rawScriptInput
-        : rawSheetInput.includes('script.google.com')
-        ? rawSheetInput
-        : '';
+    const rawScriptInput = String(
+      appsScriptExecUrl !== undefined ? appsScriptExecUrl : currentState.appsScriptExecUrl
+    ).trim();
+    const rawSheetInput = String(
+      connectionUrl !== undefined ? connectionUrl : currentState.connectionUrl
+    ).trim();
+    const token = String(
+      accessToken !== undefined ? accessToken : currentState.accessToken || 'EKIRAYA-2026'
+    ).trim();
+    const tabName = String(
+      repoTabName !== undefined ? repoTabName : currentState.repoTabName || 'repositorio'
+    ).trim();
 
-      const effectiveSheetUrl = rawSheetInput.includes('/spreadsheets/d/')
-        ? rawSheetInput
-        : rawScriptInput.includes('/spreadsheets/d/')
-        ? rawScriptInput
-        : '';
+    const effectiveScriptUrl = rawScriptInput.includes('script.google.com')
+      ? rawScriptInput
+      : rawSheetInput.includes('script.google.com')
+      ? rawSheetInput
+      : '';
 
-      const baseUsers = mergeUsersLists(
-        [],
-        [...(currentState.authorizedUsers || []), ...(Array.isArray(clientUsers) ? clientUsers : [])]
-      );
+    const effectiveSheetUrl = rawSheetInput.includes('/spreadsheets/d/')
+      ? rawSheetInput
+      : rawScriptInput.includes('/spreadsheets/d/')
+      ? rawScriptInput
+      : '';
 
-      let headers: string[] = Array.isArray(clientRawHeaders) ? clientRawHeaders : [];
-      let rows: Record<string, string>[] = Array.isArray(clientRawRows) ? clientRawRows : [];
-      let usuariosHeaders: string[] =
-        Array.isArray(clientUsuariosHeaders) && clientUsuariosHeaders.length > 0
-          ? clientUsuariosHeaders
-          : currentState.usuariosHeaders || DEFAULT_USUARIOS_HEADERS;
-      let usuariosRows: Record<string, string>[] = Array.isArray(clientUsuariosRows)
-        ? clientUsuariosRows
-        : currentState.usuariosRows || [];
-      let sheetUsers: AuthorizedSchoolUser[] =
-        Array.isArray(clientUsuariosRows) &&
-        clientUsuariosRows.length > 0 &&
-        Array.isArray(clientUsuariosHeaders)
-          ? parseUsersSheetRows(clientUsuariosRows, clientUsuariosHeaders)
-          : [];
-      let sheetAccessWarning: string | null = null;
-      const cacheBuster = `_t=${Date.now()}`;
+    const baseUsers = mergeUsersLists(
+      [],
+      [...(currentState.authorizedUsers || []), ...(Array.isArray(clientUsers) ? clientUsers : [])]
+    );
 
-      // A. Sincronizar con Google Apps Script (/exec) si está configurado
-      if (effectiveScriptUrl) {
-        const pendingUsers = baseUsers.filter((u) => u.createdInApp && !u.syncedToSheet);
-        for (const pending of pendingUsers) {
-          const pushRes = await pushUserToAppsScriptFromServer(effectiveScriptUrl, token, pending);
-          if (pushRes.pushed) {
-            pending.syncedToSheet = true;
-            pending.createdInApp = false;
-          }
+    let headers: string[] = Array.isArray(clientRawHeaders) ? clientRawHeaders : [];
+    let rows: Record<string, string>[] = Array.isArray(clientRawRows) ? clientRawRows : [];
+    let usuariosHeaders: string[] =
+      Array.isArray(clientUsuariosHeaders) && clientUsuariosHeaders.length > 0
+        ? clientUsuariosHeaders
+        : currentState.usuariosHeaders || DEFAULT_USUARIOS_HEADERS;
+    let usuariosRows: Record<string, string>[] = Array.isArray(clientUsuariosRows)
+      ? clientUsuariosRows
+      : currentState.usuariosRows || [];
+    let sheetUsers: AuthorizedSchoolUser[] =
+      Array.isArray(clientUsuariosRows) &&
+      clientUsuariosRows.length > 0 &&
+      Array.isArray(clientUsuariosHeaders)
+        ? parseUsersSheetRows(clientUsuariosRows, clientUsuariosHeaders)
+        : [];
+    let sheetAccessWarning: string | null = null;
+    const cacheBuster = `_t=${Date.now()}`;
+
+    // A. Sincronizar con Google Apps Script (/exec) si está configurado
+    if (effectiveScriptUrl) {
+      const pendingUsers = baseUsers.filter((u) => u.createdInApp && !u.syncedToSheet);
+      for (const pending of pendingUsers) {
+        const pushRes = await pushUserToAppsScriptFromServer(effectiveScriptUrl, token, pending);
+        if (pushRes.pushed) {
+          pending.syncedToSheet = true;
+          pending.createdInApp = false;
         }
+      }
 
+      try {
+        const sep = effectiveScriptUrl.includes('?') ? '&' : '?';
+        const actionName = triggerDriveScan ? 'syncDriveAndSheets' : 'syncRepo';
+        const actionParam = `&action=${actionName}`;
+        const tabParam = `&repoTabName=${encodeURIComponent(tabName || 'repositorio')}&sheet=${encodeURIComponent(tabName || 'repositorio')}`;
+        const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
+        const fullUrl = `${effectiveScriptUrl}${sep}${cacheBuster}${tokenParam}${actionParam}${tabParam}`;
+
+        let data: any = null;
+
+        // 1. Intentar GET
         try {
-          const sep = effectiveScriptUrl.includes('?') ? '&' : '?';
-          const actionParam = triggerDriveScan ? '&action=syncDrive' : '';
-          const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
-          const fullUrl = `${effectiveScriptUrl}${sep}${cacheBuster}${tokenParam}${actionParam}`;
-
           const resp = await fetch(fullUrl, {
             method: 'GET',
             redirect: 'follow',
@@ -1056,246 +1143,319 @@ async function startServer() {
               'Cache-Control': 'no-cache',
             },
           });
-
           const text = await resp.text();
           if (text && !isHtmlContent(text)) {
-            const data = JSON.parse(text);
-
-            if (Array.isArray(data?.usuariosRows) && Array.isArray(data?.usuariosHeaders)) {
-              if (data.usuariosHeaders.length > 0) {
-                usuariosHeaders = data.usuariosHeaders.map((h: string) => String(h).trim());
-              }
-              usuariosRows = data.usuariosRows;
-              sheetUsers = parseUsersSheetRows(data.usuariosRows, usuariosHeaders);
-            }
-
-            if (Array.isArray(data?.headers) && Array.isArray(data?.rows)) {
-              const incHeaders = data.headers.map((h: string) => String(h).trim());
-              if (isUsersSheetData(incHeaders, data.rows)) {
-                if (sheetUsers.length <= 1) {
-                  usuariosHeaders = incHeaders;
-                  usuariosRows = data.rows;
-                  sheetUsers = parseUsersSheetRows(data.rows, incHeaders);
-                }
-              } else if (isMonographsSheetData(incHeaders, data.rows)) {
-                headers = incHeaders;
-                rows = data.rows;
-              }
-            }
-
-            // Soporte para versiones anteriores del Apps Script que devolvían { items: [...] }
-            if (Array.isArray(data?.items) && data.items.length > 0 && rows.length === 0) {
-              const firstItem = data.items[0];
-              if (firstItem && typeof firstItem === 'object') {
-                const itemHeaders = Object.keys(firstItem);
-                if (isUsersSheetData(itemHeaders, data.items)) {
-                  usuariosHeaders = itemHeaders;
-                  usuariosRows = data.items;
-                  sheetUsers = parseUsersSheetRows(data.items, itemHeaders);
-                } else {
-                  headers = itemHeaders;
-                  rows = data.items;
-                }
-              }
-            }
-          } else if (isHtmlContent(text) && sheetUsers.length <= 1) {
-            sheetAccessWarning =
-              'El Web App de Google Apps Script devolvió inicio de sesión. Implementa como "Quién tiene acceso: Cualquier persona".';
+            data = JSON.parse(text);
           }
         } catch {
-          // Continuar con lectura directa de Google Sheets
+          // Intentar POST a continuación
         }
-      }
 
-      // B. Leer directamente las hojas desde el enlace de Google Sheets (docs.google.com/spreadsheets/d/...)
-      const sheetIdMatch = effectiveSheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
-      if (sheetIdMatch?.[1]) {
-        const sheetId = sheetIdMatch[1];
-        const gidMatch = effectiveSheetUrl.match(/[#&?]gid=(\d+)/);
-        const gid = gidMatch?.[1] || '';
-
-        const fetchSheetCsv = async (url: string): Promise<{
-          headers: string[];
-          rows: Record<string, string>[];
-          isHtml: boolean;
-        }> => {
+        // 2. Intentar POST con JSON si GET no devolvió JSON válido
+        if (!data) {
           try {
-            const r = await fetch(url, {
-              method: 'GET',
+            const postResp = await fetch(effectiveScriptUrl, {
+              method: 'POST',
               redirect: 'follow',
               headers: {
-                'Cache-Control': 'no-cache',
-                Pragma: 'no-cache',
+                'Content-Type': 'text/plain;charset=utf-8',
+                Accept: 'application/json, text/plain, */*',
               },
+              body: JSON.stringify({
+                action: actionName,
+                token: token || 'EKIRAYA-2026',
+                sheet: tabName || 'repositorio',
+                repoTabName: tabName || 'repositorio',
+                triggerDriveScan: Boolean(triggerDriveScan),
+              }),
             });
-            const txt = await r.text();
-            if (isHtmlContent(txt)) {
-              return { headers: [], rows: [], isHtml: true };
+            const postText = await postResp.text();
+            if (postText && !isHtmlContent(postText)) {
+              data = JSON.parse(postText);
             }
-            const parsed = parseCsvToRows(txt);
-            return { ...parsed, isHtml: false };
           } catch {
-            return { headers: [], rows: [], isHtml: false };
+            // Ignore
           }
-        };
+        }
 
-        // 1. Probar la URL exacta (con gid si existe) y export?format=csv
-        const primaryUrls = [
-          gid
-            ? `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}&${cacheBuster}`
-            : `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&${cacheBuster}`,
-          gid
-            ? `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}&${cacheBuster}`
-            : `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&${cacheBuster}`,
-        ];
-
-        for (const pUrl of primaryUrls) {
-          const resPrimary = await fetchSheetCsv(pUrl);
-          if (resPrimary.isHtml) {
-            if (sheetUsers.length <= 1 && rows.length === 0) {
-              sheetAccessWarning =
-                'El archivo de Google Sheets tiene acceso restringido en el servidor. Puedes cambiar Compartir → "Cualquier persona con el enlace (Lector)" o usar "Pegar tabla de Sheets".';
+        if (data) {
+          if (Array.isArray(data?.usuariosRows) && Array.isArray(data?.usuariosHeaders)) {
+            if (data.usuariosHeaders.length > 0) {
+              usuariosHeaders = data.usuariosHeaders.map((h: string) => String(h).trim());
             }
-            continue;
+            usuariosRows = data.usuariosRows;
+            sheetUsers = parseUsersSheetRows(data.usuariosRows, usuariosHeaders);
           }
-          if (resPrimary.headers.length > 0 && resPrimary.rows.length > 0) {
-            if (isUsersSheetData(resPrimary.headers, resPrimary.rows)) {
+
+          if (Array.isArray(data?.headers) && Array.isArray(data?.rows)) {
+            const incHeaders = data.headers.map((h: string) => String(h).trim());
+            if (isUsersSheetData(incHeaders, data.rows)) {
               if (sheetUsers.length <= 1) {
-                usuariosHeaders = resPrimary.headers;
-                usuariosRows = resPrimary.rows;
-                sheetUsers = parseUsersSheetRows(resPrimary.rows, resPrimary.headers);
+                usuariosHeaders = incHeaders;
+                usuariosRows = data.rows;
+                sheetUsers = parseUsersSheetRows(data.rows, incHeaders);
               }
-              sheetAccessWarning = null;
-            } else if (
-              rows.length === 0 &&
-              isMonographsSheetData(resPrimary.headers, resPrimary.rows)
-            ) {
-              headers = resPrimary.headers;
-              rows = resPrimary.rows;
-              sheetAccessWarning = null;
+            } else if (isMonographsSheetData(incHeaders, data.rows)) {
+              headers = incHeaders;
+              rows = data.rows;
             }
           }
-        }
 
-        // 2. Buscar explícitamente la hoja "usuarios" (usuarios / Usuarios / USUARIOS)
-        if (sheetUsers.length <= 1) {
-          const userTabCandidates = [
-            'usuarios',
-            'Usuarios',
-            'USUARIOS',
-            'usuario',
-            'Usuario',
-            'users',
-            'Users',
-          ];
-          for (const uTab of userTabCandidates) {
-            const uUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
-              uTab
-            )}&${cacheBuster}`;
-            const uRes = await fetchSheetCsv(uUrl);
-            if (
-              !uRes.isHtml &&
-              uRes.headers.length > 0 &&
-              uRes.rows.length > 0 &&
-              isUsersSheetData(uRes.headers, uRes.rows)
-            ) {
-              usuariosHeaders = uRes.headers;
-              usuariosRows = uRes.rows;
-              sheetUsers = parseUsersSheetRows(uRes.rows, uRes.headers);
-              sheetAccessWarning = null;
-              break;
+          // Soporte para versiones anteriores del Apps Script que devolvían { items: [...] }
+          if (Array.isArray(data?.items) && data.items.length > 0 && rows.length === 0) {
+            const firstItem = data.items[0];
+            if (firstItem && typeof firstItem === 'object') {
+              const itemHeaders = Object.keys(firstItem);
+              if (isUsersSheetData(itemHeaders, data.items)) {
+                usuariosHeaders = itemHeaders;
+                usuariosRows = data.items;
+                sheetUsers = parseUsersSheetRows(data.items, itemHeaders);
+              } else {
+                headers = itemHeaders;
+                rows = data.items;
+              }
             }
           }
+        } else if (sheetUsers.length <= 1) {
+          sheetAccessWarning =
+            'El Web App de Google Apps Script devolvió inicio de sesión. Implementa como "Quién tiene acceso: Cualquier persona".';
         }
+      } catch {
+        // Continuar con lectura directa de Google Sheets
+      }
+    }
 
-        // 3. Buscar explícitamente la hoja de Monografías ("repositorio", "Repositorio", "Hoja 1", etc.)
-        if (rows.length === 0) {
-          const repoTabCandidates = Array.from(
-            new Set([
-              tabName || 'repositorio',
-              'repositorio',
-              'Repositorio',
-              'REPOSITORIO',
-              'Hoja 1',
-              'Sheet 1',
-              'Hoja1',
-              'Sheet1',
-              'Monografías',
-              'Monografias',
-              'Unidades académicas',
-              'Unidades Académicas',
-              'Metadata Repositorio Eki',
-            ])
-          );
+    // B. Leer directamente las hojas desde el enlace de Google Sheets (docs.google.com/spreadsheets/d/...)
+    const sheetIdMatch = effectiveSheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+    if (sheetIdMatch?.[1]) {
+      const sheetId = sheetIdMatch[1];
+      const gidMatch = effectiveSheetUrl.match(/[#&?]gid=(\d+)/);
+      const gid = gidMatch?.[1] || '';
 
-          for (const rTab of repoTabCandidates) {
-            const rUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
-              rTab
-            )}&${cacheBuster}`;
-            const rRes = await fetchSheetCsv(rUrl);
-            if (
-              !rRes.isHtml &&
-              rRes.headers.length > 0 &&
-              rRes.rows.length > 0 &&
-              isMonographsSheetData(rRes.headers, rRes.rows)
-            ) {
-              headers = rRes.headers;
-              rows = rRes.rows;
-              sheetAccessWarning = null;
-              break;
+      const fetchSheetCsv = async (url: string): Promise<{
+        headers: string[];
+        rows: Record<string, string>[];
+        isHtml: boolean;
+      }> => {
+        try {
+          const r = await fetch(url, {
+            method: 'GET',
+            redirect: 'follow',
+            headers: {
+              'Cache-Control': 'no-cache',
+              Pragma: 'no-cache',
+            },
+          });
+          const txt = await r.text();
+          if (isHtmlContent(txt)) {
+            return { headers: [], rows: [], isHtml: true };
+          }
+          const parsed = parseCsvToRows(txt);
+          return { ...parsed, isHtml: false };
+        } catch {
+          return { headers: [], rows: [], isHtml: false };
+        }
+      };
+
+      // 1. Probar la URL exacta (con gid si existe) y export?format=csv
+      const primaryUrls = [
+        gid
+          ? `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}&${cacheBuster}`
+          : `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&${cacheBuster}`,
+        gid
+          ? `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}&${cacheBuster}`
+          : `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&${cacheBuster}`,
+      ];
+
+      for (const pUrl of primaryUrls) {
+        const resPrimary = await fetchSheetCsv(pUrl);
+        if (resPrimary.isHtml) {
+          if (sheetUsers.length <= 1 && rows.length === 0) {
+            sheetAccessWarning =
+              'El archivo de Google Sheets tiene acceso restringido en el servidor. Puedes cambiar Compartir → "Cualquier persona con el enlace (Lector)" o usar "Pegar tabla de Sheets".';
+          }
+          continue;
+        }
+        if (resPrimary.headers.length > 0 && resPrimary.rows.length > 0) {
+          if (isUsersSheetData(resPrimary.headers, resPrimary.rows)) {
+            if (sheetUsers.length <= 1) {
+              usuariosHeaders = resPrimary.headers;
+              usuariosRows = resPrimary.rows;
+              sheetUsers = parseUsersSheetRows(resPrimary.rows, resPrimary.headers);
             }
+            sheetAccessWarning = null;
+          } else if (
+            rows.length === 0 &&
+            isMonographsSheetData(resPrimary.headers, resPrimary.rows)
+          ) {
+            headers = resPrimary.headers;
+            rows = resPrimary.rows;
+            sheetAccessWarning = null;
           }
         }
       }
 
-      const mergedUsers = mergeUsersLists(sheetUsers, baseUsers);
-      const nowStr = new Date().toLocaleString('es-CO');
-      const nowTs = Date.now();
+      // 2. Buscar explícitamente la hoja "usuarios" (usuarios / Usuarios / USUARIOS)
+      if (sheetUsers.length <= 1) {
+        const userTabCandidates = [
+          'usuarios',
+          'Usuarios',
+          'USUARIOS',
+          'usuario',
+          'Usuario',
+          'users',
+          'Users',
+        ];
+        for (const uTab of userTabCandidates) {
+          const uUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
+            uTab
+          )}&${cacheBuster}`;
+          const uRes = await fetchSheetCsv(uUrl);
+          if (
+            !uRes.isHtml &&
+            uRes.headers.length > 0 &&
+            uRes.rows.length > 0 &&
+            isUsersSheetData(uRes.headers, uRes.rows)
+          ) {
+            usuariosHeaders = uRes.headers;
+            usuariosRows = uRes.rows;
+            sheetUsers = parseUsersSheetRows(uRes.rows, uRes.headers);
+            sheetAccessWarning = null;
+            break;
+          }
+        }
+      }
 
-      const nextHeaders =
-        headers.length > 0
-          ? headers
-          : isMonographsSheetData(currentState.rawHeaders, currentState.rawRows) &&
-              currentState.rawHeaders.length > 0
-            ? currentState.rawHeaders
-            : DEFAULT_REPO_HEADERS;
-      const nextRows =
-        rows.length > 0
-          ? rows
-          : isMonographsSheetData(currentState.rawHeaders, currentState.rawRows) &&
-              currentState.rawRows.length > 0
-            ? currentState.rawRows
-            : DEFAULT_REPO_ROWS;
+      // 3. Buscar explícitamente la hoja de Monografías ("repositorio", "Repositorio", "Hoja 1", etc.)
+      if (rows.length === 0) {
+        const repoTabCandidates = Array.from(
+          new Set([
+            tabName || 'repositorio',
+            'repositorio',
+            'Repositorio',
+            'REPOSITORIO',
+            'Hoja 1',
+            'Sheet 1',
+            'Hoja1',
+            'Sheet1',
+            'Monografías',
+            'Monografias',
+            'Unidades académicas',
+            'Unidades Académicas',
+            'Metadata Repositorio Eki',
+          ])
+        );
 
-      const nextState: PersistedRepoState = {
-        appsScriptExecUrl: effectiveScriptUrl || rawScriptInput,
-        connectionUrl: effectiveSheetUrl || rawSheetInput,
-        repoTabName: tabName,
-        accessToken: token,
-        lastSyncDate: nowStr,
-        lastSyncTimestamp: nowTs,
-        rawHeaders: nextHeaders,
-        rawRows: nextRows,
-        usuariosHeaders,
-        usuariosRows,
-        authorizedUsers: mergedUsers,
-      };
+        for (const rTab of repoTabCandidates) {
+          const rUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
+            rTab
+          )}&${cacheBuster}`;
+          const rRes = await fetchSheetCsv(rUrl);
+          if (
+            !rRes.isHtml &&
+            rRes.headers.length > 0 &&
+            rRes.rows.length > 0 &&
+            isMonographsSheetData(rRes.headers, rRes.rows)
+          ) {
+            headers = rRes.headers;
+            rows = rRes.rows;
+            sheetAccessWarning = null;
+            break;
+          }
+        }
+      }
+    }
 
-      savePersistedState(nextState);
+    const mergedUsers = mergeUsersLists(sheetUsers, baseUsers);
+    const nowStr = new Date().toLocaleString('es-CO');
+    const nowTs = Date.now();
 
-      res.json({
-        ok: true,
-        usersSyncedCount: mergedUsers.length,
-        monographsSyncedCount: nextRows.length,
-        sheetAccessWarning,
-        state: nextState,
-      });
+    const nextHeaders =
+      headers.length > 0
+        ? headers
+        : isMonographsSheetData(currentState.rawHeaders, currentState.rawRows) &&
+            currentState.rawHeaders.length > 0
+          ? currentState.rawHeaders
+          : DEFAULT_REPO_HEADERS;
+    const nextRows =
+      rows.length > 0
+        ? rows
+        : isMonographsSheetData(currentState.rawHeaders, currentState.rawRows) &&
+            currentState.rawRows.length > 0
+          ? currentState.rawRows
+          : DEFAULT_REPO_ROWS;
+
+    const nextState: PersistedRepoState = {
+      appsScriptExecUrl: effectiveScriptUrl || rawScriptInput,
+      connectionUrl: effectiveSheetUrl || rawSheetInput,
+      repoTabName: tabName,
+      accessToken: token,
+      lastSyncDate: nowStr,
+      lastSyncTimestamp: nowTs,
+      rawHeaders: nextHeaders,
+      rawRows: nextRows,
+      usuariosHeaders,
+      usuariosRows,
+      authorizedUsers: mergedUsers,
+    };
+
+    saveAndBroadcastPersistedState(nextState);
+
+    return {
+      ok: true,
+      usersSyncedCount: mergedUsers.length,
+      monographsSyncedCount: nextRows.length,
+      sheetAccessWarning,
+      state: nextState,
+    };
+  }
+
+  // 3. Sincronización completa desde el servidor (Drive <-> Google Sheets <-> Cita Master)
+  app.post('/api/repo/sync', async (req, res) => {
+    try {
+      const result = await executeServerSyncLogic(req.body || {});
+      res.json(result);
     } catch (err) {
       res.status(500).json({
         error: err instanceof Error ? err.message : 'Error durante la sincronización',
       });
     }
   });
+
+  app.get('/api/repo/sync', async (_req, res) => {
+    try {
+      const result = await executeServerSyncLogic({ triggerDriveScan: false });
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : 'Error durante la sincronización',
+      });
+    }
+  });
+
+  // Polling automático en segundo plano para verificar si hay cambios directos en Google Sheets
+  // Sincroniza cada 20 segundos para que cualquier cambio en Google Sheets aparezca en todas las terminales
+  setInterval(async () => {
+    try {
+      const st = loadPersistedState();
+      if (st.appsScriptExecUrl || st.connectionUrl) {
+        await executeServerSyncLogic({ triggerDriveScan: false });
+      }
+    } catch {
+      // Ignorar errores transitorios en segundo plano
+    }
+  }, 20000);
+
+  // Heartbeat para mantener vivas las conexiones SSE en proxies y Cloud Run
+  setInterval(() => {
+    for (const client of sseClients) {
+      try {
+        client.write(': ping\n\n');
+      } catch {
+        sseClients.delete(client);
+      }
+    }
+  }, 20000);
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

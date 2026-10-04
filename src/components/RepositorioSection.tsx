@@ -154,7 +154,7 @@ const INSTITUTIONAL_TOKEN = 'EKIRAYA-2026';
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('📚 Repositorio Ekirayá')
-    .addItem('🔄 Sincronizar carpeta Unidades Académicas ahora', 'sincronizarUnidadesAcademicas')
+    .addItem('🔄 Sincronizar hoja Repositorio y Drive ahora', 'sincronizarUnidadesAcademicas')
     .addItem('⏰ Activar sincronización automática cada 24 horas', 'configurarTrigger24Horas')
     .addItem('👥 Verificar estructura hoja usuarios', 'inicializarHojaUsuarios')
     .addToUi();
@@ -561,12 +561,18 @@ function procesarSolicitud(params) {
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let usersSheet = obtenerOCrearHojaUsuarios();
-  let repoSheet = obtenerHojaRepositorio(ss, params.sheet || params.tab || params.repoTabName);
+  let repoSheet = obtenerHojaRepositorio(ss, params.sheet || params.tab || params.repoTabName || 'repositorio');
 
-  if (params.action === 'syncDrive' || params.action === 'syncDriveAndSheets') {
+  if (
+    params.action === 'syncDrive' ||
+    params.action === 'syncDriveAndSheets' ||
+    params.action === 'syncRepo' ||
+    params.action === 'syncRepositorio' ||
+    params.action === 'syncManual'
+  ) {
     try {
       sincronizarUnidadesAcademicas();
-      repoSheet = obtenerHojaRepositorio(ss, params.sheet || params.tab || params.repoTabName);
+      repoSheet = obtenerHojaRepositorio(ss, params.sheet || params.tab || params.repoTabName || 'repositorio');
     } catch (err) {
       // Continúa leyendo las hojas disponibles
     }
@@ -576,12 +582,17 @@ function procesarSolicitud(params) {
   const usersData = leerHojaPorTitulos(usersSheet);
 
   const payload = JSON.stringify({
+    success: true,
+    action: params.action || 'syncRepo',
     folderId: ROOT_FOLDER_ID,
     syncedAt: new Date().toISOString(),
+    repoSheetName: repoSheet ? repoSheet.getName() : 'repositorio',
     headers: repoData.headers,
     rows: repoData.rows,
     usuariosHeaders: usersData.headers,
-    usuariosRows: usersData.rows
+    usuariosRows: usersData.rows,
+    totalMonographs: repoData.rows.length,
+    totalUsers: usersData.rows.length
   });
 
   if (params.callback) {
@@ -1241,34 +1252,54 @@ function getUserCellValue(user: AuthorizedSchoolUser, header: string): string {
   return user.rawRow?.[header] || '';
 }
 
-/** Une la lista de usuarios leída de Google Sheets con la comunidad base de Ekirayá y usuarios creados en Cita Master */
+/** Une la lista de usuarios leída de Google Sheets con la comunidad de Ekirayá asegurando que Google Sheets sea la fuente autorizada de la verdad */
 function mergeUsersLists(
   sheetUsers: AuthorizedSchoolUser[],
   existingAppUsers: AuthorizedSchoolUser[]
 ): AuthorizedSchoolUser[] {
-  const map = new Map<string, AuthorizedSchoolUser>();
+  // Si tenemos usuarios provenientes de Google Sheets, la hoja es la fuente autorizada (altas, bajas y ediciones en la hoja mandan)
+  if (sheetUsers && sheetUsers.length > 0) {
+    const map = new Map<string, AuthorizedSchoolUser>();
 
+    // El administrador institucional Mauricio Bolaños siempre está garantizado
+    map.set(DEFAULT_AUTHORIZED_USERS[0].correo.toLowerCase(), DEFAULT_AUTHORIZED_USERS[0]);
+
+    // Los datos de Google Sheets sobreescriben cualquier copia local (reflejan nombres, curso, rol, etc. editados en Sheets)
+    for (const u of sheetUsers) {
+      if (u && u.correo) {
+        const key = u.correo.trim().toLowerCase();
+        map.set(key, {
+          ...u,
+          correo: key,
+          isAdmin: Boolean(u.isAdmin || key === 'mebolanos@cem.edu.co'),
+          createdInApp: false,
+          syncedToSheet: true,
+          rawRow: u.rawRow ? { ...u.rawRow } : undefined,
+        });
+      }
+    }
+
+    // Conservar solo usuarios creados en la app que aún no hayan terminado de registrarse en Sheets
+    for (const u of existingAppUsers || []) {
+      if (u && u.correo && u.createdInApp && !u.syncedToSheet) {
+        const key = u.correo.trim().toLowerCase();
+        if (!map.has(key)) {
+          map.set(key, u);
+        }
+      }
+    }
+
+    return Array.from(map.values());
+  }
+
+  // Fallback si aún no se ha conectado ni leído la hoja "usuarios" de Google Sheets
+  const map = new Map<string, AuthorizedSchoolUser>();
   for (const defUser of DEFAULT_AUTHORIZED_USERS) {
     map.set(defUser.correo.toLowerCase(), defUser);
   }
-
   for (const u of existingAppUsers || []) {
     if (u && u.correo) {
       map.set(u.correo.trim().toLowerCase(), u);
-    }
-  }
-  for (const u of sheetUsers || []) {
-    if (u && u.correo) {
-      const key = u.correo.trim().toLowerCase();
-      const existing = map.get(key);
-      map.set(key, {
-        ...u,
-        correo: key,
-        isAdmin: Boolean(u.isAdmin || existing?.isAdmin || key === 'mebolanos@cem.edu.co'),
-        createdInApp: false,
-        syncedToSheet: true,
-        rawRow: u.rawRow ? { ...u.rawRow } : existing?.rawRow,
-      });
     }
   }
   return Array.from(map.values());
@@ -1512,6 +1543,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
   const [userSearchQuery, setUserSearchQuery] = useState<string>('');
 
+  // Modal para conectar Apps Script si el usuario pulsa "Sincronizar ahora" sin URL
+  const [showSyncConfigModal, setShowSyncConfigModal] = useState<boolean>(false);
+  const [isRealtimeActive, setIsRealtimeActive] = useState<boolean>(true);
+
   /** Persiste toda la configuración en localStorage */
   const saveLocalRepoConfig = useCallback(
     (nextData: {
@@ -1553,7 +1588,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       targetToken: string,
       targetTabName: string,
       currentUsersList: AuthorizedSchoolUser[],
-      options?: { silent?: boolean; triggerDriveScan?: boolean }
+      options?: { silent?: boolean; triggerDriveScan?: boolean; isManual?: boolean }
     ) => {
       let cleanScript = targetScriptUrl.trim();
       let cleanSheet = targetSheetUrl.trim();
@@ -1661,7 +1696,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         if (cleanScript && cleanScript.includes('script.google.com')) {
           const jsonpExec = await callAppsScriptViaBrowserJsonp(cleanScript, {
             token: targetToken.trim() || 'EKIRAYA-2026',
-            action: options?.triggerDriveScan ? 'syncDriveAndSheets' : 'readAll',
+            action: options?.triggerDriveScan ? 'syncDriveAndSheets' : 'syncRepo',
+            sheet: targetTabName.trim() || 'repositorio',
+            repoTabName: targetTabName.trim() || 'repositorio',
+            _t: String(Date.now()),
           });
           if (jsonpExec && !jsonpExec.error) {
             const rawUHeaders =
@@ -1787,11 +1825,15 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             });
 
             if (!options?.silent) {
-              if (data.sheetAccessWarning && clientUsuariosHeaders.length === 0) {
+              if (options?.isManual) {
+                showToast(
+                  `¡Sincronización manual en tiempo real completada! Hoja 'Repositorio': ${finalRows.length} monografías actualizadas · ${mergedUsers.length} usuarios sincronizados.`
+                );
+              } else if (data.sheetAccessWarning && clientUsuariosHeaders.length === 0) {
                 showToast(data.sheetAccessWarning);
               } else if (finalRows.length > 0) {
                 showToast(
-                  `Sincronización exitosa: ${mergedUsers.length} usuarios (${incomingUsuariosHeaders.join(' · ')}) y ${finalRows.length} monografías.`
+                  `Sincronización exitosa: ${mergedUsers.length} usuarios (${incomingUsuariosHeaders.join(' · ')}) y ${finalRows.length} monografías en hoja 'Repositorio'.`
                 );
               } else {
                 showToast(
@@ -1811,7 +1853,129 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     [columnMapping, saveLocalRepoConfig, showToast, usuariosHeaders]
   );
 
-  // Recuperar y sanear toda la configuración previa desde todas las versiones de localStorage + estado del servidor
+  /**
+   * Sincronización manual para la hoja 'Repositorio' conectando con Apps Script:
+   * Asegura que el botón 'Sincronizar ahora' actualice correctamente la base de datos en tiempo real.
+   */
+  const handleManualSyncNow = async () => {
+    const cleanScript = (appsScriptExecUrl || '').trim();
+    const cleanConn = (connectionUrl || '').trim();
+
+    if (!cleanScript && !cleanConn) {
+      setShowSyncConfigModal(true);
+      return;
+    }
+
+    showToast('Conectando con Apps Script para sincronizar la hoja "Repositorio" en tiempo real...');
+    await executeSyncWithSheets(
+      cleanScript,
+      cleanConn,
+      accessToken,
+      repoTabName || 'repositorio',
+      authorizedUsers,
+      { triggerDriveScan: true, silent: false, isManual: true }
+    );
+  };
+
+  /**
+   * Aplica un estado compartido recibido desde el servidor Node.js o desde otra terminal en tiempo real.
+   * Garantiza que la información mostrada corresponda fielmente a Google Sheets.
+   */
+  const applySharedState = useCallback(
+    (st: any) => {
+      if (!st || typeof st !== 'object') return;
+
+      if (st.appsScriptExecUrl !== undefined && st.appsScriptExecUrl !== '') {
+        setAppsScriptExecUrl(st.appsScriptExecUrl);
+      }
+      if (st.connectionUrl !== undefined && st.connectionUrl !== '') {
+        setConnectionUrl(st.connectionUrl);
+      }
+      if (st.repoTabName !== undefined && st.repoTabName !== '') {
+        setRepoTabName(st.repoTabName);
+      }
+      if (st.accessToken !== undefined && st.accessToken !== '') {
+        setAccessToken(st.accessToken);
+      }
+      if (st.lastSyncDate) {
+        setLastSyncDate(st.lastSyncDate);
+      }
+
+      let effectiveHeaders = rawHeaders;
+      let effectiveRows = rawRows;
+
+      if (
+        Array.isArray(st.rawHeaders) &&
+        Array.isArray(st.rawRows) &&
+        isMonographsSheetData(st.rawHeaders, st.rawRows)
+      ) {
+        effectiveHeaders = st.rawHeaders;
+        effectiveRows = st.rawRows;
+        setRawHeaders(st.rawHeaders);
+        setRawRows(st.rawRows);
+        const detected = autoDetectColumnMapping(st.rawHeaders);
+        setColumnMapping(detected);
+        if (st.rawRows.length > 0) {
+          setForceShowSamples(false);
+        }
+      }
+
+      let effectiveUsers = authorizedUsers;
+      if (Array.isArray(st.authorizedUsers) && st.authorizedUsers.length > 0) {
+        effectiveUsers = st.authorizedUsers;
+        setAuthorizedUsers(st.authorizedUsers);
+        setCurrentUser((prev) => {
+          if (!prev) return null;
+          const refreshed = st.authorizedUsers.find(
+            (u: AuthorizedSchoolUser) => u.correo.toLowerCase() === prev.correo.toLowerCase()
+          );
+          if (refreshed) {
+            try {
+              localStorage.setItem(STORAGE_AUTH_USER_KEY, JSON.stringify(refreshed));
+            } catch {
+              // ignore
+            }
+            return refreshed;
+          }
+          return prev;
+        });
+      }
+
+      let effectiveUserHeaders = usuariosHeaders;
+      if (Array.isArray(st.usuariosHeaders) && st.usuariosHeaders.length > 0) {
+        effectiveUserHeaders = st.usuariosHeaders;
+        setUsuariosHeaders(st.usuariosHeaders);
+        setEditingColumnsText(st.usuariosHeaders.join(', '));
+      }
+
+      saveLocalRepoConfig({
+        appsScriptExecUrl: st.appsScriptExecUrl || appsScriptExecUrl,
+        connectionUrl: st.connectionUrl || connectionUrl,
+        repoTabName: st.repoTabName || repoTabName,
+        accessToken: st.accessToken || accessToken,
+        lastSyncDate: st.lastSyncDate || lastSyncDate,
+        rawHeaders: effectiveHeaders,
+        rawRows: effectiveRows,
+        columnMapping: autoDetectColumnMapping(effectiveHeaders),
+        authorizedUsers: effectiveUsers,
+        usuariosHeaders: effectiveUserHeaders,
+      });
+    },
+    [
+      appsScriptExecUrl,
+      connectionUrl,
+      repoTabName,
+      accessToken,
+      lastSyncDate,
+      rawHeaders,
+      rawRows,
+      authorizedUsers,
+      usuariosHeaders,
+      saveLocalRepoConfig,
+    ]
+  );
+
+  // 1. Carga inicial: Recupera de localStorage y sincroniza de inmediato con el servidor central /api/repo/state
   useEffect(() => {
     let accumulatedUsers: AuthorizedSchoolUser[] = [...DEFAULT_AUTHORIZED_USERS];
     let savedScriptUrl = '';
@@ -1824,7 +1988,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     let savedLastSync: string | null = null;
 
     try {
-      // Recorrer TODAS las claves anteriores para rescatar usuarios y URLs sin perder ninguno
+      // Recorrer claves anteriores para rescatar configuración local rápida
       for (const key of [...LEGACY_CONFIG_KEYS].reverse()) {
         const raw = localStorage.getItem(key);
         if (!raw) continue;
@@ -1852,7 +2016,6 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             accumulatedUsers = mergeUsersLists(parsed.authorizedUsers, accumulatedUsers);
           }
 
-          // Si en una versión previa la hoja "usuarios" quedó guardada por error dentro de rawRows, rescatar esos usuarios y sus columnas
           if (Array.isArray(parsed.rawHeaders) && Array.isArray(parsed.rawRows)) {
             if (isUsersSheetData(parsed.rawHeaders, parsed.rawRows)) {
               savedUsuariosHeaders = parsed.rawHeaders.map(String);
@@ -1910,32 +2073,152 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       // Ignore storage errors
     }
 
-    // Sincronizar con el estado persistido en el servidor y con Google Sheets
-    executeSyncWithSheets(
-      savedScriptUrl,
-      savedSheetUrl,
-      savedToken,
-      savedTab,
-      accumulatedUsers,
-      { silent: true, triggerDriveScan: false }
-    );
+    // Consultar de inmediato al servidor central para unificar con cualquier otra terminal
+    fetch('/api/repo/state')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((serverState) => {
+        if (serverState) {
+          applySharedState(serverState);
+          const effectiveScript = serverState.appsScriptExecUrl || savedScriptUrl;
+          const effectiveSheet = serverState.connectionUrl || savedSheetUrl;
+          const effectiveTok = serverState.accessToken || savedToken;
+          const effectiveTab = serverState.repoTabName || savedTab;
+          const effectiveUsrs =
+            serverState.authorizedUsers && serverState.authorizedUsers.length > 0
+              ? serverState.authorizedUsers
+              : accumulatedUsers;
+
+          executeSyncWithSheets(
+            effectiveScript,
+            effectiveSheet,
+            effectiveTok,
+            effectiveTab,
+            effectiveUsrs,
+            { silent: true, triggerDriveScan: false }
+          );
+        } else {
+          executeSyncWithSheets(
+            savedScriptUrl,
+            savedSheetUrl,
+            savedToken,
+            savedTab,
+            accumulatedUsers,
+            { silent: true, triggerDriveScan: false }
+          );
+        }
+      })
+      .catch(() => {
+        executeSyncWithSheets(
+          savedScriptUrl,
+          savedSheetUrl,
+          savedToken,
+          savedTab,
+          accumulatedUsers,
+          { silent: true, triggerDriveScan: false }
+        );
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sincronización automática cada 24 horas
+  // 2. Conexión en tiempo real multi-terminal vía Server-Sent Events (SSE)
+  // Cualquier terminal que agregue o edite un usuario o documento propaga el cambio inmediatamente a las demás
   useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      executeSyncWithSheets(
-        appsScriptExecUrl,
-        connectionUrl,
-        accessToken,
-        repoTabName,
-        authorizedUsers,
-        { silent: true, triggerDriveScan: false }
-      );
-    }, TWENTY_FOUR_HOURS_MS);
+    let es: EventSource | null = null;
+    let reconnectTimer: number | null = null;
+    let isCancelled = false;
 
-    return () => window.clearInterval(intervalId);
+    const connectSSE = () => {
+      if (isCancelled) return;
+      try {
+        es = new EventSource('/api/repo/events');
+        es.onopen = () => {
+          setIsRealtimeActive(true);
+        };
+        es.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data?.state) {
+              applySharedState(data.state);
+              setIsRealtimeActive(true);
+            }
+          } catch {
+            // ignore parse error
+          }
+        };
+        es.onerror = () => {
+          setIsRealtimeActive(false);
+          es?.close();
+          if (!isCancelled) {
+            reconnectTimer = window.setTimeout(connectSSE, 4000);
+          }
+        };
+      } catch {
+        setIsRealtimeActive(false);
+      }
+    };
+
+    connectSSE();
+
+    return () => {
+      isCancelled = true;
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      es?.close();
+    };
+  }, [applySharedState]);
+
+  // 3. Sincronización entre pestañas en el mismo navegador mediante BroadcastChannel
+  useEffect(() => {
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('ekiraya_sync_channel');
+      channel.onmessage = (event) => {
+        if (event.data?.state) {
+          applySharedState(event.data.state);
+        }
+      };
+    } catch {
+      // BroadcastChannel opcional en entornos sin soporte
+    }
+    return () => {
+      channel?.close();
+    };
+  }, [applySharedState]);
+
+  // 4. Sincronización periódica en tiempo real con Google Sheets (cada 20s) y al enfocar la pestaña
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (!document.hidden) {
+        fetch('/api/repo/state')
+          .then((r) => (r.ok ? r.json() : null))
+          .then((st) => {
+            if (st) applySharedState(st);
+          })
+          .catch(() => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    // Polling de verificación continua cada 20 segundos
+    const intervalId = window.setInterval(() => {
+      if (!document.hidden && !isSyncing) {
+        executeSyncWithSheets(
+          appsScriptExecUrl,
+          connectionUrl,
+          accessToken,
+          repoTabName,
+          authorizedUsers,
+          { silent: true, triggerDriveScan: false }
+        );
+      }
+    }, 20000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      window.clearInterval(intervalId);
+    };
   }, [
     appsScriptExecUrl,
     connectionUrl,
@@ -1943,6 +2226,8 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     repoTabName,
     authorizedUsers,
     executeSyncWithSheets,
+    applySharedState,
+    isSyncing,
   ]);
 
   // Monografías sincronizadas desde Google Sheets
@@ -3188,18 +3473,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full">
                 <button
                   type="button"
-                  onClick={() =>
-                    executeSyncWithSheets(
-                      appsScriptExecUrl,
-                      connectionUrl,
-                      accessToken,
-                      repoTabName,
-                      authorizedUsers,
-                      { triggerDriveScan: true }
-                    )
-                  }
+                  onClick={handleManualSyncNow}
                   disabled={isSyncing}
-                  title="Sincronizar ahora manualmente en ambas direcciones"
+                  title="Sincronizar ahora manualmente con Apps Script y Google Sheets"
                   className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-slate-200 shrink-0 cursor-pointer"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
@@ -3269,18 +3545,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
                 <button
                   type="button"
-                  onClick={() =>
-                    executeSyncWithSheets(
-                      appsScriptExecUrl,
-                      connectionUrl,
-                      accessToken,
-                      repoTabName,
-                      authorizedUsers,
-                      { triggerDriveScan: true }
-                    )
-                  }
+                  onClick={handleManualSyncNow}
                   disabled={isSyncing}
-                  className="px-4 py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-600 text-white border border-emerald-400/40 text-xs font-semibold transition-colors flex items-center justify-center gap-2"
+                  title="Sincronizar ahora la hoja 'Repositorio' conectando con Apps Script"
+                  className="px-4 py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-600 text-white border border-emerald-400/40 text-xs font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                   <span>
@@ -3324,9 +3592,18 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
           {isAdmin ? (
             <div className="flex items-center gap-2 text-violet-200">
-              <Clock className="w-3.5 h-3.5 text-emerald-300" />
+              <span className="relative flex h-2 w-2">
+                {isRealtimeActive && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                )}
+                <span
+                  className={`relative inline-flex rounded-full h-2 w-2 ${
+                    isRealtimeActive ? 'bg-emerald-400' : 'bg-amber-400'
+                  }`}
+                ></span>
+              </span>
               <span>
-                Sincronización automática cada 24h activa
+                Sincronización en tiempo real activa (Google Sheets)
                 {lastSyncDate ? ` · Última: ${lastSyncDate}` : ''}
               </span>
             </div>
@@ -4096,26 +4373,49 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             )}
           </div>
 
-          {/* BOTÓN "SINCRONIZAR AHORA" - Sincronización manual en ambas direcciones */}
-          <button
-            type="button"
-            onClick={() =>
-              executeSyncWithSheets(
-                appsScriptExecUrl,
-                connectionUrl,
-                accessToken,
-                repoTabName,
-                authorizedUsers,
-                { triggerDriveScan: true }
-              )
-            }
-            disabled={isSyncing}
-            title="Sincronizar ahora bidireccionalmente con la hoja 'repositorio' y Google Drive"
-            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-xs shrink-0 cursor-pointer"
-          >
-            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar ahora'}</span>
-          </button>
+          {/* BOTÓN "SINCRONIZAR AHORA" - Sincronización manual en ambas direcciones + Indicador en tiempo real */}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() =>
+                executeSyncWithSheets(
+                  appsScriptExecUrl,
+                  connectionUrl,
+                  accessToken,
+                  repoTabName,
+                  authorizedUsers,
+                  { triggerDriveScan: true, isManual: true }
+                )
+              }
+              disabled={isSyncing}
+              title="Sincronizar ahora bidireccionalmente con la hoja 'repositorio' y Google Drive"
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-xs shrink-0 cursor-pointer"
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar ahora'}</span>
+            </button>
+
+            <div
+              className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border ${
+                isRealtimeActive
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : 'bg-amber-50 text-amber-800 border-amber-200'
+              }`}
+              title="Sincronización en tiempo real activa entre todas las terminales y Google Sheets"
+            >
+              <span className="relative flex h-2 w-2">
+                {isRealtimeActive && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                )}
+                <span
+                  className={`relative inline-flex rounded-full h-2 w-2 ${
+                    isRealtimeActive ? 'bg-emerald-500' : 'bg-amber-500'
+                  }`}
+                ></span>
+              </span>
+              <span>{isRealtimeActive ? 'Tiempo Real (Sheets)' : 'Reconectando...'}</span>
+            </div>
+          </div>
 
           <div className="flex items-center gap-2 shrink-0">
             <SlidersHorizontal className="w-4 h-4 text-violet-700 shrink-0" />
