@@ -370,14 +370,106 @@ function agregarUsuarioEnSheet(params) {
   SpreadsheetApp.flush();
 }
 
+function actualizarUsuarioEnSheet(params) {
+  const userSheet = obtenerOCrearHojaUsuarios();
+  const data = userSheet.getDataRange().getDisplayValues();
+  if (data.length <= 1) {
+    agregarUsuarioEnSheet(params);
+    return;
+  }
+  const headers = data[0].map(function(h) { return String(h).trim(); });
+
+  let correoColIdx = headers.findIndex(function(h) {
+    const norm = h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return /correo|email|mail|cuenta/.test(norm);
+  });
+  if (correoColIdx < 0) {
+    for (let c = 0; c < headers.length; c++) {
+      for (let r = 1; r < Math.min(data.length, 5); r++) {
+        if (String(data[r][c] || '').includes('@')) {
+          correoColIdx = c;
+          break;
+        }
+      }
+      if (correoColIdx >= 0) break;
+    }
+  }
+  if (correoColIdx < 0) correoColIdx = 2;
+
+  const targetEmail = String(
+    params.originalCorreo || params.originalEmail || params.correo || params.email || ''
+  ).trim().toLowerCase();
+  const newEmail = String(
+    params.correo || params.email || targetEmail
+  ).trim().toLowerCase();
+
+  let rawRowMap = {};
+  if (params.rawRowJson) {
+    try { rawRowMap = JSON.parse(params.rawRowJson); } catch (e) {}
+  } else if (params.rawRow && typeof params.rawRow === 'object') {
+    rawRowMap = params.rawRow;
+  } else if (params.rowJson) {
+    try { rawRowMap = JSON.parse(params.rowJson); } catch (e) {}
+  }
+
+  const nuevaFila = headers.map(function(h) {
+    if (rawRowMap[h] !== undefined && String(rawRowMap[h]).trim() !== '') {
+      return String(rawRowMap[h]).trim();
+    }
+    if (params[h] !== undefined && String(params[h]).trim() !== '') {
+      return String(params[h]).trim();
+    }
+    const norm = h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    if (/correo|email|mail|cuenta/.test(norm)) return newEmail;
+    if (/nombre|estudiante|usuario/.test(norm)) return params.nombres || params.nombre || '';
+    if (/curso|grado|nivel/.test(norm)) return params.curso || 'General';
+    if (/seccion|dependencia|area/.test(norm)) return params.seccion || 'General';
+    if (/perfil|rol|admin|cargo|estamento/.test(norm)) return params.perfil || 'Estudiante';
+    return '';
+  });
+
+  // Buscar por correo original o por nuevo correo
+  let foundRowIdx = -1;
+  for (let r = 1; r < data.length; r++) {
+    const existing = String(data[r][correoColIdx] || '').trim().toLowerCase();
+    if (existing === targetEmail || existing === newEmail) {
+      foundRowIdx = r;
+      break;
+    }
+  }
+
+  if (foundRowIdx >= 1) {
+    userSheet.getRange(foundRowIdx + 1, 1, 1, nuevaFila.length).setValues([nuevaFila]);
+  } else {
+    userSheet.appendRow(nuevaFila);
+  }
+  SpreadsheetApp.flush();
+}
+
 function eliminarUsuarioEnSheet(params) {
   const userSheet = obtenerOCrearHojaUsuarios();
   const data = userSheet.getDataRange().getDisplayValues();
   if (data.length <= 1) return;
   const headers = data[0].map(function(h) { return String(h).trim(); });
-  let correoColIdx = headers.findIndex(function(h) { return /correo|email|mail|cuenta/i.test(h); });
+  let correoColIdx = headers.findIndex(function(h) {
+    const norm = h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return /correo|email|mail|cuenta/.test(norm);
+  });
+  if (correoColIdx < 0) {
+    for (let c = 0; c < headers.length; c++) {
+      for (let r = 1; r < Math.min(data.length, 5); r++) {
+        if (String(data[r][c] || '').includes('@')) {
+          correoColIdx = c;
+          break;
+        }
+      }
+      if (correoColIdx >= 0) break;
+    }
+  }
   if (correoColIdx < 0) correoColIdx = 2;
-  const correoEliminar = String(params.correo || params.email || '').trim().toLowerCase();
+  const correoEliminar = String(
+    params.correo || params.email || params.originalCorreo || params.originalEmail || ''
+  ).trim().toLowerCase();
   if (!correoEliminar) return;
 
   for (let r = 1; r < data.length; r++) {
@@ -539,12 +631,17 @@ function procesarSolicitud(params) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
-  if (params.action === 'addUser' || params.action === 'updateUser') {
-    if (params.action === 'updateUser' && params.originalCorreo && params.originalCorreo !== params.correo) {
-      eliminarUsuarioEnSheet({ correo: params.originalCorreo });
+  if (params.action === 'updateUser') {
+    actualizarUsuarioEnSheet(params);
+    // Sincronización bidireccional automática de monografías al editar usuario
+    try {
+      sincronizarUnidadesAcademicas();
+    } catch (err) {
+      // Continuar con la respuesta
     }
+  } else if (params.action === 'addUser') {
     agregarUsuarioEnSheet(params);
-    // Sincronización bidireccional automática de monografías al crear o editar usuario
+    // Sincronización bidireccional automática de monografías al crear usuario
     try {
       sincronizarUnidadesAcademicas();
     } catch (err) {
@@ -2783,25 +2880,46 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         (connectionUrl.includes('script.google.com') ? connectionUrl : '')
       ).trim();
 
-      // 1. Sincronizar vía JSONP con Apps Script si está configurado
+      // 1. Sincronizar vía JSONP con Apps Script directamente desde el navegador hacia Google Sheets
       if (effectiveExec && effectiveExec.includes('script.google.com')) {
         const jsonpRes = await callAppsScriptViaBrowserJsonp(effectiveExec, {
           action: 'updateUser',
           token: accessToken || 'EKIRAYA-2026',
           originalCorreo: originalEmail,
+          originalEmail: originalEmail,
           curso: updatedUser.curso,
           seccion: updatedUser.seccion,
           nombres: updatedUser.nombres,
+          nombre: updatedUser.nombres,
           correo: updatedUser.correo,
+          email: updatedUser.correo,
           perfil: updatedUser.perfil,
+          rol: updatedUser.perfil,
+          rawRowJson: JSON.stringify(builtRawRow),
           rowJson: JSON.stringify(builtRawRow),
+          _t: String(Date.now()),
         });
-        if (jsonpRes && (jsonpRes.success || Array.isArray(jsonpRes.usersRows))) {
+        if (
+          jsonpRes &&
+          (jsonpRes.success ||
+            Array.isArray(jsonpRes.usuariosRows) ||
+            Array.isArray(jsonpRes.usersRows))
+        ) {
           browserPushed = true;
+          const uRows = jsonpRes.usuariosRows || jsonpRes.usersRows;
+          const rawUHeaders = jsonpRes.usuariosHeaders || jsonpRes.usersHeaders;
+          const uHeaders: string[] = Array.isArray(rawUHeaders)
+            ? rawUHeaders.map(String)
+            : usuariosHeaders;
+          if (Array.isArray(uRows) && uRows.length > 0) {
+            const sheetUsers = parseUsersSheetRows(uRows, uHeaders);
+            const freshUsers = mergeUsersLists(sheetUsers, updatedUsers);
+            setAuthorizedUsers(freshUsers);
+          }
         }
       }
 
-      // 2. Enviar actualización al backend
+      // 2. Enviar actualización al backend Express (que también sincroniza con Apps Script en Google Sheets y propaga a todas las terminales)
       const resp = await fetch('/api/repo/users', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -2821,19 +2939,23 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           const merged = mergeUsersLists(data.state.authorizedUsers, updatedUsers);
           setAuthorizedUsers(merged);
         }
-        showToast(`¡Usuario "${updatedUser.nombres}" editado y sincronizado exitosamente!`);
+        showToast(
+          data?.pushedToSheet || browserPushed
+            ? `¡Usuario "${updatedUser.nombres}" editado y sincronizado en Google Sheets!`
+            : `Usuario "${updatedUser.nombres}" editado correctamente en la base de datos.`
+        );
       } else {
-        showToast(`Usuario "${updatedUser.nombres}" actualizado en la aplicación.`);
+        showToast(`Usuario "${updatedUser.nombres}" actualizado.`);
       }
 
-      // Sincronización bidireccional automática del repositorio
+      // Sincronización en segundo plano con el servidor
       executeSyncWithSheets(
         appsScriptExecUrl,
         connectionUrl,
         accessToken,
         repoTabName,
         updatedUsers,
-        { triggerDriveScan: true, silent: true }
+        { triggerDriveScan: false, silent: true }
       );
     } catch {
       showToast(`Usuario "${updatedUser.nombres}" guardado localmente.`);

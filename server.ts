@@ -427,7 +427,8 @@ async function pushUserToAppsScriptFromServer(
   scriptUrl: string,
   token: string,
   user: AuthorizedSchoolUser,
-  originalEmail?: string
+  originalEmail?: string,
+  action: 'addUser' | 'updateUser' = 'addUser'
 ): Promise<{
   pushed: boolean;
   updatedUsers: AuthorizedSchoolUser[] | null;
@@ -451,9 +452,11 @@ async function pushUserToAppsScriptFromServer(
     }
   }
 
+  const targetOrigEmail = (originalEmail || user.correo).trim().toLowerCase();
+
   const query = new URLSearchParams({
     ...extraFields,
-    action: 'addUser',
+    action,
     token: (token || 'EKIRAYA-2026').trim(),
     curso: user.curso || 'General',
     seccion: user.seccion || 'General',
@@ -461,10 +464,12 @@ async function pushUserToAppsScriptFromServer(
     nombre: user.nombres,
     correo: user.correo,
     email: user.correo,
-    originalEmail: (originalEmail || user.correo).trim().toLowerCase(),
+    originalEmail: targetOrigEmail,
+    originalCorreo: targetOrigEmail,
     perfil: user.perfil || 'Estudiante',
     rol: user.perfil || 'Estudiante',
     rawRowJson: JSON.stringify(user.rawRow || {}),
+    rowJson: JSON.stringify(user.rawRow || {}),
     _t: String(Date.now()),
   });
 
@@ -516,15 +521,21 @@ async function pushUserToAppsScriptFromServer(
       },
       body: JSON.stringify({
         ...extraFields,
-        action: 'addUser',
+        action,
         token: (token || 'EKIRAYA-2026').trim(),
         curso: user.curso || 'General',
         seccion: user.seccion || 'General',
         nombres: user.nombres,
+        nombre: user.nombres,
         correo: user.correo,
-        originalEmail: (originalEmail || user.correo).trim().toLowerCase(),
+        email: user.correo,
+        originalEmail: targetOrigEmail,
+        originalCorreo: targetOrigEmail,
         perfil: user.perfil || 'Estudiante',
+        rol: user.perfil || 'Estudiante',
         rawRow: user.rawRow || {},
+        rawRowJson: JSON.stringify(user.rawRow || {}),
+        rowJson: JSON.stringify(user.rawRow || {}),
       }),
     });
 
@@ -832,7 +843,9 @@ async function startServer() {
         const pushResult = await pushUserToAppsScriptFromServer(
           effectiveScriptUrl,
           effectiveToken,
-          updatedUser
+          updatedUser,
+          origEmail,
+          'updateUser'
         );
         pushedToSheet = pushResult.pushed;
         remoteUsers = pushResult.updatedUsers;
