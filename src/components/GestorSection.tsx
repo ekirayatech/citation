@@ -17,7 +17,10 @@ import {
   BookOpen,
   HelpCircle,
   SlidersHorizontal,
+  Bot,
+  X,
 } from 'lucide-react';
+import { SocraticAiTutor } from './SocraticAiTutor';
 import {
   AudiovisualSubtype,
   AuthorMode,
@@ -70,6 +73,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
     APA_DOCUMENT_EXAMPLES[0].id
   );
   const [showSpecialCases, setShowSpecialCases] = useState<boolean>(false);
+  const [isTutorOpen, setIsTutorOpen] = useState<boolean>(false);
 
   const generated = generateCitationOutput(formData);
 
@@ -269,6 +273,15 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
             </h2>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsTutorOpen(true)}
+              className="px-3 py-1.5 text-xs font-bold text-slate-950 bg-[#f8c62e] hover:bg-[#e5b320] border border-[#f8c62e] rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-xs"
+              title="Abrir el Tutor Socrático IA para resolver dudas"
+            >
+              <Bot className="w-3.5 h-3.5 text-slate-950" />
+              Tutor IA
+            </button>
             <button
               type="button"
               onClick={loadPresetExample}
@@ -1462,15 +1475,26 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
               <span aria-hidden="true">·</span>
               <span>{STYLE_LABELS[formData.style]}</span>
             </div>
-            <button
-              type="button"
-              onClick={handleSaveToBibliography}
-              disabled={!generated.requiresReferenceList}
-              className="px-4 py-2 bg-violet-700 hover:bg-violet-800 disabled:bg-slate-300 text-white text-xs sm:text-sm font-semibold rounded-xl transition-colors flex items-center gap-1.5 shadow-sm whitespace-nowrap"
-            >
-              <Plus className="w-4 h-4" />
-              Guardar en mi Bibliografía
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setIsTutorOpen(true)}
+                className="px-3 py-2 bg-[#f8c62e] hover:bg-[#e5b320] text-slate-950 font-bold text-xs sm:text-sm rounded-xl transition-colors flex items-center gap-1.5 shadow-xs whitespace-nowrap"
+                title="Consultar al Tutor Socrático IA si tienes dudas sobre esta cita o referencia"
+              >
+                <Bot className="w-4 h-4 text-slate-950" />
+                <span>¿Dudas? Pregunta al Tutor IA</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveToBibliography}
+                disabled={!generated.requiresReferenceList}
+                className="px-4 py-2 bg-violet-700 hover:bg-violet-800 disabled:bg-slate-300 text-white text-xs sm:text-sm font-semibold rounded-xl transition-colors flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+              >
+                <Plus className="w-4 h-4" />
+                Guardar en mi Bibliografía
+              </button>
+            </div>
           </div>
 
           {generated.specialNote && (
@@ -1871,6 +1895,56 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
           )}
         </div>
       </section>
+
+      {/* BOTÓN FLOTANTE Y VENTANA DESPLEGABLE DEL TUTOR SOCRÁTICO IA */}
+      <div className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end pointer-events-auto">
+        {/* Ventana Flotante del Tutor */}
+        {isTutorOpen && (
+          <div className="mb-3 w-[calc(100vw-2rem)] sm:w-[420px] md:w-[450px] h-[580px] max-h-[82vh] shadow-2xl rounded-2xl overflow-hidden border border-violet-300/80 bg-white transition-all transform origin-bottom-right">
+            <SocraticAiTutor
+              formData={formData}
+              className="h-full max-h-none border-0 shadow-none rounded-none"
+              onClose={() => setIsTutorOpen(false)}
+            />
+          </div>
+        )}
+
+        {/* Botón Flotante Redondo / Pill con animaciones y estilo institucional */}
+        <button
+          type="button"
+          onClick={() => setIsTutorOpen(!isTutorOpen)}
+          className={`flex items-center gap-2.5 px-4 py-3 rounded-full text-white shadow-xl transition-all duration-300 transform hover:scale-105 active:scale-95 border-2 ${
+            isTutorOpen
+              ? 'bg-[#533e6f] border-[#f8c62e] ring-4 ring-purple-300/40'
+              : 'bg-[#664d88] hover:bg-[#533e6f] border-white/90 hover:shadow-2xl'
+          }`}
+          title={isTutorOpen ? 'Cerrar Tutor Socrático IA' : 'Abrir Tutor Socrático IA (Gemini)'}
+          aria-label="Tutor Socrático IA flotante"
+        >
+          {isTutorOpen ? (
+            <>
+              <X className="w-5 h-5 text-[#f8c62e]" />
+              <span className="text-xs sm:text-sm font-bold tracking-wide">
+                Cerrar Tutor
+              </span>
+            </>
+          ) : (
+            <>
+              <div className="relative">
+                <Bot className="w-5 h-5 text-[#f8c62e]" />
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#f8c62e] rounded-full animate-ping" />
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#f8c62e] rounded-full" />
+              </div>
+              <span className="text-xs sm:text-sm font-bold tracking-tight">
+                Tutor Socrático IA
+              </span>
+              <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-[#f8c62e] text-[10px] font-extrabold uppercase hidden sm:inline-block">
+                Gemini
+              </span>
+            </>
+          )}
+        </button>
+      </div>
     </div>
   );
 };
