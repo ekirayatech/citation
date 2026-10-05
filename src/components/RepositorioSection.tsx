@@ -35,6 +35,7 @@ import {
   Download,
   Pencil,
   Trash2,
+  Save,
 } from 'lucide-react';
 import { CitationFormData } from '../types/citation';
 import {
@@ -1607,6 +1608,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   const [lastSyncDate, setLastSyncDate] = useState<string | null>(null);
   const [sheetAccessWarning, setSheetAccessWarning] = useState<string | null>(null);
   const [copiedScript, setCopiedScript] = useState<boolean>(false);
+  const [isSavingConfig, setIsSavingConfig] = useState<boolean>(false);
 
   // Importación directa por pegado o CSV (útil si el Sheet tiene restricción de dominio)
   const [showQuickPasteModal, setShowQuickPasteModal] = useState<boolean>(false);
@@ -2072,6 +2074,59 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     ]
   );
 
+  /**
+   * Guarda de manera centralizada la dirección de implementación de Google Sheets / Apps Script
+   * en el servidor Node.js (/api/repo/config) para que quede disponible para todas las terminales,
+   * computadores e IPs que accedan al aplicativo (soporta más de 50 dispositivos simultáneos).
+   */
+  const handleSaveGlobalConfigToServer = useCallback(
+    async (showUserFeedback = false) => {
+      const cleanScript = (appsScriptExecUrl || '').trim();
+      const cleanSheet = (connectionUrl || '').trim();
+      const cleanToken = (accessToken || '').trim() || 'EKIRAYA-2026';
+      const cleanTab = (repoTabName || '').trim() || 'repositorio';
+
+      if (!cleanScript && !cleanSheet && !showUserFeedback) {
+        return;
+      }
+
+      setIsSavingConfig(true);
+      try {
+        const resp = await fetch('/api/repo/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            appsScriptExecUrl: cleanScript,
+            connectionUrl: cleanSheet,
+            accessToken: cleanToken,
+            repoTabName: cleanTab,
+          }),
+        });
+
+        if (resp.ok) {
+          const result = await resp.json();
+          if (result?.state) {
+            applySharedState(result.state);
+          }
+          if (showUserFeedback) {
+            showToast('✅ Configuración de Sheets guardada para todos los equipos y dispositivos.');
+          }
+        } else {
+          if (showUserFeedback) {
+            showToast('⚠️ No se pudo guardar la configuración en el servidor central.');
+          }
+        }
+      } catch {
+        if (showUserFeedback) {
+          showToast('⚠️ Error de comunicación con el servidor central.');
+        }
+      } finally {
+        setIsSavingConfig(false);
+      }
+    },
+    [appsScriptExecUrl, connectionUrl, accessToken, repoTabName, applySharedState, showToast]
+  );
+
   // 1. Carga inicial: Recupera de localStorage y sincroniza de inmediato con el servidor central /api/repo/state
   useEffect(() => {
     let accumulatedUsers: AuthorizedSchoolUser[] = [...DEFAULT_AUTHORIZED_USERS];
@@ -2185,15 +2240,40 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               ? serverState.authorizedUsers
               : accumulatedUsers;
 
-          executeSyncWithSheets(
-            effectiveScript,
-            effectiveSheet,
-            effectiveTok,
-            effectiveTab,
-            effectiveUsrs,
-            { silent: true, triggerDriveScan: false }
-          );
-        } else {
+          // Si el cliente tiene una URL guardada en su localStorage que el servidor aún no tiene,
+          // registrarla automáticamente en el servidor central para beneficiar a todas las demás terminales:
+          if (
+            (!serverState.appsScriptExecUrl && savedScriptUrl) ||
+            (!serverState.connectionUrl && savedSheetUrl)
+          ) {
+            fetch('/api/repo/config', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                appsScriptExecUrl: effectiveScript,
+                connectionUrl: effectiveSheet,
+                accessToken: effectiveTok,
+                repoTabName: effectiveTab,
+              }),
+            })
+              .then((r) => (r.ok ? r.json() : null))
+              .then((res) => {
+                if (res?.state) applySharedState(res.state);
+              })
+              .catch(() => {});
+          }
+
+          if (effectiveScript || effectiveSheet) {
+            executeSyncWithSheets(
+              effectiveScript,
+              effectiveSheet,
+              effectiveTok,
+              effectiveTab,
+              effectiveUsrs,
+              { silent: true, triggerDriveScan: false }
+            );
+          }
+        } else if (savedScriptUrl || savedSheetUrl) {
           executeSyncWithSheets(
             savedScriptUrl,
             savedSheetUrl,
@@ -2205,14 +2285,16 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         }
       })
       .catch(() => {
-        executeSyncWithSheets(
-          savedScriptUrl,
-          savedSheetUrl,
-          savedToken,
-          savedTab,
-          accumulatedUsers,
-          { silent: true, triggerDriveScan: false }
-        );
+        if (savedScriptUrl || savedSheetUrl) {
+          executeSyncWithSheets(
+            savedScriptUrl,
+            savedSheetUrl,
+            savedToken,
+            savedTab,
+            accumulatedUsers,
+            { silent: true, triggerDriveScan: false }
+          );
+        }
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -2297,19 +2379,17 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     document.addEventListener('visibilitychange', handleVisibilityOrFocus);
     window.addEventListener('focus', handleVisibilityOrFocus);
 
-    // Polling de verificación continua cada 20 segundos
+    // Polling de verificación continua cada 10 segundos para más de 50 terminales simultáneas
     const intervalId = window.setInterval(() => {
       if (!document.hidden && !isSyncing) {
-        executeSyncWithSheets(
-          appsScriptExecUrl,
-          connectionUrl,
-          accessToken,
-          repoTabName,
-          authorizedUsers,
-          { silent: true, triggerDriveScan: false }
-        );
+        fetch('/api/repo/state')
+          .then((r) => (r.ok ? r.json() : null))
+          .then((st) => {
+            if (st) applySharedState(st);
+          })
+          .catch(() => {});
       }
-    }, 20000);
+    }, 10000);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
@@ -3480,6 +3560,280 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     setPageIndex(0);
   };
 
+  const renderSyncConfigModal = () => {
+    if (!showSyncConfigModal) return null;
+
+    const hasConfig = Boolean(appsScriptExecUrl || connectionUrl);
+
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+        <div className="bg-white rounded-2xl border border-slate-200 max-w-xl w-full p-6 space-y-4 shadow-2xl my-8">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-violet-900 text-white flex items-center justify-center shrink-0">
+                <Database className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+                  Dirección de la Implementación de Google Sheets
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Guardada en el servidor central · Sincronización en vivo cada 10s para todas las terminales (50+ equipos)
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSyncConfigModal(false)}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="space-y-4 text-xs">
+            <div
+              className={`p-3.5 rounded-xl border flex items-start gap-2.5 ${
+                hasConfig
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                  : 'bg-amber-50 border-amber-200 text-amber-950'
+              }`}
+            >
+              {hasConfig ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              )}
+              <div className="space-y-1">
+                <div className="font-bold text-xs">
+                  {hasConfig
+                    ? 'Conexión Central Activa en el Servidor'
+                    : 'Configura la dirección para conectar todas las terminales'}
+                </div>
+                <p className="leading-relaxed text-[11px]">
+                  {hasConfig
+                    ? 'La dirección se encuentra guardada en el servidor central. Todos los equipos (estudiantes, docentes, salas de cómputo) consultan automáticamente esta misma fuente en vivo cada 10 segundos.'
+                    : 'Pega la URL de tu implementación de Google Apps Script o el enlace directo de tu Google Sheets. Se guardará en el servidor y estará activa de inmediato para cualquier computador o IP que ingrese.'}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-violet-950 mb-1">
+                A. URL de la Aplicación Web de Google Apps Script (/exec) — Escritura en Sheets y escaneo Drive
+              </label>
+              <input
+                type="url"
+                value={appsScriptExecUrl}
+                onChange={(e) => setAppsScriptExecUrl(e.target.value)}
+                placeholder="https://script.google.com/macros/s/.../exec"
+                className="w-full rounded-xl border border-violet-300 bg-violet-50/40 py-2.5 px-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-violet-600 font-mono"
+              />
+              <span className="text-[10px] text-slate-500 mt-1 block">
+                En Google Sheets: Extensiones → Apps Script → Implementar → Nueva implementación → Tipo: Aplicación web (Acceso: Cualquier persona).
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                B. Enlace directo del archivo de Google Sheets (docs.google.com/spreadsheets/d/...)
+              </label>
+              <input
+                type="url"
+                value={connectionUrl}
+                onChange={(e) => setConnectionUrl(e.target.value)}
+                placeholder="https://docs.google.com/spreadsheets/d/.../edit"
+                className="w-full rounded-xl border border-slate-300 bg-slate-50 py-2.5 px-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-violet-600 font-mono"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Pestaña de Monografías
+                </label>
+                <input
+                  type="text"
+                  value={repoTabName}
+                  onChange={(e) => setRepoTabName(e.target.value)}
+                  placeholder="repositorio (u Hoja 1)"
+                  className="w-full rounded-xl border border-slate-300 bg-slate-50 py-2 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-violet-600"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Token Institucional
+                </label>
+                <input
+                  type="text"
+                  value={accessToken}
+                  onChange={(e) => setAccessToken(e.target.value)}
+                  placeholder="EKIRAYA-2026"
+                  className="w-full rounded-xl border border-slate-300 bg-slate-50 py-2 px-3 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-violet-600"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
+            <button
+              type="button"
+              onClick={() => setShowSyncConfigModal(false)}
+              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
+            >
+              Cerrar
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await handleSaveGlobalConfigToServer(true);
+                await executeSyncWithSheets(
+                  appsScriptExecUrl,
+                  connectionUrl,
+                  accessToken,
+                  repoTabName,
+                  authorizedUsers,
+                  { isManual: true }
+                );
+                setShowSyncConfigModal(false);
+              }}
+              disabled={isSavingConfig || isSyncing}
+              className="px-5 py-2 rounded-xl bg-violet-700 hover:bg-violet-800 disabled:bg-slate-400 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+            >
+              <Save className="w-3.5 h-3.5 text-[#f8c62e]" />
+              <span>
+                {isSavingConfig || isSyncing
+                  ? 'Guardando en servidor...'
+                  : 'Guardar en Servidor para Todos los Equipos y Sincronizar'}
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCreateUserModal = () => {
+    if (!showCreateUserModal) return null;
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 space-y-4 shadow-2xl">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+            <div className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-violet-700" />
+              <h3 className="text-base font-bold text-slate-900">
+                Crear Usuario en el Sistema
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCreateUserModal(false)}
+              className="p-1 rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Al crear un usuario desde la app, este se registrará en la hoja <strong>usuarios</strong> y se sincronizará automáticamente para todas las terminales y dispositivos.
+          </p>
+
+          <form onSubmit={handleRegisterAndLoginNewUser} className="space-y-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Nombre y Apellido *
+              </label>
+              <input
+                type="text"
+                required
+                value={registerName}
+                onChange={(e) => setRegisterName(e.target.value)}
+                placeholder="Ej. Sofía Mendoza"
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-600 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Correo institucional (@cem.edu.co) *
+              </label>
+              <input
+                type="email"
+                required
+                value={registerEmail}
+                onChange={(e) => setRegisterEmail(e.target.value)}
+                placeholder="nombre@cem.edu.co"
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-600 focus:outline-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Curso / Grado
+                </label>
+                <input
+                  type="text"
+                  value={registerCurso}
+                  onChange={(e) => setRegisterCurso(e.target.value)}
+                  placeholder="11°"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-600 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Sección
+                </label>
+                <input
+                  type="text"
+                  value={registerSeccion}
+                  onChange={(e) => setRegisterSeccion(e.target.value)}
+                  placeholder="Bachillerato"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-600 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Perfil en el Colegio
+              </label>
+              <select
+                value={registerPerfil}
+                onChange={(e) => setRegisterPerfil(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-600 focus:outline-none bg-white"
+              >
+                <option value="Estudiante">Estudiante</option>
+                <option value="Docente">Docente</option>
+                <option value="Directivo">Directivo</option>
+                <option value="Coordinador">Coordinador</option>
+                <option value="Administrador">Administrador</option>
+              </select>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowCreateUserModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isRegisteringUser}
+                className="px-4 py-2 rounded-xl bg-violet-700 hover:bg-violet-800 disabled:bg-slate-300 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRegisteringUser ? 'animate-spin' : ''}`} />
+                <span>{isRegisteringUser ? 'Guardando y sincronizando...' : 'Crear usuario y sincronizar ahora'}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
   // ============================================================================
   // PANTALLA DE CONTROL DE ACCESO: SOLO USUARIOS EN LA HOJA "USUARIOS"
   // ============================================================================
@@ -3604,6 +3958,15 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar ahora'}</span>
                 </button>
                 <button
+                  type="button"
+                  onClick={() => setShowSyncConfigModal(true)}
+                  title="Configurar dirección de implementación de Google Sheets para todas las terminales"
+                  className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-900 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-violet-200 shrink-0 cursor-pointer"
+                >
+                  <Settings className="w-3.5 h-3.5 text-violet-700" />
+                  <span>Configurar Google Sheets</span>
+                </button>
+                <button
                   type="submit"
                   className="w-full sm:flex-1 px-5 py-2.5 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer"
                 >
@@ -3612,8 +3975,35 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* Indicador de estado de sincronización en vivo cada 10s */}
+            <div className="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+              <div className="flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span
+                    className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                      isRealtimeActive ? 'bg-emerald-400' : 'bg-amber-400'
+                    }`}
+                  ></span>
+                  <span
+                    className={`relative inline-flex rounded-full h-2 w-2 ${
+                      isRealtimeActive ? 'bg-emerald-500' : 'bg-amber-500'
+                    }`}
+                  ></span>
+                </span>
+                <span className="font-medium text-slate-700">
+                  Sincronización en vivo cada 10s · Multi-terminal activo (50+ equipos)
+                </span>
+              </div>
+              <span>
+                {lastSyncDate ? `Última sincronización: ${lastSyncDate}` : 'Listo para sincronizar'}
+              </span>
+            </div>
           </form>
         </div>
+
+        {renderCreateUserModal()}
+        {renderSyncConfigModal()}
       </div>
     );
   }
@@ -3810,6 +4200,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   type="url"
                   value={appsScriptExecUrl}
                   onChange={(e) => setAppsScriptExecUrl(e.target.value)}
+                  onBlur={() => handleSaveGlobalConfigToServer(false)}
                   placeholder="https://script.google.com/macros/s/.../exec"
                   className="w-full rounded-xl border border-violet-300 bg-violet-50/40 py-2 px-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                 />
@@ -3823,6 +4214,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   type="url"
                   value={connectionUrl}
                   onChange={(e) => setConnectionUrl(e.target.value)}
+                  onBlur={() => handleSaveGlobalConfigToServer(false)}
                   placeholder="https://docs.google.com/spreadsheets/d/.../edit"
                   className="w-full rounded-xl border border-slate-300 bg-slate-50 py-2 px-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                 />
@@ -3838,6 +4230,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   type="text"
                   value={repoTabName}
                   onChange={(e) => setRepoTabName(e.target.value)}
+                  onBlur={() => handleSaveGlobalConfigToServer(false)}
                   placeholder="Hoja 1 (o Repositorio)"
                   className="w-full rounded-xl border border-slate-300 bg-slate-50 py-2 px-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-violet-600"
                 />
@@ -3850,6 +4243,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   type="text"
                   value={accessToken}
                   onChange={(e) => setAccessToken(e.target.value)}
+                  onBlur={() => handleSaveGlobalConfigToServer(false)}
                   placeholder="EKIRAYA-2026"
                   className="w-full rounded-xl border border-slate-300 bg-slate-50 py-2 px-3 text-xs sm:text-sm font-mono focus:outline-none focus:ring-2 focus:ring-violet-600"
                 />
@@ -3882,10 +4276,25 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1 border-t border-slate-100">
               <span className="text-[11px] text-slate-500 flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                Lee la base de datos (Hoja 1) y sincroniza usuarios automáticamente cada 24h.
+                Sincronización en vivo cada 10s · Multi-terminal activo (50+ dispositivos).
               </span>
 
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSaveGlobalConfigToServer(true)}
+                  disabled={isSavingConfig}
+                  className="px-3.5 py-2 rounded-xl bg-[#664d88] hover:bg-[#533e6f] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                  title="Guardar esta URL en el servidor para que todos los computadores e IPs tengan acceso inmediato"
+                >
+                  <Save className="w-3.5 h-3.5 text-[#f8c62e]" />
+                  <span>
+                    {isSavingConfig
+                      ? 'Guardando...'
+                      : 'Guardar URL en Servidor (Para Todos los Equipos)'}
+                  </span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() =>
@@ -5272,126 +5681,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         </div>
       )}
 
-      {/* =========================================================================
-          MODAL DE CREACIÓN DE USUARIO DESDE LA APP (SINCRONIZACIÓN BIDIRECCIONAL)
-         ========================================================================= */}
-      {showCreateUserModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <div className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-violet-700" />
-                <h3 className="text-base font-bold text-slate-900">
-                  Crear Usuario en el Sistema
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowCreateUserModal(false)}
-                className="p-1 rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Al crear un usuario desde la app, este se registrará en la hoja <strong>usuarios</strong> y se alimentará la hoja <strong>repositorio</strong> en ambas direcciones según los documentos encontrados en Google Drive.
-            </p>
-
-            <form onSubmit={handleRegisterAndLoginNewUser} className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nombre y Apellido *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={registerName}
-                  onChange={(e) => setRegisterName(e.target.value)}
-                  placeholder="Ej. Sofía Mendoza"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-600 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Correo institucional (@cem.edu.co) *
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={registerEmail}
-                  onChange={(e) => setRegisterEmail(e.target.value)}
-                  placeholder="nombre@cem.edu.co"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-600 focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Curso / Grado
-                  </label>
-                  <input
-                    type="text"
-                    value={registerCurso}
-                    onChange={(e) => setRegisterCurso(e.target.value)}
-                    placeholder="11°"
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-600 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Sección
-                  </label>
-                  <input
-                    type="text"
-                    value={registerSeccion}
-                    onChange={(e) => setRegisterSeccion(e.target.value)}
-                    placeholder="Bachillerato"
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-600 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Perfil en el Colegio
-                </label>
-                <select
-                  value={registerPerfil}
-                  onChange={(e) => setRegisterPerfil(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-600 focus:outline-none bg-white"
-                >
-                  <option value="Estudiante">Estudiante</option>
-                  <option value="Docente">Docente</option>
-                  <option value="Directivo">Directivo</option>
-                  <option value="Coordinador">Coordinador</option>
-                  <option value="Administrador">Administrador</option>
-                </select>
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateUserModal(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isRegisteringUser}
-                  className="px-4 py-2 rounded-xl bg-violet-700 hover:bg-violet-800 disabled:bg-slate-300 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isRegisteringUser ? 'animate-spin' : ''}`} />
-                  <span>{isRegisteringUser ? 'Guardando y sincronizando...' : 'Crear usuario y sincronizar ahora'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Modales Compartidos (Crear usuario y Configuración Sheets) */}
+      {renderCreateUserModal()}
+      {renderSyncConfigModal()}
 
       {/* =========================================================================
           MODAL PARA EDITAR INFORMACIÓN DE USUARIO (SINCRONIZACIÓN BIDIRECCIONAL)

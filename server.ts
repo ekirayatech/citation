@@ -12,9 +12,45 @@ import {
   DEFAULT_REPO_ROWS,
   DEFAULT_USUARIOS_HEADERS,
 } from './src/data/repositorioDefaultData';
+import { CmsPage } from './src/types/cms';
+import { DEFAULT_CMS_PAGES } from './src/data/defaultCmsPages';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const CMS_FILE_PATH = path.join(__dirname, '.ekiraya-cms-pages.json');
+
+function loadPersistedCmsPages(): CmsPage[] {
+  try {
+    if (fs.existsSync(CMS_FILE_PATH)) {
+      const raw = fs.readFileSync(CMS_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {
+    // Ignore error
+  }
+  return DEFAULT_CMS_PAGES;
+}
+
+function savePersistedCmsPages(pages: CmsPage[]): void {
+  try {
+    fs.writeFileSync(CMS_FILE_PATH, JSON.stringify(pages, null, 2), 'utf-8');
+  } catch {
+    // Ignore write error
+  }
+}
+
+function broadcastCmsUpdate(pages: CmsPage[], eventType = 'CMS_UPDATE'): void {
+  const payload = JSON.stringify({ type: eventType, pages, timestamp: Date.now() });
+  for (const client of sseClients) {
+    try {
+      client.write(`data: ${payload}\n\n`);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
 
 function getGeminiClient(): GoogleGenAI | null {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -418,10 +454,20 @@ function loadPersistedState(): PersistedRepoState {
       }
 
       return {
-        appsScriptExecUrl: parsed.appsScriptExecUrl || '',
-        connectionUrl: parsed.connectionUrl || '',
-        repoTabName: parsed.repoTabName || 'repositorio',
-        accessToken: parsed.accessToken || 'EKIRAYA-2026',
+        appsScriptExecUrl:
+          parsed.appsScriptExecUrl ||
+          process.env.APPS_SCRIPT_URL ||
+          process.env.GOOGLE_APPS_SCRIPT_URL ||
+          process.env.VITE_APPS_SCRIPT_URL ||
+          '',
+        connectionUrl:
+          parsed.connectionUrl ||
+          process.env.GOOGLE_SHEETS_URL ||
+          process.env.SHEETS_CONNECTION_URL ||
+          process.env.VITE_GOOGLE_SHEETS_URL ||
+          '',
+        repoTabName: parsed.repoTabName || process.env.REPO_TAB_NAME || 'repositorio',
+        accessToken: parsed.accessToken || process.env.ACCESS_TOKEN || 'EKIRAYA-2026',
         lastSyncDate: parsed.lastSyncDate || new Date().toLocaleString('es-CO'),
         lastSyncTimestamp: parsed.lastSyncTimestamp || Date.now(),
         rawHeaders: hasValidMonoRows ? parsed.rawHeaders : DEFAULT_REPO_HEADERS,
@@ -438,10 +484,18 @@ function loadPersistedState(): PersistedRepoState {
     // Ignore read error
   }
   return {
-    appsScriptExecUrl: '',
-    connectionUrl: '',
-    repoTabName: 'repositorio',
-    accessToken: 'EKIRAYA-2026',
+    appsScriptExecUrl:
+      process.env.APPS_SCRIPT_URL ||
+      process.env.GOOGLE_APPS_SCRIPT_URL ||
+      process.env.VITE_APPS_SCRIPT_URL ||
+      '',
+    connectionUrl:
+      process.env.GOOGLE_SHEETS_URL ||
+      process.env.SHEETS_CONNECTION_URL ||
+      process.env.VITE_GOOGLE_SHEETS_URL ||
+      '',
+    repoTabName: process.env.REPO_TAB_NAME || 'repositorio',
+    accessToken: process.env.ACCESS_TOKEN || 'EKIRAYA-2026',
     lastSyncDate: new Date().toLocaleString('es-CO'),
     lastSyncTimestamp: Date.now(),
     rawHeaders: DEFAULT_REPO_HEADERS,
@@ -663,7 +717,10 @@ async function startServer() {
     });
 
     const state = loadPersistedState();
-    res.write(`data: ${JSON.stringify({ type: 'INIT', state, timestamp: Date.now() })}\n\n`);
+    const cmsPages = loadPersistedCmsPages();
+    res.write(
+      `data: ${JSON.stringify({ type: 'INIT', state, cmsPages, timestamp: Date.now() })}\n\n`
+    );
 
     sseClients.add(res);
 
@@ -672,10 +729,141 @@ async function startServer() {
     });
   });
 
-  // 1. Obtener el estado actual del repositorio y usuarios
+  // 1. Obtener el estado actual del repositorio, usuarios y páginas CMS
   app.get('/api/repo/state', (_req, res) => {
     const state = loadPersistedState();
-    res.json(state);
+    const cmsPages = loadPersistedCmsPages();
+    res.json({
+      ...state,
+      cmsPages,
+    });
+  });
+
+  // 1.1 Guardar configuración centralizada de Sheets en el servidor (para todas las terminales)
+  app.post('/api/repo/config', async (req, res) => {
+    try {
+      const state = loadPersistedState();
+      const { appsScriptExecUrl, connectionUrl, repoTabName, accessToken } = req.body || {};
+
+      const nextScript =
+        typeof appsScriptExecUrl === 'string' && appsScriptExecUrl.trim() !== ''
+          ? appsScriptExecUrl.trim()
+          : state.appsScriptExecUrl;
+
+      const nextSheet =
+        typeof connectionUrl === 'string' && connectionUrl.trim() !== ''
+          ? connectionUrl.trim()
+          : state.connectionUrl;
+
+      const nextTab =
+        typeof repoTabName === 'string' && repoTabName.trim() !== ''
+          ? repoTabName.trim()
+          : state.repoTabName || 'repositorio';
+
+      const nextToken =
+        typeof accessToken === 'string' && accessToken.trim() !== ''
+          ? accessToken.trim()
+          : state.accessToken || 'EKIRAYA-2026';
+
+      const nextState: PersistedRepoState = {
+        ...state,
+        appsScriptExecUrl: nextScript,
+        connectionUrl: nextSheet,
+        repoTabName: nextTab,
+        accessToken: nextToken,
+        lastSyncTimestamp: Date.now(),
+      };
+
+      saveAndBroadcastPersistedState(nextState, 'CONFIG_SAVED');
+
+      // Si se proporcionó una URL, sincronizar de inmediato
+      let syncResult = null;
+      if (nextScript || nextSheet) {
+        try {
+          syncResult = await executeServerSyncLogic({
+            appsScriptExecUrl: nextScript,
+            connectionUrl: nextSheet,
+            repoTabName: nextTab,
+            accessToken: nextToken,
+            triggerDriveScan: false,
+          });
+        } catch {
+          // Ignorar error transitorio si aún no hay conexión
+        }
+      }
+
+      res.json({
+        ok: true,
+        message: 'Configuración guardada en el servidor para todos los equipos',
+        state: syncResult?.state || loadPersistedState(),
+      });
+    } catch (err) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : 'Error al guardar configuración',
+      });
+    }
+  });
+
+  // CMS: Obtener todas las páginas dinámicas
+  app.get('/api/cms/pages', (_req, res) => {
+    res.json(loadPersistedCmsPages());
+  });
+
+  // CMS: Crear o actualizar una página dinámica
+  app.post('/api/cms/pages', (req, res) => {
+    try {
+      const pageData: CmsPage = req.body;
+      if (!pageData || !pageData.id || !pageData.title) {
+        res.status(400).json({ error: 'Datos de página incompletos' });
+        return;
+      }
+
+      const existingPages = loadPersistedCmsPages();
+      const index = existingPages.findIndex((p) => p.id === pageData.id);
+
+      let updatedPages: CmsPage[];
+      if (index >= 0) {
+        updatedPages = [...existingPages];
+        updatedPages[index] = {
+          ...existingPages[index],
+          ...pageData,
+          updatedAt: new Date().toISOString(),
+        };
+      } else {
+        updatedPages = [
+          ...existingPages,
+          {
+            ...pageData,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ];
+      }
+
+      savePersistedCmsPages(updatedPages);
+      broadcastCmsUpdate(updatedPages, 'CMS_PAGE_SAVED');
+      res.json({ ok: true, pages: updatedPages });
+    } catch (err) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : 'Error al guardar la página en el CMS',
+      });
+    }
+  });
+
+  // CMS: Eliminar una página dinámica
+  app.delete('/api/cms/pages/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      const existingPages = loadPersistedCmsPages();
+      const filtered = existingPages.filter((p) => p.id !== id);
+      savePersistedCmsPages(filtered);
+      broadcastCmsUpdate(filtered, 'CMS_PAGE_DELETED');
+      res.json({ ok: true, pages: filtered });
+    } catch (err) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : 'Error al eliminar la página en el CMS',
+      });
+    }
   });
 
   // 2. Crear / actualizar un usuario en Cita Master y sincronizarlo con Google Sheets
@@ -767,6 +955,16 @@ async function startServer() {
         }
       }
 
+      if (!remoteUsers) {
+        nextUserRows = [
+          ...(state.usuariosRows || []).filter((r) => {
+            const e = String(r['correo'] || r['Correo'] || r['email'] || r['Email'] || '').trim().toLowerCase();
+            return e !== cleanEmail;
+          }),
+          builtRawRow,
+        ];
+      }
+
       const updatedLocal = [
         ...state.authorizedUsers.filter((u) => u.correo.toLowerCase() !== cleanEmail),
         newUser,
@@ -779,7 +977,7 @@ async function startServer() {
       const nextState: PersistedRepoState = {
         ...state,
         appsScriptExecUrl: effectiveScriptUrl || state.appsScriptExecUrl,
-        connectionUrl: String(connectionUrl || state.connectionUrl || '').trim(),
+        connectionUrl: String(connectionUrl || state.connectionUrl || '').trim() || state.connectionUrl,
         accessToken: effectiveToken,
         usuariosHeaders: nextUserHeaders,
         usuariosRows: nextUserRows,
@@ -901,6 +1099,16 @@ async function startServer() {
         }
       }
 
+      if (!remoteUsers) {
+        nextUserRows = (state.usuariosRows || []).map((r) => {
+          const e = String(r['correo'] || r['Correo'] || r['email'] || r['Email'] || '').trim().toLowerCase();
+          if (e === origEmail || e === cleanEmail) {
+            return builtRawRow;
+          }
+          return r;
+        });
+      }
+
       const updatedLocal = [
         ...state.authorizedUsers.filter(
           (u) => u.correo.toLowerCase() !== origEmail && u.correo.toLowerCase() !== cleanEmail
@@ -915,7 +1123,7 @@ async function startServer() {
       const nextState: PersistedRepoState = {
         ...state,
         appsScriptExecUrl: effectiveScriptUrl || state.appsScriptExecUrl,
-        connectionUrl: String(connectionUrl || state.connectionUrl || '').trim(),
+        connectionUrl: String(connectionUrl || state.connectionUrl || '').trim() || state.connectionUrl,
         accessToken: effectiveToken,
         usuariosHeaders: nextUserHeaders,
         usuariosRows: nextUserRows,
@@ -976,8 +1184,16 @@ async function startServer() {
         (u) => u.correo.toLowerCase() !== cleanEmail
       );
 
+      const updatedUsuariosRows = (state.usuariosRows || []).filter((row) => {
+        const rowEmail = String(row['correo'] || row['Correo'] || row['email'] || row['Email'] || '').trim().toLowerCase();
+        return rowEmail !== cleanEmail;
+      });
+
       const nextState: PersistedRepoState = {
         ...state,
+        appsScriptExecUrl: effectiveScriptUrl || state.appsScriptExecUrl,
+        connectionUrl: String(connectionUrl || state.connectionUrl || '').trim() || state.connectionUrl,
+        usuariosRows: updatedUsuariosRows,
         authorizedUsers: updatedUsers,
         lastSyncDate: new Date().toLocaleString('es-CO'),
         lastSyncTimestamp: Date.now(),
@@ -1115,29 +1331,37 @@ async function startServer() {
     } = params;
 
     const rawScriptInput = String(
-      appsScriptExecUrl !== undefined ? appsScriptExecUrl : currentState.appsScriptExecUrl
+      appsScriptExecUrl && typeof appsScriptExecUrl === 'string' && appsScriptExecUrl.trim() !== ''
+        ? appsScriptExecUrl.trim()
+        : currentState.appsScriptExecUrl || ''
     ).trim();
     const rawSheetInput = String(
-      connectionUrl !== undefined ? connectionUrl : currentState.connectionUrl
+      connectionUrl && typeof connectionUrl === 'string' && connectionUrl.trim() !== ''
+        ? connectionUrl.trim()
+        : currentState.connectionUrl || ''
     ).trim();
     const token = String(
-      accessToken !== undefined ? accessToken : currentState.accessToken || 'EKIRAYA-2026'
+      accessToken && typeof accessToken === 'string' && accessToken.trim() !== ''
+        ? accessToken.trim()
+        : currentState.accessToken || 'EKIRAYA-2026'
     ).trim();
     const tabName = String(
-      repoTabName !== undefined ? repoTabName : currentState.repoTabName || 'repositorio'
+      repoTabName && typeof repoTabName === 'string' && repoTabName.trim() !== ''
+        ? repoTabName.trim()
+        : currentState.repoTabName || 'repositorio'
     ).trim();
 
     const effectiveScriptUrl = rawScriptInput.includes('script.google.com')
       ? rawScriptInput
       : rawSheetInput.includes('script.google.com')
       ? rawSheetInput
-      : '';
+      : currentState.appsScriptExecUrl || '';
 
     const effectiveSheetUrl = rawSheetInput.includes('/spreadsheets/d/')
       ? rawSheetInput
       : rawScriptInput.includes('/spreadsheets/d/')
       ? rawScriptInput
-      : '';
+      : currentState.connectionUrl || '';
 
     const baseUsers = mergeUsersLists(
       [],
@@ -1436,10 +1660,10 @@ async function startServer() {
           : DEFAULT_REPO_ROWS;
 
     const nextState: PersistedRepoState = {
-      appsScriptExecUrl: effectiveScriptUrl || rawScriptInput,
-      connectionUrl: effectiveSheetUrl || rawSheetInput,
-      repoTabName: tabName,
-      accessToken: token,
+      appsScriptExecUrl: effectiveScriptUrl || currentState.appsScriptExecUrl || '',
+      connectionUrl: effectiveSheetUrl || currentState.connectionUrl || '',
+      repoTabName: tabName || currentState.repoTabName || 'repositorio',
+      accessToken: token || currentState.accessToken || 'EKIRAYA-2026',
       lastSyncDate: nowStr,
       lastSyncTimestamp: nowTs,
       rawHeaders: nextHeaders,
@@ -1765,7 +1989,7 @@ Cuéntame: ¿con cuál de estos 4 elementos tienes dudas y qué datos has encont
   });
 
   // Polling automático en segundo plano para verificar si hay cambios directos en Google Sheets
-  // Sincroniza cada 20 segundos para que cualquier cambio en Google Sheets aparezca en todas las terminales
+  // Sincroniza cada 10 segundos para que cualquier cambio en Google Sheets aparezca en todas las terminales
   setInterval(async () => {
     try {
       const st = loadPersistedState();
@@ -1775,9 +1999,21 @@ Cuéntame: ¿con cuál de estos 4 elementos tienes dudas y qué datos has encont
     } catch {
       // Ignorar errores transitorios en segundo plano
     }
-  }, 20000);
+  }, 10000);
 
-  // Heartbeat para mantener vivas las conexiones SSE en proxies y Cloud Run
+  // Disparo inicial inmediato (a los 1.5s) para precargar los usuarios de Sheets en cuanto arranca el servidor
+  setTimeout(async () => {
+    try {
+      const st = loadPersistedState();
+      if (st.appsScriptExecUrl || st.connectionUrl) {
+        await executeServerSyncLogic({ triggerDriveScan: false });
+      }
+    } catch {
+      // Ignorar
+    }
+  }, 1500);
+
+  // Heartbeat para mantener vivas las conexiones SSE en proxies y Cloud Run (cada 10s)
   setInterval(() => {
     for (const client of sseClients) {
       try {
@@ -1786,7 +2022,7 @@ Cuéntame: ¿con cuál de estos 4 elementos tienes dudas y qué datos has encont
         sseClients.delete(client);
       }
     }
-  }, 20000);
+  }, 10000);
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
