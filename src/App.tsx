@@ -42,6 +42,17 @@ const STORAGE_KEY = 'ekiraya_citamaster_refs_v2';
 const LEGACY_STORAGE_KEY = 'ekiraya_manager_refs';
 const CMS_PAGES_STORAGE_KEY = 'ekiraya_cms_pages_cache_v2';
 
+const isForbiddenCmsPage = (p: CmsPage | null | undefined): boolean => {
+  if (!p) return true;
+  const str = `${p.id || ''} ${p.title || ''} ${p.navLabel || ''} ${p.slug || ''}`.toLowerCase();
+  return (
+    str.includes('crono') ||
+    str.includes('línea') ||
+    str.includes('linea') ||
+    str.includes('investiga')
+  );
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('teoria');
   const [formData, setFormData] = useState<CitationFormData>({
@@ -61,12 +72,16 @@ export default function App() {
       const stored = localStorage.getItem(CMS_PAGES_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          const cleaned = parsed.filter((p) => !isForbiddenCmsPage(p));
+          localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(cleaned));
+          return cleaned;
+        }
       }
     } catch {
       // Ignore
     }
-    return DEFAULT_CMS_PAGES;
+    return DEFAULT_CMS_PAGES.filter((p) => !isForbiddenCmsPage(p));
   });
   const [cmsModalOpen, setCmsModalOpen] = useState<boolean>(false);
   const [cmsEditingPageId, setCmsEditingPageId] = useState<string | null>(null);
@@ -76,10 +91,11 @@ export default function App() {
     fetch('/api/cms/pages')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setCmsPages(data);
+        if (Array.isArray(data)) {
+          const cleaned = data.filter((p) => !isForbiddenCmsPage(p));
+          setCmsPages(cleaned);
           try {
-            localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(data));
+            localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(cleaned));
           } catch {
             // Ignore
           }
@@ -101,15 +117,17 @@ export default function App() {
         es.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            if (Array.isArray(data?.cmsPages) && data.cmsPages.length > 0) {
-              setCmsPages(data.cmsPages);
+            if (Array.isArray(data?.cmsPages)) {
+              const cleaned = data.cmsPages.filter((p: CmsPage) => !isForbiddenCmsPage(p));
+              setCmsPages(cleaned);
               try {
-                localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(data.cmsPages));
+                localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(cleaned));
               } catch {}
-            } else if (Array.isArray(data?.pages) && data.pages.length > 0) {
-              setCmsPages(data.pages);
+            } else if (Array.isArray(data?.pages)) {
+              const cleaned = data.pages.filter((p: CmsPage) => !isForbiddenCmsPage(p));
+              setCmsPages(cleaned);
               try {
-                localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(data.pages));
+                localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(cleaned));
               } catch {}
             }
           } catch {}

@@ -478,12 +478,12 @@ function makeUser(
  * - Personal de no clases
  */
 export const DEFAULT_AUTHORIZED_USERS: AuthorizedSchoolUser[] = [
-  // Administrador principal
+  // Administrador principal institucional (se actualiza automáticamente desde la hoja "usuarios")
   makeUser(
-    'Coordinación Repositorio Ekirayá',
-    'Administrativo',
+    'Esteban Bolaños R',
+    'Docente',
     'mebolanos@cem.edu.co',
-    'Dirección Académica',
+    'Academia',
     'Administrador'
   ),
 

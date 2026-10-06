@@ -346,28 +346,21 @@ function agregarUsuarioEnSheet(params, ssParam) {
   ).trim().toLowerCase();
   if (!correoNuevo) return;
 
-  let correoColIdx = headers.findIndex(function(h) { return /correo|email|mail|cuenta/i.test(h); });
-  if (correoColIdx < 0) correoColIdx = 2;
-
   const nuevaFila = headers.map(function(h) {
-    if (rawRowMap[h] !== undefined && String(rawRowMap[h]).trim() !== '') {
-      return String(rawRowMap[h]).trim();
-    }
-    if (params[h] !== undefined && String(params[h]).trim() !== '') {
-      return String(params[h]).trim();
-    }
-    const k = h.toLowerCase();
-    if (k.includes('correo') || k.includes('email') || k.includes('mail')) return correoNuevo;
-    if (k.includes('nombre') || k.includes('estudiante') || k.includes('usuario')) return params.nombres || params.nombre || '';
-    if (k.includes('curso') || k.includes('grado') || k.includes('nivel')) return params.curso || 'General';
-    if (k.includes('sección') || k.includes('seccion') || k.includes('dependencia') || k.includes('área')) return params.seccion || 'General';
-    if (k.includes('perfil') || k.includes('rol') || k.includes('admin') || k.includes('cargo')) return params.perfil || 'Estudiante';
+    const norm = h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    if (/correo|email|mail|cuenta/.test(norm)) return correoNuevo;
+    if (/nombre|estudiante|usuario/.test(norm)) return params.nombres || params.nombre || (rawRowMap && rawRowMap[h]) || '';
+    if (/curso|grado|nivel/.test(norm)) return params.curso || (rawRowMap && rawRowMap[h]) || 'General';
+    if (/seccion|dependencia|area/.test(norm)) return params.seccion || (rawRowMap && rawRowMap[h]) || 'General';
+    if (/perfil|rol|admin|cargo/.test(norm)) return params.perfil || params.rol || (rawRowMap && rawRowMap[h]) || 'Estudiante';
+    if (params[h] !== undefined && String(params[h]).trim() !== '') return String(params[h]).trim();
+    if (rawRowMap && rawRowMap[h] !== undefined) return String(rawRowMap[h]).trim();
     return '';
   });
 
   for (let r = 1; r < data.length; r++) {
-    const correoExistente = String(data[r][correoColIdx] || '').trim().toLowerCase();
-    if (correoExistente === correoNuevo) {
+    const rowValues = data[r].map(function(cell) { return String(cell || '').trim().toLowerCase(); });
+    if (rowValues.indexOf(correoNuevo) !== -1) {
       userSheet.getRange(r + 1, 1, 1, nuevaFila.length).setValues([nuevaFila]);
       SpreadsheetApp.flush();
       return;
@@ -388,23 +381,6 @@ function actualizarUsuarioEnSheet(params, ssParam) {
   }
   const headers = data[0].map(function(h) { return String(h).trim(); });
 
-  let correoColIdx = headers.findIndex(function(h) {
-    const norm = h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    return /correo|email|mail|cuenta/.test(norm);
-  });
-  if (correoColIdx < 0) {
-    for (let c = 0; c < headers.length; c++) {
-      for (let r = 1; r < Math.min(data.length, 5); r++) {
-        if (String(data[r][c] || '').includes('@')) {
-          correoColIdx = c;
-          break;
-        }
-      }
-      if (correoColIdx >= 0) break;
-    }
-  }
-  if (correoColIdx < 0) correoColIdx = 2;
-
   const targetEmail = String(
     params.originalCorreo || params.originalEmail || params.correo || params.email || ''
   ).trim().toLowerCase();
@@ -421,29 +397,52 @@ function actualizarUsuarioEnSheet(params, ssParam) {
     try { rawRowMap = JSON.parse(params.rowJson); } catch (e) {}
   }
 
+  // Priorizar estrictamente los datos nuevos editados por el usuario
   const nuevaFila = headers.map(function(h) {
-    if (rawRowMap[h] !== undefined && String(rawRowMap[h]).trim() !== '') {
-      return String(rawRowMap[h]).trim();
+    const norm = h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    if (/correo|email|mail|cuenta/.test(norm)) {
+      return newEmail;
+    }
+    if (/nombre|estudiante|usuario/.test(norm)) {
+      return params.nombres || params.nombre || (rawRowMap && rawRowMap[h]) || '';
+    }
+    if (/curso|grado|nivel/.test(norm)) {
+      return params.curso || (rawRowMap && rawRowMap[h]) || 'General';
+    }
+    if (/seccion|dependencia|area/.test(norm)) {
+      return params.seccion || (rawRowMap && rawRowMap[h]) || 'General';
+    }
+    if (/perfil|rol|admin|cargo|estamento/.test(norm)) {
+      return params.perfil || params.rol || (rawRowMap && rawRowMap[h]) || 'Estudiante';
     }
     if (params[h] !== undefined && String(params[h]).trim() !== '') {
       return String(params[h]).trim();
     }
-    const norm = h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-    if (/correo|email|mail|cuenta/.test(norm)) return newEmail;
-    if (/nombre|estudiante|usuario/.test(norm)) return params.nombres || params.nombre || '';
-    if (/curso|grado|nivel/.test(norm)) return params.curso || 'General';
-    if (/seccion|dependencia|area/.test(norm)) return params.seccion || 'General';
-    if (/perfil|rol|admin|cargo|estamento/.test(norm)) return params.perfil || 'Estudiante';
+    if (rawRowMap && rawRowMap[h] !== undefined) {
+      return String(rawRowMap[h]).trim();
+    }
     return '';
   });
 
-  // Buscar por correo original o por nuevo correo
+  // Buscar por correo en cualquier columna de la fila
   let foundRowIdx = -1;
   for (let r = 1; r < data.length; r++) {
-    const existing = String(data[r][correoColIdx] || '').trim().toLowerCase();
-    if (existing === targetEmail || existing === newEmail) {
+    const rowValues = data[r].map(function(cell) { return String(cell || '').trim().toLowerCase(); });
+    if (rowValues.indexOf(targetEmail) !== -1 || (newEmail && rowValues.indexOf(newEmail) !== -1)) {
       foundRowIdx = r;
       break;
+    }
+  }
+
+  // Si no se halló por correo, buscar por nombre
+  if (foundRowIdx < 1 && params.nombres) {
+    const targetName = String(params.nombres).trim().toLowerCase();
+    for (let r = 1; r < data.length; r++) {
+      const rowValues = data[r].map(function(cell) { return String(cell || '').trim().toLowerCase(); });
+      if (rowValues.indexOf(targetName) !== -1) {
+        foundRowIdx = r;
+        break;
+      }
     }
   }
 
