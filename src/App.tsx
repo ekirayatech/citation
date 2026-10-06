@@ -9,6 +9,13 @@ import {
   FolderGit2,
   Menu,
   X,
+  Layers,
+  Award,
+  Compass,
+  FileText,
+  Globe,
+  Star,
+  HelpCircle,
 } from 'lucide-react';
 import {
   CitationFormData,
@@ -26,14 +33,17 @@ import { GestorSection } from './components/GestorSection';
 import { TallerSection } from './components/TallerSection';
 import { UniversitariosSection } from './components/UniversitariosSection';
 import { RepositorioSection } from './components/RepositorioSection';
-
-type ActiveTab = 'teoria' | 'apa2026' | 'gestor' | 'repositorio' | 'universitarios' | 'taller';
+import { CmsPageView } from './components/CmsPageView';
+import { CmsAdminModal } from './components/CmsAdminModal';
+import { CmsPage, CmsIconName } from './types/cms';
+import { DEFAULT_CMS_PAGES } from './data/defaultCmsPages';
 
 const STORAGE_KEY = 'ekiraya_citamaster_refs_v2';
 const LEGACY_STORAGE_KEY = 'ekiraya_manager_refs';
+const CMS_PAGES_STORAGE_KEY = 'ekiraya_cms_pages_cache_v2';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('teoria');
+  const [activeTab, setActiveTab] = useState<string>('teoria');
   const [formData, setFormData] = useState<CitationFormData>({
     ...INITIAL_FORM_DATA,
     ...EXAMPLE_PRESETS.book,
@@ -44,6 +54,83 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [logoFailed, setLogoFailed] = useState<boolean>(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+
+  // Estado del CMS (Content Management System)
+  const [cmsPages, setCmsPages] = useState<CmsPage[]>(() => {
+    try {
+      const stored = localStorage.getItem(CMS_PAGES_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // Ignore
+    }
+    return DEFAULT_CMS_PAGES;
+  });
+  const [cmsModalOpen, setCmsModalOpen] = useState<boolean>(false);
+  const [cmsEditingPageId, setCmsEditingPageId] = useState<string | null>(null);
+
+  // Carga inicial y sincronización de páginas CMS
+  useEffect(() => {
+    fetch('/api/cms/pages')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setCmsPages(data);
+          try {
+            localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(data));
+          } catch {
+            // Ignore
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Escuchar stream SSE para sincronización en tiempo real de páginas CMS entre terminales
+  useEffect(() => {
+    let es: EventSource | null = null;
+    let timer: number | null = null;
+    let cancelled = false;
+
+    const connect = () => {
+      if (cancelled) return;
+      try {
+        es = new EventSource('/api/repo/events');
+        es.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (Array.isArray(data?.cmsPages) && data.cmsPages.length > 0) {
+              setCmsPages(data.cmsPages);
+              try {
+                localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(data.cmsPages));
+              } catch {}
+            } else if (Array.isArray(data?.pages) && data.pages.length > 0) {
+              setCmsPages(data.pages);
+              try {
+                localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(data.pages));
+              } catch {}
+            }
+          } catch {}
+        };
+        es.onerror = () => {
+          es?.close();
+          if (!cancelled) {
+            timer = window.setTimeout(connect, 6000);
+          }
+        };
+      } catch {}
+    };
+
+    connect();
+
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+      es?.close();
+    };
+  }, []);
 
   // Load saved references from localStorage (including legacy key migration)
   useEffect(() => {
@@ -120,7 +207,7 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSwitchTab = (tab: ActiveTab) => {
+  const handleSwitchTab = (tab: string) => {
     setActiveTab(tab);
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -153,7 +240,77 @@ export default function App() {
     setSavedReferences([]);
   };
 
-  const navItems: { id: ActiveTab; label: string; icon: React.ReactNode; count?: number }[] = [
+  const renderCmsIcon = (name?: CmsIconName) => {
+    const className = 'w-4 h-4 shrink-0';
+    switch (name) {
+      case 'Award':
+        return <Award className={className} />;
+      case 'Compass':
+        return <Compass className={className} />;
+      case 'BookOpen':
+        return <BookOpen className={className} />;
+      case 'GraduationCap':
+        return <GraduationCap className={className} />;
+      case 'FolderGit2':
+        return <FolderGit2 className={className} />;
+      case 'Globe':
+        return <Globe className={className} />;
+      case 'Sparkles':
+        return <Sparkles className={className} />;
+      case 'Star':
+        return <Star className={className} />;
+      case 'HelpCircle':
+        return <HelpCircle className={className} />;
+      case 'FileText':
+      default:
+        return <FileText className={className} />;
+    }
+  };
+
+  const handleSaveCmsPage = async (page: CmsPage) => {
+    const resp = await fetch('/api/cms/pages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(page),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => null);
+      throw new Error(err?.error || 'Error al guardar la página');
+    }
+    const data = await resp.json();
+    if (Array.isArray(data?.pages)) {
+      setCmsPages(data.pages);
+      try {
+        localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(data.pages));
+      } catch {
+        // Ignore
+      }
+    }
+  };
+
+  const handleDeleteCmsPage = async (pageId: string) => {
+    const resp = await fetch(`/api/cms/pages/${encodeURIComponent(pageId)}`, {
+      method: 'DELETE',
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => null);
+      throw new Error(err?.error || 'Error al eliminar la página');
+    }
+    const data = await resp.json();
+    if (Array.isArray(data?.pages)) {
+      setCmsPages(data.pages);
+      try {
+        localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(data.pages));
+      } catch {
+        // Ignore
+      }
+    }
+    if (activeTab === pageId) {
+      setActiveTab('teoria');
+    }
+  };
+
+  const navItems: { id: string; label: string; icon: React.ReactNode; count?: number }[] = [
     { id: 'teoria', label: 'Guía Teórica', icon: <BookOpen className="w-4 h-4 shrink-0" /> },
     { id: 'apa2026', label: 'Normas APA 2026', icon: <FileCheck2 className="w-4 h-4 shrink-0" /> },
     {
@@ -165,6 +322,14 @@ export default function App() {
     { id: 'repositorio', label: 'Repositorio', icon: <FolderGit2 className="w-4 h-4 shrink-0" /> },
     { id: 'universitarios', label: 'Universitarios', icon: <GraduationCap className="w-4 h-4 shrink-0" /> },
     { id: 'taller', label: 'Ejercicios', icon: <ClipboardList className="w-4 h-4 shrink-0" /> },
+    ...cmsPages
+      .filter((p) => p.published)
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .map((p) => ({
+        id: p.id,
+        label: p.navLabel || p.title,
+        icon: renderCmsIcon(p.iconName),
+      })),
   ];
 
   return (

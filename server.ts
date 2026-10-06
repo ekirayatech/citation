@@ -11,9 +11,9 @@ import {
   DEFAULT_REPO_HEADERS,
   DEFAULT_REPO_ROWS,
   DEFAULT_USUARIOS_HEADERS,
-} from './src/data/repositorioDefaultData';
-import { CmsPage } from './src/types/cms';
-import { DEFAULT_CMS_PAGES } from './src/data/defaultCmsPages';
+} from './src/data/repositorioDefaultData.ts';
+import { CmsPage } from './src/types/cms.ts';
+import { DEFAULT_CMS_PAGES } from './src/data/defaultCmsPages.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -570,6 +570,7 @@ async function pushUserToAppsScriptFromServer(
     const getResp = await fetch(fullGetUrl, {
       method: 'GET',
       redirect: 'follow',
+      signal: AbortSignal.timeout(5000),
       headers: {
         Accept: 'application/json, text/plain, */*',
         'Cache-Control': 'no-cache',
@@ -606,6 +607,7 @@ async function pushUserToAppsScriptFromServer(
     const postResp = await fetch(cleanUrl, {
       method: 'POST',
       redirect: 'follow',
+      signal: AbortSignal.timeout(5000),
       headers: {
         'Content-Type': 'text/plain;charset=utf-8',
         Accept: 'application/json, text/plain, */*',
@@ -705,7 +707,18 @@ function saveAndBroadcastPersistedState(state: PersistedRepoState, eventType = '
 
 async function startServer() {
   const app = express();
-  app.use(express.json({ limit: '5mb' }));
+  app.use(express.json({ limit: '15mb' }));
+
+  // Middleware CORS y cabeceras permisivas para conexiones multi-terminal, proxies y preflight
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    next();
+  });
 
   // 0. Stream SSE para sincronización en tiempo real entre múltiples terminales
   app.get('/api/repo/events', (_req, res) => {
@@ -739,11 +752,21 @@ async function startServer() {
     });
   });
 
-  // 1.1 Guardar configuración centralizada de Sheets en el servidor (para todas las terminales)
+  // 1.1 Guardar configuración centralizada de Sheets y usuarios en el servidor (para todas las terminales)
   app.post('/api/repo/config', async (req, res) => {
     try {
       const state = loadPersistedState();
-      const { appsScriptExecUrl, connectionUrl, repoTabName, accessToken } = req.body || {};
+      const {
+        appsScriptExecUrl,
+        connectionUrl,
+        repoTabName,
+        accessToken,
+        authorizedUsers,
+        usuariosHeaders,
+        usuariosRows,
+        rawHeaders,
+        rawRows,
+      } = req.body || {};
 
       const nextScript =
         typeof appsScriptExecUrl === 'string' && appsScriptExecUrl.trim() !== ''
@@ -765,6 +788,33 @@ async function startServer() {
           ? accessToken.trim()
           : state.accessToken || 'EKIRAYA-2026';
 
+      let effectiveUsers = state.authorizedUsers || DEFAULT_AUTHORIZED_USERS;
+      if (Array.isArray(authorizedUsers) && authorizedUsers.length > 0) {
+        effectiveUsers = mergeUsersLists(authorizedUsers, state.authorizedUsers || []);
+      }
+
+      let effectiveUserHeaders = state.usuariosHeaders || DEFAULT_USUARIOS_HEADERS;
+      if (Array.isArray(usuariosHeaders) && usuariosHeaders.length > 0) {
+        effectiveUserHeaders = usuariosHeaders.map(String);
+      }
+
+      let effectiveUserRows = state.usuariosRows || [];
+      if (Array.isArray(usuariosRows) && usuariosRows.length > 0) {
+        effectiveUserRows = usuariosRows;
+      }
+
+      let effectiveRawHeaders = state.rawHeaders || DEFAULT_REPO_HEADERS;
+      let effectiveRawRows = state.rawRows || DEFAULT_REPO_ROWS;
+      if (
+        Array.isArray(rawHeaders) &&
+        Array.isArray(rawRows) &&
+        rawRows.length > 0 &&
+        isMonographsSheetData(rawHeaders, rawRows)
+      ) {
+        effectiveRawHeaders = rawHeaders;
+        effectiveRawRows = rawRows;
+      }
+
       const nextState: PersistedRepoState = {
         ...state,
         appsScriptExecUrl: nextScript,
@@ -772,33 +822,46 @@ async function startServer() {
         repoTabName: nextTab,
         accessToken: nextToken,
         lastSyncTimestamp: Date.now(),
+        lastSyncDate: new Date().toLocaleString('es-CO'),
+        authorizedUsers: effectiveUsers,
+        usuariosHeaders: effectiveUserHeaders,
+        usuariosRows: effectiveUserRows,
+        rawHeaders: effectiveRawHeaders,
+        rawRows: effectiveRawRows,
       };
 
       saveAndBroadcastPersistedState(nextState, 'CONFIG_SAVED');
 
-      // Si se proporcionó una URL, sincronizar de inmediato
-      let syncResult = null;
+      // Responder de inmediato en milisegundos para evitar timeouts de proxy o Cloud Run
+      res.json({
+        ok: true,
+        message: 'Configuración guardada en el servidor para todos los equipos',
+        state: nextState,
+      });
+
+      // Disparar la sincronización en segundo plano preservando los datos recibidos
       if (nextScript || nextSheet) {
-        try {
-          syncResult = await executeServerSyncLogic({
+        setImmediate(() => {
+          executeServerSyncLogic({
             appsScriptExecUrl: nextScript,
             connectionUrl: nextSheet,
             repoTabName: nextTab,
             accessToken: nextToken,
             triggerDriveScan: false,
+            clientUsers: effectiveUsers,
+            clientUsuariosHeaders: effectiveUserHeaders,
+            clientUsuariosRows: effectiveUserRows,
+            clientRawHeaders: effectiveRawHeaders,
+            clientRawRows: effectiveRawRows,
+          }).catch((err) => {
+            console.error('Error en sincronización en segundo plano:', err);
           });
-        } catch {
-          // Ignorar error transitorio si aún no hay conexión
-        }
+        });
       }
-
-      res.json({
-        ok: true,
-        message: 'Configuración guardada en el servidor para todos los equipos',
-        state: syncResult?.state || loadPersistedState(),
-      });
     } catch (err) {
+      console.error('Error al guardar configuración:', err);
       res.status(500).json({
+        ok: false,
         error: err instanceof Error ? err.message : 'Error al guardar configuración',
       });
     }
@@ -1368,20 +1431,33 @@ async function startServer() {
       [...(currentState.authorizedUsers || []), ...(Array.isArray(clientUsers) ? clientUsers : [])]
     );
 
-    let headers: string[] = Array.isArray(clientRawHeaders) ? clientRawHeaders : [];
-    let rows: Record<string, string>[] = Array.isArray(clientRawRows) ? clientRawRows : [];
+    let headers: string[] =
+      Array.isArray(clientRawHeaders) && clientRawHeaders.length > 0
+        ? clientRawHeaders
+        : isMonographsSheetData(currentState.rawHeaders, currentState.rawRows)
+        ? currentState.rawHeaders
+        : [];
+    let rows: Record<string, string>[] =
+      Array.isArray(clientRawRows) && clientRawRows.length > 0
+        ? clientRawRows
+        : isMonographsSheetData(currentState.rawHeaders, currentState.rawRows)
+        ? currentState.rawRows
+        : [];
     let usuariosHeaders: string[] =
       Array.isArray(clientUsuariosHeaders) && clientUsuariosHeaders.length > 0
         ? clientUsuariosHeaders
         : currentState.usuariosHeaders || DEFAULT_USUARIOS_HEADERS;
-    let usuariosRows: Record<string, string>[] = Array.isArray(clientUsuariosRows)
-      ? clientUsuariosRows
-      : currentState.usuariosRows || [];
+    let usuariosRows: Record<string, string>[] =
+      Array.isArray(clientUsuariosRows) && clientUsuariosRows.length > 0
+        ? clientUsuariosRows
+        : currentState.usuariosRows || [];
     let sheetUsers: AuthorizedSchoolUser[] =
       Array.isArray(clientUsuariosRows) &&
       clientUsuariosRows.length > 0 &&
       Array.isArray(clientUsuariosHeaders)
         ? parseUsersSheetRows(clientUsuariosRows, clientUsuariosHeaders)
+        : Array.isArray(clientUsers) && clientUsers.length > 0
+        ? clientUsers
         : [];
     let sheetAccessWarning: string | null = null;
     const cacheBuster = `_t=${Date.now()}`;
@@ -1412,6 +1488,7 @@ async function startServer() {
           const resp = await fetch(fullUrl, {
             method: 'GET',
             redirect: 'follow',
+            signal: AbortSignal.timeout(6000),
             headers: {
               Accept: 'application/json, text/plain, */*',
               'Cache-Control': 'no-cache',
@@ -1431,6 +1508,7 @@ async function startServer() {
             const postResp = await fetch(effectiveScriptUrl, {
               method: 'POST',
               redirect: 'follow',
+              signal: AbortSignal.timeout(6000),
               headers: {
                 'Content-Type': 'text/plain;charset=utf-8',
                 Accept: 'application/json, text/plain, */*',
@@ -1515,6 +1593,7 @@ async function startServer() {
           const r = await fetch(url, {
             method: 'GET',
             redirect: 'follow',
+            signal: AbortSignal.timeout(4500),
             headers: {
               'Cache-Control': 'no-cache',
               Pragma: 'no-cache',
@@ -1989,17 +2068,22 @@ Cuéntame: ¿con cuál de estos 4 elementos tienes dudas y qué datos has encont
   });
 
   // Polling automático en segundo plano para verificar si hay cambios directos en Google Sheets
-  // Sincroniza cada 10 segundos para que cualquier cambio en Google Sheets aparezca en todas las terminales
+  // Sincroniza cada 15 segundos con bloqueo de concurrencia para evitar solapamientos
+  let isBackgroundSyncRunning = false;
   setInterval(async () => {
+    if (isBackgroundSyncRunning) return;
     try {
       const st = loadPersistedState();
       if (st.appsScriptExecUrl || st.connectionUrl) {
+        isBackgroundSyncRunning = true;
         await executeServerSyncLogic({ triggerDriveScan: false });
       }
     } catch {
       // Ignorar errores transitorios en segundo plano
+    } finally {
+      isBackgroundSyncRunning = false;
     }
-  }, 10000);
+  }, 15000);
 
   // Disparo inicial inmediato (a los 1.5s) para precargar los usuarios de Sheets en cuanto arranca el servidor
   setTimeout(async () => {

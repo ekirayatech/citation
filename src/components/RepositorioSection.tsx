@@ -36,6 +36,7 @@ import {
   Pencil,
   Trash2,
   Save,
+  Layers,
 } from 'lucide-react';
 import { CitationFormData } from '../types/citation';
 import {
@@ -106,6 +107,7 @@ interface ColumnMapping {
 interface RepositorioSectionProps {
   onCiteMonographInGestor: (formData: Partial<CitationFormData>, title: string) => void;
   showToast: (msg: string) => void;
+  onOpenCms?: () => void;
 }
 
 const DRIVE_ROOT_FOLDER_ID = '1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC';
@@ -210,8 +212,12 @@ function obtenerHojaRepositorio(ss, tabNameParam) {
   return allSheets[0];
 }
 
-function obtenerOCrearHojaUsuarios() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+function obtenerOCrearHojaUsuarios(ssParam) {
+  let ss = ssParam;
+  if (!ss) {
+    try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) {}
+  }
+  if (!ss) return null;
   const all = ss.getSheets();
   let userSheet = null;
 
@@ -320,8 +326,9 @@ function inicializarHojaUsuarios() {
   }
 }
 
-function agregarUsuarioEnSheet(params) {
-  const userSheet = obtenerOCrearHojaUsuarios();
+function agregarUsuarioEnSheet(params, ssParam) {
+  const userSheet = obtenerOCrearHojaUsuarios(ssParam);
+  if (!userSheet) return;
   const data = userSheet.getDataRange().getDisplayValues();
   const headers = data[0].map(function(h) { return String(h).trim(); });
 
@@ -371,11 +378,12 @@ function agregarUsuarioEnSheet(params) {
   SpreadsheetApp.flush();
 }
 
-function actualizarUsuarioEnSheet(params) {
-  const userSheet = obtenerOCrearHojaUsuarios();
+function actualizarUsuarioEnSheet(params, ssParam) {
+  const userSheet = obtenerOCrearHojaUsuarios(ssParam);
+  if (!userSheet) return;
   const data = userSheet.getDataRange().getDisplayValues();
   if (data.length <= 1) {
-    agregarUsuarioEnSheet(params);
+    agregarUsuarioEnSheet(params, ssParam);
     return;
   }
   const headers = data[0].map(function(h) { return String(h).trim(); });
@@ -447,8 +455,9 @@ function actualizarUsuarioEnSheet(params) {
   SpreadsheetApp.flush();
 }
 
-function eliminarUsuarioEnSheet(params) {
-  const userSheet = obtenerOCrearHojaUsuarios();
+function eliminarUsuarioEnSheet(params, ssParam) {
+  const userSheet = obtenerOCrearHojaUsuarios(ssParam);
+  if (!userSheet) return;
   const data = userSheet.getDataRange().getDisplayValues();
   if (data.length <= 1) return;
   const headers = data[0].map(function(h) { return String(h).trim(); });
@@ -483,8 +492,12 @@ function eliminarUsuarioEnSheet(params) {
   }
 }
 
-function sincronizarUnidadesAcademicas() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+function sincronizarUnidadesAcademicas(ssParam) {
+  let ss = ssParam;
+  if (!ss) {
+    try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) {}
+  }
+  if (!ss) return;
   let sheet = obtenerHojaRepositorio(ss, null);
 
   const expectedHeaders = [
@@ -626,50 +639,68 @@ function leerHojaPorTitulos(sheet) {
 }
 
 function procesarSolicitud(params) {
+  params = params || {};
   const tokenParam = params.token || '';
   if (INSTITUTIONAL_TOKEN && tokenParam && tokenParam !== INSTITUTIONAL_TOKEN) {
-    return ContentService.createTextOutput(JSON.stringify({ error: 'Token no válido' }))
+    const errPayload = JSON.stringify({ error: 'Token no válido' });
+    if (params.callback) {
+      return ContentService.createTextOutput(params.callback + '(' + errPayload + ');')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(errPayload)
       .setMimeType(ContentService.MimeType.JSON);
   }
 
-  if (params.action === 'updateUser') {
-    actualizarUsuarioEnSheet(params);
-    // Sincronización bidireccional automática de monografías al editar usuario
-    try {
-      sincronizarUnidadesAcademicas();
-    } catch (err) {
-      // Continuar con la respuesta
+  if (params.action === 'ping' || params.action === 'test') {
+    const pingPayload = JSON.stringify({
+      success: true,
+      message: 'Apps Script de Cita Master conectado exitosamente',
+      action: 'ping',
+      timestamp: new Date().toISOString()
+    });
+    if (params.callback) {
+      return ContentService.createTextOutput(params.callback + '(' + pingPayload + ');')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
     }
-  } else if (params.action === 'addUser') {
-    agregarUsuarioEnSheet(params);
-    // Sincronización bidireccional automática de monografías al crear usuario
-    try {
-      sincronizarUnidadesAcademicas();
-    } catch (err) {
-      // Continuar con la respuesta
-    }
-  } else if (params.action === 'deleteUser') {
-    eliminarUsuarioEnSheet(params);
-    try {
-      sincronizarUnidadesAcademicas();
-    } catch (err) {
-      // Continuar con la respuesta
+    return ContentService.createTextOutput(pingPayload)
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Obtener libro de cálculo: admite scripts vinculados y scripts independientes (vía ID o URL)
+  let ss = null;
+  try {
+    ss = SpreadsheetApp.getActiveSpreadsheet();
+  } catch (e) {}
+
+  if (!ss) {
+    const sId = params.spreadsheetId || params.sheetId;
+    if (sId) {
+      try { ss = SpreadsheetApp.openById(sId); } catch (e) {}
+    } else if (params.connectionUrl || params.sheetUrl) {
+      try { ss = SpreadsheetApp.openByUrl(params.connectionUrl || params.sheetUrl); } catch (e) {}
     }
   }
 
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let usersSheet = obtenerOCrearHojaUsuarios();
+  if (params.action === 'updateUser') {
+    actualizarUsuarioEnSheet(params, ss);
+  } else if (params.action === 'addUser') {
+    agregarUsuarioEnSheet(params, ss);
+  } else if (params.action === 'deleteUser') {
+    eliminarUsuarioEnSheet(params, ss);
+  }
+
+  let usersSheet = obtenerOCrearHojaUsuarios(ss);
   let repoSheet = obtenerHojaRepositorio(ss, params.sheet || params.tab || params.repoTabName || 'repositorio');
 
+  // Solo escanear Drive si se solicita explícitamente (syncDrive o triggerDriveScan)
   if (
     params.action === 'syncDrive' ||
-    params.action === 'syncDriveAndSheets' ||
-    params.action === 'syncRepo' ||
-    params.action === 'syncRepositorio' ||
-    params.action === 'syncManual'
+    params.action === 'scanDrive' ||
+    params.triggerDriveScan === 'true' ||
+    params.triggerDriveScan === true
   ) {
     try {
-      sincronizarUnidadesAcademicas();
+      sincronizarUnidadesAcademicas(ss);
       repoSheet = obtenerHojaRepositorio(ss, params.sheet || params.tab || params.repoTabName || 'repositorio');
     } catch (err) {
       // Continúa leyendo las hojas disponibles
@@ -1972,7 +2003,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       accessToken,
       repoTabName || 'repositorio',
       authorizedUsers,
-      { triggerDriveScan: true, silent: false, isManual: true }
+      { triggerDriveScan: false, silent: false, isManual: true }
     );
   };
 
@@ -2100,6 +2131,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             connectionUrl: cleanSheet,
             accessToken: cleanToken,
             repoTabName: cleanTab,
+            authorizedUsers,
+            usuariosHeaders,
+            rawHeaders,
+            rawRows,
           }),
         });
 
@@ -2109,22 +2144,35 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             applySharedState(result.state);
           }
           if (showUserFeedback) {
-            showToast('✅ Configuración de Sheets guardada para todos los equipos y dispositivos.');
+            const count = (result?.state?.authorizedUsers || authorizedUsers || []).length;
+            showToast(`✅ Configuración y ${count} usuarios guardados en el servidor para todos los equipos.`);
+          }
+          if (cleanScript || cleanSheet) {
+            executeSyncWithSheets(
+              cleanScript,
+              cleanSheet,
+              cleanToken,
+              cleanTab,
+              authorizedUsers,
+              { triggerDriveScan: false, silent: !showUserFeedback }
+            );
           }
         } else {
+          const errData = await resp.json().catch(() => null);
+          const errMsg = errData?.error || 'No se pudo guardar la configuración en el servidor central.';
           if (showUserFeedback) {
-            showToast('⚠️ No se pudo guardar la configuración en el servidor central.');
+            showToast(`⚠️ ${errMsg}`);
           }
         }
-      } catch {
+      } catch (err: any) {
         if (showUserFeedback) {
-          showToast('⚠️ Error de comunicación con el servidor central.');
+          showToast(`⚠️ Error al contactar al servidor: ${err?.message || 'Error de conexión'}`);
         }
       } finally {
         setIsSavingConfig(false);
       }
     },
-    [appsScriptExecUrl, connectionUrl, accessToken, repoTabName, applySharedState, showToast]
+    [appsScriptExecUrl, connectionUrl, accessToken, repoTabName, authorizedUsers, usuariosHeaders, rawHeaders, rawRows, applySharedState, showToast, executeSyncWithSheets]
   );
 
   // 1. Carga inicial: Recupera de localStorage y sincroniza de inmediato con el servidor central /api/repo/state
@@ -2240,11 +2288,12 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               ? serverState.authorizedUsers
               : accumulatedUsers;
 
-          // Si el cliente tiene una URL guardada en su localStorage que el servidor aún no tiene,
-          // registrarla automáticamente en el servidor central para beneficiar a todas las demás terminales:
+          // Si el cliente tiene una URL o usuarios guardados en su localStorage que el servidor aún no tiene,
+          // registrarlos automáticamente en el servidor central para beneficiar a todas las demás terminales:
           if (
             (!serverState.appsScriptExecUrl && savedScriptUrl) ||
-            (!serverState.connectionUrl && savedSheetUrl)
+            (!serverState.connectionUrl && savedSheetUrl) ||
+            (accumulatedUsers.length > (serverState.authorizedUsers?.length || 0))
           ) {
             fetch('/api/repo/config', {
               method: 'POST',
@@ -2254,6 +2303,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 connectionUrl: effectiveSheet,
                 accessToken: effectiveTok,
                 repoTabName: effectiveTab,
+                authorizedUsers: accumulatedUsers,
+                usuariosHeaders: savedUsuariosHeaders,
+                rawHeaders: savedHeaders,
+                rawRows: savedRows,
               }),
             })
               .then((r) => (r.ok ? r.json() : null))

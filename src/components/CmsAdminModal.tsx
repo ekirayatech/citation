@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Plus,
@@ -23,6 +23,7 @@ import {
   Star,
   Award,
   Compass,
+  Copy,
 } from 'lucide-react';
 import { CmsPage, CmsBlock, CmsBlockType, CmsIconName, CmsBlockItem } from '../types/cms';
 
@@ -82,10 +83,51 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
     };
   });
 
+  // Sincronizar selección cuando se abre el modal o cambia initialEditPageId
+  useEffect(() => {
+    if (isOpen) {
+      if (initialEditPageId) {
+        const target = pages.find((p) => p.id === initialEditPageId);
+        if (target) {
+          setIsCreatingNew(false);
+          setSelectedPageId(target.id);
+          setFormData(JSON.parse(JSON.stringify(target)));
+          return;
+        }
+      }
+      if (pages.length > 0) {
+        const found = pages.find((p) => p.id === selectedPageId) || pages[0];
+        setIsCreatingNew(false);
+        setSelectedPageId(found.id);
+        setFormData(JSON.parse(JSON.stringify(found)));
+      } else {
+        handleStartNewPage();
+      }
+    }
+  }, [isOpen, initialEditPageId]);
+
   const handleSelectPage = (page: CmsPage) => {
     setIsCreatingNew(false);
     setSelectedPageId(page.id);
     setFormData(JSON.parse(JSON.stringify(page)));
+  };
+
+  const handleDuplicatePage = () => {
+    const newId = `cms-${Date.now()}`;
+    const clone: Partial<CmsPage> = {
+      ...JSON.parse(JSON.stringify(formData)),
+      id: newId,
+      slug: `${formData.slug || 'seccion'}-copia`,
+      navLabel: `${formData.navLabel || 'Pestaña'} (Copia)`,
+      title: `${formData.title || 'Sección'} (Copia)`,
+      order: (Number(formData.order) || 10) + 5,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setIsCreatingNew(true);
+    setSelectedPageId(newId);
+    setFormData(clone);
+    showToast('Pestaña duplicada en borrador. Revisa y haz clic en Guardar.');
   };
 
   const handleStartNewPage = () => {
@@ -175,6 +217,38 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
       ...prev,
       blocks: (prev.blocks || []).filter((_, i) => i !== index),
     }));
+  };
+
+  const handleMoveBlock = (index: number, direction: 'up' | 'down') => {
+    setFormData((prev) => {
+      const blocks = [...(prev.blocks || [])];
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= blocks.length) return prev;
+      const temp = blocks[index];
+      blocks[index] = blocks[targetIndex];
+      blocks[targetIndex] = temp;
+      return { ...prev, blocks };
+    });
+  };
+
+  const handleMoveItemInBlock = (
+    blockIndex: number,
+    itemIndex: number,
+    direction: 'up' | 'down'
+  ) => {
+    setFormData((prev) => {
+      const copy = [...(prev.blocks || [])];
+      const block = copy[blockIndex];
+      if (!block || !block.items) return prev;
+      const items = [...block.items];
+      const targetIndex = direction === 'up' ? itemIndex - 1 : itemIndex + 1;
+      if (targetIndex < 0 || targetIndex >= items.length) return prev;
+      const temp = items[itemIndex];
+      items[itemIndex] = items[targetIndex];
+      items[targetIndex] = temp;
+      block.items = items;
+      return { ...prev, blocks: copy };
+    });
   };
 
   const handleAddItemToBlock = (blockIndex: number) => {
@@ -373,6 +447,17 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
                   <span>Configuración General de la Pestaña</span>
                 </h4>
                 <div className="flex items-center gap-2">
+                  {!isCreatingNew && (
+                    <button
+                      type="button"
+                      onClick={handleDuplicatePage}
+                      className="px-2.5 py-1 text-xs font-semibold text-violet-700 hover:text-violet-950 hover:bg-violet-50 rounded-lg transition-colors flex items-center gap-1 border border-violet-200"
+                      title="Duplicar esta pestaña para crear una nueva rápidamente"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Duplicar</span>
+                    </button>
+                  )}
                   <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
                     <input
                       type="checkbox"
@@ -414,7 +499,7 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
                   />
                 </div>
 
-                <div className="sm:col-span-6">
+                <div className="sm:col-span-4">
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Icono para la barra superior
                   </label>
@@ -433,7 +518,7 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
                   </select>
                 </div>
 
-                <div className="sm:col-span-6">
+                <div className="sm:col-span-5">
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Identificador de enlace (Slug)
                   </label>
@@ -443,6 +528,23 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
                     onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
                     placeholder="convocatoria-2026"
                     className="w-full text-xs sm:text-sm px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#664d88] font-mono text-slate-600"
+                  />
+                </div>
+
+                <div className="sm:col-span-3">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Orden (Prioridad menú)
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.order ?? 10}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        order: parseInt(e.target.value, 10) || 10,
+                      }))
+                    }
+                    className="w-full text-xs sm:text-sm px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#664d88]"
                   />
                 </div>
 
@@ -538,14 +640,34 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
                         </span>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveBlock(bIdx)}
-                        className="text-slate-400 hover:text-red-600 p-1 transition-colors"
-                        title="Eliminar este bloque"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          disabled={bIdx === 0}
+                          onClick={() => handleMoveBlock(bIdx, 'up')}
+                          className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 transition-colors cursor-pointer"
+                          title="Mover bloque hacia arriba"
+                        >
+                          <ChevronUp className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={bIdx === (formData.blocks?.length || 0) - 1}
+                          onClick={() => handleMoveBlock(bIdx, 'down')}
+                          className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 transition-colors cursor-pointer"
+                          title="Mover bloque hacia abajo"
+                        >
+                          <ChevronDown className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveBlock(bIdx)}
+                          className="text-slate-400 hover:text-red-600 p-1 transition-colors ml-1 cursor-pointer"
+                          title="Eliminar este bloque"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Campos según el tipo de bloque */}
@@ -650,13 +772,34 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
                                     placeholder="Título del elemento..."
                                     className="flex-1 font-semibold text-xs px-2 py-1 rounded border border-slate-200"
                                   />
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveItemFromBlock(bIdx, iIdx)}
-                                    className="text-slate-400 hover:text-red-600 p-1"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                      type="button"
+                                      disabled={iIdx === 0}
+                                      onClick={() => handleMoveItemInBlock(bIdx, iIdx, 'up')}
+                                      className="text-slate-400 hover:text-slate-700 disabled:opacity-20 p-1 cursor-pointer"
+                                      title="Subir elemento"
+                                    >
+                                      <ChevronUp className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={iIdx === (block.items?.length || 0) - 1}
+                                      onClick={() => handleMoveItemInBlock(bIdx, iIdx, 'down')}
+                                      className="text-slate-400 hover:text-slate-700 disabled:opacity-20 p-1 cursor-pointer"
+                                      title="Bajar elemento"
+                                    >
+                                      <ChevronDown className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveItemFromBlock(bIdx, iIdx)}
+                                      className="text-slate-400 hover:text-red-600 p-1 cursor-pointer"
+                                      title="Eliminar elemento"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  </div>
                                 </div>
 
                                 <textarea
