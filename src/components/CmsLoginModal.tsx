@@ -139,12 +139,12 @@ export const CmsLoginModal: React.FC<CmsLoginModalProps> = ({
         <div className="bg-[#664d88] text-white px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-white/15 text-[#f8c62e]">
-              <Layers className="w-5 h-5" />
+              <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-base leading-tight">Acceso Administrativo CMS</h3>
+              <h3 className="font-bold text-base leading-tight">Administración CMS</h3>
               <p className="text-[11px] text-violet-200">
-                Gestión de Páginas y Contenidos · Colegio Ekirayá
+                Iniciar Sesión de Administrador · Colegio Ekirayá
               </p>
             </div>
           </div>

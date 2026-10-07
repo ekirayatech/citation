@@ -487,35 +487,38 @@ export default function App() {
               </div>
             </button>
 
-            {/* Acciones de Cuenta / CMS / Menú Móvil */}
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Acciones de Administración CMS / Menú Móvil */}
+            <div className="flex items-center gap-2.5 shrink-0">
               <button
                 type="button"
-                onClick={() => {
-                  setLoginEmailInput(currentUserEmail);
-                  setIsAuthModalOpen(true);
-                }}
-                className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-semibold text-white transition-all flex items-center gap-1.5 cursor-pointer"
-                title="Cuenta institucional"
+                onClick={handleOpenCmsModal}
+                className={`px-3 sm:px-3.5 py-1.5 rounded-xl border text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs ${
+                  isCmsAdminLoggedIn
+                    ? 'bg-[#f8c62e] text-slate-950 border-[#eab308] hover:bg-[#f3bc20] hover:shadow-md'
+                    : 'bg-white/10 hover:bg-white/20 border-white/20 text-white hover:border-white/30'
+                }`}
+                title="Administración CMS - Panel y Login"
               >
-                <UserCheck className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
-                <span className="hidden md:inline max-w-[130px] lg:max-w-[170px] truncate">{currentUserEmail}</span>
-                {isAdminUser && (
-                  <span className="px-1.5 py-0.5 rounded bg-[#f8c62e] text-slate-950 text-[9px] font-black uppercase">
-                    Admin
+                <ShieldCheck className={`w-4 h-4 shrink-0 ${isCmsAdminLoggedIn ? 'text-slate-950' : 'text-[#f8c62e]'}`} />
+                <span>Administración CMS</span>
+                {isCmsAdminLoggedIn && (
+                  <span className="hidden xl:inline text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-slate-900/15 text-slate-900">
+                    Activo
                   </span>
                 )}
               </button>
 
-              <button
-                type="button"
-                onClick={handleOpenCmsModal}
-                className="hidden sm:flex px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-semibold text-white transition-all items-center gap-1.5 cursor-pointer"
-                title="Panel de Gestión CMS"
-              >
-                <Layers className="w-3.5 h-3.5 text-[#f8c62e]" />
-                <span className="hidden lg:inline">CMS</span>
-              </button>
+              {/* Si el administrador tiene sesión abierta, botón para cerrar sesión */}
+              {isCmsAdminLoggedIn && (
+                <button
+                  type="button"
+                  onClick={handleCmsLogout}
+                  className="hidden md:flex p-1.5 text-xs text-violet-200 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+                  title="Cerrar sesión de Administración CMS"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              )}
 
               {/* Toggle Menú Móvil */}
               <button
@@ -577,7 +580,7 @@ export default function App() {
 
         {/* Menú Desplegable en Móviles (< md) */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-[#533e6f] bg-[#533e6f] px-4 py-3 space-y-1.5 shadow-lg animate-in slide-in-from-top-2 duration-150">
+          <div className="md:hidden border-t border-[#533e6f] bg-[#533e6f] px-4 py-3 space-y-2 shadow-lg animate-in slide-in-from-top-2 duration-150">
             {navItems.map((item) => {
               const isActive = activeTab === item.id;
               return (
@@ -609,6 +612,31 @@ export default function App() {
                 </button>
               );
             })}
+
+            <div className="pt-2 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleOpenCmsModal();
+                }}
+                className={`w-full px-3.5 py-2.5 rounded-xl text-left text-sm font-bold transition-all flex items-center justify-between cursor-pointer ${
+                  isCmsAdminLoggedIn
+                    ? 'bg-[#f8c62e] text-slate-950 shadow-xs'
+                    : 'bg-white/10 text-white hover:bg-white/20'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <ShieldCheck className={`w-4 h-4 ${isCmsAdminLoggedIn ? 'text-slate-950' : 'text-[#f8c62e]'}`} />
+                  <span>Administración CMS</span>
+                </div>
+                {isCmsAdminLoggedIn && (
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-slate-900/20 text-slate-950">
+                    Activo
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         )}
       </header>
