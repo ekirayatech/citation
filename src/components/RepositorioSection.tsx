@@ -100,14 +100,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     cleanEmail.endsWith('@est.cem.edu.co') ||
     cleanEmail.endsWith('@ekiraya.edu.co');
 
-  const isAdmin =
-    isAdminLoggedIn ||
-    cleanEmail === 'mebolanos@cem.edu.co' ||
-    usuarios.some(
-      (u) =>
-        u.Correo?.toLowerCase() === cleanEmail &&
-        /admin|administrador|coordinador/i.test(u.Perfil || '')
-    );
+  const isAdmin = Boolean(isAdminLoggedIn);
 
   const userRole: UserPerfilRole = isAdmin
     ? 'Administrador'
@@ -578,6 +571,16 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     });
   }, [monografias, searchQuery, selectedUnidad, selectedAnio, selectedGrado]);
 
+  const isFiltering =
+    searchQuery.trim() !== '' ||
+    selectedUnidad !== 'TODAS' ||
+    selectedAnio !== 'TODOS' ||
+    selectedGrado !== 'TODOS';
+
+  const displayedMonografias = isFiltering
+    ? filteredMonografias
+    : filteredMonografias.slice(0, 3);
+
   // Si el usuario no pertenece a la comunidad educativa
   if (!isAllowedDomain) {
     return (
@@ -908,7 +911,21 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         </div>
       </div>
 
-      {/* 3. Cuadrícula de 3 Columnas con Tarjetas de Monografía */}
+      {/* 3. Cuadrícula de Columnas con Tarjetas de Monografía */}
+      {!isFiltering && monografias.length > 3 && (
+        <div className="bg-gradient-to-r from-violet-50 via-purple-50 to-indigo-50 border border-violet-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-violet-900 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-5 h-5 text-[#664d88] shrink-0" />
+            <div>
+              <span className="font-bold">Vista de prueba (3 monografías visibles de {monografias.length}):</span> Usa los filtros de Unidad Académica, Año, Grado o la barra de búsqueda para explorar todas las monografías según tu criterio.
+            </div>
+          </div>
+          <span className="px-3 py-1 rounded-xl bg-[#664d88]/10 text-[#664d88] font-bold shrink-0">
+            Filtra para ver más
+          </span>
+        </div>
+      )}
+
       {filteredMonografias.length === 0 ? (
         <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-sm">
           <div className="w-16 h-16 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-4">
@@ -933,7 +950,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredMonografias.map((doc, idx) => {
+          {displayedMonografias.map((doc, idx) => {
             const docId = doc.documento_id || `doc_${idx}`;
             const isExpanded = Boolean(expandedAbstracts[docId]);
             const unidad = doc['Unidad Académica'] || doc['unidad_academica'] || 'General';
