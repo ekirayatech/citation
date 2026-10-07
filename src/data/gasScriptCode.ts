@@ -30,7 +30,7 @@ const HOJA_REPOSITORIO = 'Repositorio';
 const HOJA_USUARIOS = 'Usuarios';
 
 // Dominios autorizados de la comunidad educativa
-const ALLOWED_DOMAINS = ['@cem.edu.co', '@est.cem.edu.co', '@ekiraya.edu.co'];
+const ALLOWED_DOMAINS = ['@cem.edu.co', '@est.cem.edu.co'];
 
 /**
  * Encabezados esperados en la hoja Repositorio (17 columnas)
@@ -457,7 +457,7 @@ function verificarRolUsuario(email) {
   const hoja = ss.getSheetByName(HOJA_USUARIOS);
   
   if (!hoja || hoja.getLastRow() <= 1) {
-    const isTeacherDomain = cleanEmail.endsWith('@cem.edu.co') || cleanEmail.endsWith('@ekiraya.edu.co');
+    const isTeacherDomain = cleanEmail.endsWith('@cem.edu.co');
     return {
       registered: isTeacherDomain || cleanEmail.endsWith('@est.cem.edu.co'),
       perfil: isTeacherDomain ? 'Docente' : 'Estudiante',
@@ -491,7 +491,7 @@ function verificarRolUsuario(email) {
   }
   
   // Si no está explícito en la hoja pero tiene dominio institucional
-  const isEduCo = cleanEmail.endsWith('@cem.edu.co') || cleanEmail.endsWith('@ekiraya.edu.co');
+  const isEduCo = cleanEmail.endsWith('@cem.edu.co');
   const isEstCo = cleanEmail.endsWith('@est.cem.edu.co');
   
   return {

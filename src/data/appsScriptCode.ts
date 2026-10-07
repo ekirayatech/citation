@@ -35,7 +35,7 @@ const CONFIG = {
   USUARIOS_SHEET_NAME: 'usuarios',
   ADMIN_EMAIL: 'mebolanos@cem.edu.co',
   INSTITUTIONAL_TOKEN: 'EKIRAYA-2026',
-  DOMINIOS_AUTORIZADOS: ['@cem.edu.co', '@est.cem.edu.co', '@ekiraya.edu.co']
+  DOMINIOS_AUTORIZADOS: ['@cem.edu.co', '@est.cem.edu.co']
 };
 
 /**

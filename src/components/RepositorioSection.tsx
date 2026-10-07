@@ -97,8 +97,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   const cleanEmail = currentUserEmail.trim().toLowerCase();
   const isAllowedDomain =
     cleanEmail.endsWith('@cem.edu.co') ||
-    cleanEmail.endsWith('@est.cem.edu.co') ||
-    cleanEmail.endsWith('@ekiraya.edu.co');
+    cleanEmail.endsWith('@est.cem.edu.co');
 
   const isAdmin = Boolean(isAdminLoggedIn);
 
@@ -433,8 +432,8 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       return;
     }
 
-    if (!email.endsWith('@cem.edu.co') && !email.endsWith('@est.cem.edu.co') && !email.endsWith('@ekiraya.edu.co')) {
-      setUserActionError('Solo se permiten correos del dominio institucional (@cem.edu.co / @est.cem.edu.co / @ekiraya.edu.co).');
+    if (!email.endsWith('@cem.edu.co') && !email.endsWith('@est.cem.edu.co')) {
+      setUserActionError('Solo se permiten correos del dominio institucional (@cem.edu.co / @est.cem.edu.co).');
       return;
     }
 

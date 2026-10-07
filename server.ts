@@ -1655,8 +1655,7 @@ async function startServer() {
 
       const isValidDomain =
         emailQuery.endsWith('@cem.edu.co') ||
-        emailQuery.endsWith('@est.cem.edu.co') ||
-        emailQuery.endsWith('@ekiraya.edu.co');
+        emailQuery.endsWith('@est.cem.edu.co');
 
       if (!isValidDomain) {
         res.status(403).json({

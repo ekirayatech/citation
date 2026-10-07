@@ -465,7 +465,7 @@ function verificarRol(email) {
   const hoja = ss.getSheetByName(HOJA_USUARIOS);
 
   if (!hoja || hoja.getLastRow() <= 1) {
-    const isDoc = clean.endsWith('@cem.edu.co') || clean.endsWith('@ekiraya.edu.co');
+    const isDoc = clean.endsWith('@cem.edu.co');
     return {
       registered: isDoc || clean.endsWith('@est.cem.edu.co'),
       perfil: isDoc ? 'Docente' : 'Estudiante',
@@ -489,7 +489,7 @@ function verificarRol(email) {
     }
   }
 
-  const isDoc = clean.endsWith('@cem.edu.co') || clean.endsWith('@ekiraya.edu.co');
+  const isDoc = clean.endsWith('@cem.edu.co');
   return {
     registered: isDoc || clean.endsWith('@est.cem.edu.co'),
     perfil: isDoc ? 'Docente' : 'Estudiante',
