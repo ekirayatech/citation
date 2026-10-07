@@ -490,13 +490,13 @@ function loadPersistedState(): PersistedRepoState {
           process.env.VITE_APPS_SCRIPT_URL ||
           '',
         connectionUrl:
-          (parsed.connectionUrl && !parsed.connectionUrl.includes('1XB7fp')
+          (parsed.connectionUrl && !parsed.connectionUrl.includes('1XB7fp') && !parsed.connectionUrl.includes('1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs')
             ? parsed.connectionUrl
             : '') ||
           process.env.GOOGLE_SHEETS_URL ||
           process.env.SHEETS_CONNECTION_URL ||
           process.env.VITE_GOOGLE_SHEETS_URL ||
-          'https://docs.google.com/spreadsheets/d/1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs/edit',
+          'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
         repoTabName: parsed.repoTabName || process.env.REPO_TAB_NAME || 'repositorio',
         accessToken: parsed.accessToken || process.env.ACCESS_TOKEN || 'EKIRAYA-2026',
         lastSyncDate: parsed.lastSyncDate || new Date().toLocaleString('es-CO'),
@@ -524,7 +524,7 @@ function loadPersistedState(): PersistedRepoState {
       process.env.GOOGLE_SHEETS_URL ||
       process.env.SHEETS_CONNECTION_URL ||
       process.env.VITE_GOOGLE_SHEETS_URL ||
-      'https://docs.google.com/spreadsheets/d/1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs/edit',
+      'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
     repoTabName: process.env.REPO_TAB_NAME || 'repositorio',
     accessToken: process.env.ACCESS_TOKEN || 'EKIRAYA-2026',
     lastSyncDate: new Date().toLocaleString('es-CO'),
@@ -582,9 +582,9 @@ async function pushUserToAppsScriptFromServer(
     action,
     subAction,
     manageAction: subAction,
-    spreadsheetId: '1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs',
-    connectionUrl: 'https://docs.google.com/spreadsheets/d/1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs/edit',
-    sheetUrl: 'https://docs.google.com/spreadsheets/d/1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs/edit',
+    spreadsheetId: '1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0',
+    connectionUrl: 'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
+    sheetUrl: 'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
     token: (token || 'EKIRAYA-2026').trim(),
     curso: user.curso || 'General',
     seccion: user.seccion || 'General',
@@ -654,9 +654,9 @@ async function pushUserToAppsScriptFromServer(
         action,
         subAction,
         manageAction: subAction,
-        spreadsheetId: '1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs',
-        connectionUrl: 'https://docs.google.com/spreadsheets/d/1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs/edit',
-        sheetUrl: 'https://docs.google.com/spreadsheets/d/1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs/edit',
+        spreadsheetId: '1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0',
+        connectionUrl: 'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
+        sheetUrl: 'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
         token: (token || 'EKIRAYA-2026').trim(),
         curso: user.curso || 'General',
         seccion: user.seccion || 'General',
@@ -712,8 +712,8 @@ async function deleteUserFromAppsScript(
   const query = new URLSearchParams({
     action: 'deleteUser',
     subAction: 'delete',
-    spreadsheetId: '1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs',
-    connectionUrl: 'https://docs.google.com/spreadsheets/d/1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs/edit',
+    spreadsheetId: '1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0',
+    connectionUrl: 'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
     token: (token || 'EKIRAYA-2026').trim(),
     correo: email,
     email: email,

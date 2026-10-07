@@ -8,17 +8,32 @@ export const APPS_SCRIPT_CODE = `/**
  * ============================================================================
  * COLEGIO EKIRAYÁ · CITA MASTER — GOOGLE APPS SCRIPT BACKEND (Code.gs)
  * ============================================================================
- * Backend de lectura y sincronización de Google Sheets del Repositorio de
- * Monografías (Proyecto de Vida) del Colegio Ekirayá.
- * 
- * Acceso directo: Lectura de monografías desde la hoja "repositorio" (17 columnas).
+ * Jerarquía en Google Drive:
+ *   REPOSITORIO PV (ID: 1U0BfnGyQXzxuKaa95nqGx8iqbdG-eCii)
+ *   └── Unidades Académicas
+ *       ├── [Unidad Académica] (Ciencias, Música, Psicología, Aviación...)
+ *       │   └── [Año] (2025, 2026, 2027)
+ *       │       └── [archivo_monografia.pdf]
+ *
+ * Hojas en Google Sheets:
+ * 1. "repositorio" (17 columnas dinámicas):
+ *    documento_id, titulo, autor, grado, año, Unidad Académica,
+ *    Linea de investigación, tipo, palabras_clave, resumen, Asesor(es),
+ *    drive_file_id, url_documento, visibilidad, estado, fecha_registro,
+ *    fecha_actualizacion
+ *
+ * 2. "usuarios" (Administrador y comunidad educativa):
+ *    nombres, correo, perfil, estado
  * ============================================================================
  */
 
 const CONFIG = {
-  SPREADSHEET_ID: '1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs',
-  SPREADSHEET_URL: 'https://docs.google.com/spreadsheets/d/1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs/edit',
+  SPREADSHEET_ID: '1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0',
+  SPREADSHEET_URL: 'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
+  DRIVE_FOLDER_ID: '1U0BfnGyQXzxuKaa95nqGx8iqbdG-eCii',
   REPO_SHEET_NAME: 'repositorio',
+  USUARIOS_SHEET_NAME: 'usuarios',
+  ADMIN_EMAIL: 'mebolanos@cem.edu.co',
   INSTITUTIONAL_TOKEN: 'EKIRAYA-2026',
   DOMINIOS_AUTORIZADOS: ['@cem.edu.co', '@est.cem.edu.co', '@ekiraya.edu.co']
 };
@@ -74,216 +89,193 @@ const ENCABEZADOS_REPOSITORIO_ESPERADOS = [
 ];
 
 /**
- * Menú contextual en Google Sheets
- */
-function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu('📚 Repositorio Ekirayá')
-    .addItem('📋 Verificar encabezados de Monografías', 'verificarEstructuraHojas')
-    .addToUi();
-}
-
-/**
- * Normaliza nombres de encabezados para mapeo flexible
- */
-function normalizarClave(texto) {
-  if (!texto) return '';
-  return String(texto)
-    .normalize('NFD')
-    .replace(/[\\u0300-\\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[_-]+/g, ' ')
-    .replace(/\\s+/g, ' ')
-    .trim();
-}
-
-/**
- * Sanitiza texto para salida JSON segura
- */
-function sanitizarTexto(valor) {
-  if (valor === null || valor === undefined) return '';
-  if (typeof valor !== 'string') return String(valor);
-  return valor
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-/**
- * Lee la Fila 1 y extrae los encabezados existentes
- */
-function obtenerMapaColumnas(hoja) {
-  if (!hoja) return { mapa: {}, headers: [], totalColumnas: 0 };
-  const lastCol = Math.max(1, hoja.getLastColumn());
-  const headers = hoja.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
-  const mapa = {};
-
-  headers.forEach(function(h, idx) {
-    const raw = String(h || '').trim();
-    if (!raw) return;
-    const colNum = idx + 1;
-    const norm = normalizarClave(raw);
-    mapa[norm] = colNum;
-    mapa[raw] = colNum;
-  });
-
-  return { mapa: mapa, headers: headers, totalColumnas: lastCol };
-}
-
-/**
- * Obtiene la hoja de monografías buscando "repositorio", "monografias" o la primera hoja
- */
-function obtenerOCrearHojaRepositorio(ssParam, params) {
-  const ss = obtenerSpreadsheet(ssParam, params);
-  if (!ss) return null;
-
-  const targetName = (params && params.sheetName) ? String(params.sheetName).trim().toLowerCase() : CONFIG.REPO_SHEET_NAME;
-  let hoja = ss.getSheetByName(CONFIG.REPO_SHEET_NAME);
-  
-  if (!hoja) {
-    const all = ss.getSheets();
-    for (let i = 0; i < all.length; i++) {
-      const n = all[i].getName().trim().toLowerCase();
-      if (n === targetName || n === 'repositorio' || n === 'monografias' || n === 'monografías') {
-        hoja = all[i];
-        break;
-      }
-    }
-    if (!hoja && all.length > 0) {
-      hoja = all[0];
-    }
-  }
-
-  if (!hoja) {
-    hoja = ss.insertSheet(CONFIG.REPO_SHEET_NAME, 0);
-    hoja.appendRow(ENCABEZADOS_REPOSITORIO_ESPERADOS);
-    hoja.getRange(1, 1, 1, ENCABEZADOS_REPOSITORIO_ESPERADOS.length)
-      .setFontWeight('bold')
-      .setBackground('#664d88')
-      .setFontColor('#ffffff');
-  } else if (hoja.getLastRow() === 0) {
-    hoja.appendRow(ENCABEZADOS_REPOSITORIO_ESPERADOS);
-    hoja.getRange(1, 1, 1, ENCABEZADOS_REPOSITORIO_ESPERADOS.length)
-      .setFontWeight('bold')
-      .setBackground('#664d88')
-      .setFontColor('#ffffff');
-  }
-
-  return hoja;
-}
-
-/**
- * Valida la hoja repositorio
- */
-function verificarEstructuraHojas() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const hoja = obtenerOCrearHojaRepositorio(ss);
-  SpreadsheetApp.flush();
-  SpreadsheetApp.getUi().alert('✅ Hoja de Monografías ("' + (hoja ? hoja.getName() : 'repositorio') + '") configurada y lista.');
-}
-
-/**
- * Lee todas las monografías de la hoja de cálculo
- */
-function apiGetMonografias(ssParam, params) {
-  const hoja = obtenerOCrearHojaRepositorio(ssParam, params);
-  if (!hoja || hoja.getLastRow() <= 1) {
-    return {
-      status: 'success',
-      total: 0,
-      headers: ENCABEZADOS_REPOSITORIO_ESPERADOS,
-      data: [],
-      spreadsheetId: CONFIG.SPREADSHEET_ID,
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  const { headers } = obtenerMapaColumnas(hoja);
-  const rawValues = hoja.getDataRange().getDisplayValues();
-  const rows = [];
-
-  for (let r = 1; r < rawValues.length; r++) {
-    const rowValues = rawValues[r];
-    const isEmpty = rowValues.every(function(cell) { return !String(cell || '').trim(); });
-    if (isEmpty) continue;
-
-    const rowObj = {};
-    for (let c = 0; c < headers.length; c++) {
-      const colTitle = headers[c];
-      rowObj[colTitle] = sanitizarTexto(rowValues[c] || '');
-    }
-    rows.push(rowObj);
-  }
-
-  return {
-    status: 'success',
-    total: rows.length,
-    headers: headers,
-    data: rows,
-    spreadsheetId: CONFIG.SPREADSHEET_ID,
-    sheetName: hoja.getName(),
-    timestamp: new Date().toISOString()
-  };
-}
-
-/**
- * Genera respuesta JSON o JSONP
- */
-function crearSalida(obj, callback) {
-  const payload = JSON.stringify(obj);
-  if (callback && String(callback).trim() !== '') {
-    const cb = String(callback).replace(/[^a-zA-Z0-9_$.]/g, '');
-    return ContentService.createTextOutput(cb + '(' + payload + ');')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
-  return ContentService.createTextOutput(payload)
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-/**
- * Endpoint GET (Web App)
+ * Manejador principal para peticiones GET (Lectura de monografías, JSONP y estado)
  */
 function doGet(e) {
   try {
     const params = (e && e.parameter) ? e.parameter : {};
-    const action = String(params.action || 'getMonografias').trim();
-    const callback = params.callback || null;
+    const action = (params.action || 'syncRepo').toLowerCase();
+    const callback = params.callback || params.jsonp;
 
-    if (action === 'ping' || action === 'test') {
-      return crearSalida({
-        status: 'success',
-        success: true,
-        message: 'Apps Script de Cita Master conectado exitosamente',
-        action: 'ping',
-        spreadsheetId: CONFIG.SPREADSHEET_ID,
-        timestamp: new Date().toISOString()
+    const ss = obtenerSpreadsheet(null, params);
+    if (!ss) {
+      return jsonResponse({
+        success: false,
+        error: 'No se pudo abrir la hoja de cálculo. Verifica el ID: ' + CONFIG.SPREADSHEET_ID,
+        headers: ENCABEZADOS_REPOSITORIO_ESPERADOS,
+        rows: []
       }, callback);
     }
 
-    const monoRes = apiGetMonografias(null, params);
-    return crearSalida(Object.assign({
-      status: 'success',
-      success: true,
-      action: action,
-      spreadsheetId: CONFIG.SPREADSHEET_ID,
-      syncedAt: new Date().toISOString()
-    }, monoRes), callback);
+    // Acción 1: Escanear carpeta de Drive y sincronizar con la hoja Repositorio
+    if (action === 'syncdrive' || action === 'syncdriveandsheets') {
+      const scanResult = sincronizarDriveConRepositorio(ss, params.folderId || CONFIG.DRIVE_FOLDER_ID);
+      return jsonResponse(scanResult, callback);
+    }
 
-  } catch (error) {
-    return crearSalida({
-      status: 'error',
+    // Acción 2: Lectura estándar de la hoja Repositorio
+    const sheetName = params.sheet || params.repoTabName || CONFIG.REPO_SHEET_NAME;
+    let sheet = ss.getSheetByName(sheetName) || ss.getSheetByName('Repositorio') || ss.getSheetByName('REPOSITORIO');
+    
+    if (!sheet) {
+      const sheets = ss.getSheets();
+      sheet = sheets.length > 0 ? sheets[0] : null;
+    }
+
+    if (!sheet) {
+      return jsonResponse({
+        success: false,
+        error: 'No se encontró la pestaña "' + sheetName + '"',
+        headers: ENCABEZADOS_REPOSITORIO_ESPERADOS,
+        rows: []
+      }, callback);
+    }
+
+    const data = sheet.getDataRange().getValues();
+    if (!data || data.length === 0) {
+      return jsonResponse({
+        success: true,
+        headers: ENCABEZADOS_REPOSITORIO_ESPERADOS,
+        rows: [],
+        count: 0
+      }, callback);
+    }
+
+    const rawHeaders = data[0].map(h => String(h || '').trim());
+    const rows = [];
+
+    for (let r = 1; r < data.length; r++) {
+      const rowArr = data[r];
+      const hasContent = rowArr.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== '');
+      if (!hasContent) continue;
+
+      const rowObj = {};
+      rawHeaders.forEach((header, colIdx) => {
+        if (!header) return;
+        const val = rowArr[colIdx];
+        if (val instanceof Date) {
+          rowObj[header] = Utilities.formatDate(val, Session.getScriptTimeZone() || 'America/Bogota', 'yyyy-MM-dd');
+        } else {
+          rowObj[header] = val !== null && val !== undefined ? String(val).trim() : '';
+        }
+      });
+      rows.push(rowObj);
+    }
+
+    return jsonResponse({
+      success: true,
+      headers: rawHeaders,
+      rows: rows,
+      count: rows.length,
+      sheetName: sheet.getName(),
+      lastSync: Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'America/Bogota', 'yyyy-MM-dd HH:mm:ss')
+    }, callback);
+
+  } catch (err) {
+    return jsonResponse({
       success: false,
-      message: error.message || 'Error en ejecución de doGet'
-    }, e && e.parameter ? e.parameter.callback : null);
+      error: 'Excepción en doGet: ' + err.toString()
+    });
   }
 }
 
 /**
- * Endpoint POST (Web App)
+ * Manejador para peticiones POST (Sincronización forzada y Webhook)
  */
 function doPost(e) {
-  return doGet(e);
+  try {
+    let payload = {};
+    if (e && e.postData && e.postData.contents) {
+      try {
+        payload = JSON.parse(e.postData.contents);
+      } catch (ex) {
+        payload = (e && e.parameter) ? e.parameter : {};
+      }
+    } else if (e && e.parameter) {
+      payload = e.parameter;
+    }
+
+    return doGet({ parameter: payload });
+  } catch (err) {
+    return jsonResponse({ success: false, error: 'Error en doPost: ' + err.toString() });
+  }
+}
+
+/**
+ * Escanea recursivamente la carpeta de Google Drive "REPOSITORIO PV"
+ * Jerarquía: Unidades Académicas / [Área] / [Año] / [Archivo.pdf]
+ */
+function sincronizarDriveConRepositorio(ss, folderId) {
+  try {
+    const targetFolderId = folderId || CONFIG.DRIVE_FOLDER_ID;
+    const rootFolder = DriveApp.getFolderById(targetFolderId);
+    if (!rootFolder) {
+      return { success: false, error: 'No se pudo acceder a la carpeta de Google Drive ID: ' + targetFolderId };
+    }
+
+    const sheetName = CONFIG.REPO_SHEET_NAME;
+    let sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
+      sheet.appendRow(ENCABEZADOS_REPOSITORIO_ESPERADOS);
+    }
+
+    const driveFiles = [];
+    recorrerCarpetaDrive(rootFolder, '', '', driveFiles);
+
+    return {
+      success: true,
+      message: 'Drive escaneado exitosamente',
+      archivosEncontrados: driveFiles.length,
+      archivos: driveFiles
+    };
+  } catch (e) {
+    return { success: false, error: 'Error al escanear Drive: ' + e.toString() };
+  }
+}
+
+function recorrerCarpetaDrive(folder, parentUnit, parentYear, fileList) {
+  const files = folder.getFiles();
+  while (files.hasNext()) {
+    const file = files.next();
+    const name = file.getName();
+    if (name.toLowerCase().endsWith('.pdf') || name.toLowerCase().endsWith('.docx') || name.toLowerCase().endsWith('.doc')) {
+      fileList.push({
+        id: file.getId(),
+        name: name,
+        url: file.getUrl(),
+        unidadAcademica: parentUnit || 'General',
+        ano: parentYear || '2026',
+        size: file.getSize(),
+        lastUpdated: file.getLastUpdated()
+      });
+    }
+  }
+
+  const subfolders = folder.getFolders();
+  while (subfolders.hasNext()) {
+    const sub = subfolders.next();
+    const subName = sub.getName();
+    let nextUnit = parentUnit;
+    let nextYear = parentYear;
+
+    if (/^\\d{4}$/.test(subName)) {
+      nextYear = subName;
+    } else if (!parentUnit) {
+      nextUnit = subName;
+    }
+
+    recorrerCarpetaDrive(sub, nextUnit, nextYear, fileList);
+  }
+}
+
+function jsonResponse(data, callback) {
+  const jsonString = JSON.stringify(data);
+  if (callback) {
+    return ContentService.createTextOutput(callback + '(' + jsonString + ');')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(jsonString)
+    .setMimeType(ContentService.MimeType.JSON);
 }
 `;
