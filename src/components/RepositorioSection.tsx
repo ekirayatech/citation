@@ -46,6 +46,7 @@ import {
   DEFAULT_REPO_ROWS,
   DEFAULT_USUARIOS_HEADERS,
 } from '../data/repositorioDefaultData';
+import { APPS_SCRIPT_CODE } from '../data/appsScriptCode';
 
 export type { AuthorizedSchoolUser };
 
@@ -110,7 +111,7 @@ interface RepositorioSectionProps {
   onOpenCms?: () => void;
 }
 
-const DRIVE_ROOT_FOLDER_ID = '1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC';
+const DRIVE_ROOT_FOLDER_ID = '1U0BfnGyQXzxuKaa95nqGx8iqbdG-eCii';
 const DRIVE_ROOT_FOLDER_URL = `https://drive.google.com/drive/folders/${DRIVE_ROOT_FOLDER_ID}`;
 
 const STORAGE_REPO_CONFIG_KEY = 'ekiraya_repo_unidades_academicas_v7';
@@ -135,620 +136,8 @@ const LEGACY_AUTH_KEYS = [
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
-export const APPS_SCRIPT_CODE = `/**
- * COLEGIO EKIRAYÁ EDUCACIÓN MONTESSORI — CITA MASTER
- * Script Bidireccional (Google Drive <-> Google Sheets <-> Cita Master)
- * Carpeta "Unidades académicas": 1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC
- *
- * Funcionalidades:
- * 1) Sincroniza la carpeta 1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC en la pestaña "Repositorio"
- *    respetando cualquier cambio manual que hagas en Google Sheets.
- * 2) Programa un activador (Trigger) automático cada 24 horas.
- * 3) Recibe usuarios creados desde Cita Master (vía GET o POST) y los escribe en la pestaña "usuarios"
- *    (compatible con Curso | Sección | Nombre y Apellido | Correo institucional | Perfil
- *     y con Nombres | Curso | Correo | Sección).
- */
+// APPS_SCRIPT_CODE importado de src/data/appsScriptCode.ts
 
-const ROOT_FOLDER_ID = '1Tnh99KMMX06tFfNQQt_zumwOcvhOxvXC';
-const REPO_SHEET_NAME = 'repositorio';
-const USERS_SHEET_NAME = 'usuarios';
-const INSTITUTIONAL_TOKEN = 'EKIRAYA-2026';
-
-function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu('📚 Repositorio Ekirayá')
-    .addItem('🔄 Sincronizar hoja Repositorio y Drive ahora', 'sincronizarUnidadesAcademicas')
-    .addItem('⏰ Activar sincronización automática cada 24 horas', 'configurarTrigger24Horas')
-    .addItem('👥 Verificar estructura hoja usuarios', 'inicializarHojaUsuarios')
-    .addToUi();
-}
-
-function configurarTrigger24Horas() {
-  const triggers = ScriptApp.getProjectTriggers();
-  for (let i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'sincronizarUnidadesAcademicas') {
-      ScriptApp.deleteTrigger(triggers[i]);
-    }
-  }
-  ScriptApp.newTrigger('sincronizarUnidadesAcademicas')
-    .timeBased()
-    .everyDays(1)
-    .create();
-}
-
-function obtenerHojaRepositorio(ss, tabNameParam) {
-  if (tabNameParam) {
-    const custom = ss.getSheetByName(tabNameParam);
-    if (custom) return custom;
-  }
-  // 1. Buscar explícitamente la hoja "repositorio" o "Repositorio"
-  const repoSheet = ss.getSheetByName('repositorio') || ss.getSheetByName('Repositorio') || ss.getSheetByName('REPOSITORIO');
-  if (repoSheet) return repoSheet;
-
-  // 2. Si existe una hoja llamada "Hoja 1", "Sheet 1", "Hoja1" o "Sheet1"
-  const allSheets = ss.getSheets();
-  for (let i = 0; i < allSheets.length; i++) {
-    const name = allSheets[i].getName().trim().toLowerCase();
-    if (name === 'hoja 1' || name === 'sheet 1' || name === 'hoja1' || name === 'sheet1' || name === 'monografías' || name === 'monografias') {
-      return allSheets[i];
-    }
-  }
-
-  // 3. Si la primera hoja no es la hoja de usuarios, tomar la primera hoja del libro
-  const usersSh = ss.getSheetByName('usuarios') || ss.getSheetByName('Usuarios');
-  const usersName = usersSh ? usersSh.getName().toLowerCase() : 'usuarios';
-  if (allSheets.length > 0 && allSheets[0].getName().toLowerCase() !== usersName) {
-    return allSheets[0];
-  }
-
-  // 4. Buscar cualquier otra hoja que no sea usuarios
-  for (let j = 0; j < allSheets.length; j++) {
-    const n = allSheets[j].getName().trim().toLowerCase();
-    if (n !== usersName && allSheets[j].getLastRow() > 0) {
-      return allSheets[j];
-    }
-  }
-
-  return allSheets[0];
-}
-
-function obtenerOCrearHojaUsuarios(ssParam) {
-  let ss = ssParam;
-  if (!ss) {
-    try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) {}
-  }
-  if (!ss) return null;
-  const all = ss.getSheets();
-  let userSheet = null;
-
-  for (let i = 0; i < all.length; i++) {
-    const cleanName = all[i].getName().trim().toLowerCase();
-    if (cleanName === 'usuarios' || cleanName === 'usuario') {
-      userSheet = all[i];
-      break;
-    }
-  }
-
-  if (!userSheet) {
-    for (let i = 0; i < all.length; i++) {
-      if (all[i].getLastRow() > 0) {
-        const row1 = all[i]
-          .getRange(1, 1, 1, Math.max(1, all[i].getLastColumn()))
-          .getDisplayValues()[0]
-          .join(' ')
-          .toLowerCase();
-        if (
-          row1.includes('correo') ||
-          row1.includes('email') ||
-          (row1.includes('curso') && row1.includes('sección')) ||
-          (row1.includes('curso') && row1.includes('seccion'))
-        ) {
-          userSheet = all[i];
-          break;
-        }
-      }
-    }
-  }
-
-  const expectedUserHeaders = [
-    'Nombres',
-    'Curso',
-    'Correo',
-    'Sección',
-    'Perfil'
-  ];
-
-  if (!userSheet) {
-    userSheet = ss.insertSheet(USERS_SHEET_NAME);
-    userSheet.appendRow(expectedUserHeaders);
-    userSheet.getRange(1, 1, 1, expectedUserHeaders.length).setFontWeight('bold');
-    poblarUsuariosInicialesEnHoja(userSheet);
-  } else if (userSheet.getLastRow() === 0) {
-    userSheet.appendRow(expectedUserHeaders);
-    userSheet.getRange(1, 1, 1, expectedUserHeaders.length).setFontWeight('bold');
-    poblarUsuariosInicialesEnHoja(userSheet);
-  }
-
-  return userSheet;
-}
-
-function poblarUsuariosInicialesEnHoja(userSheet) {
-  const initialUsers = [
-    ['Coordinación Repositorio Ekirayá', 'Administrativo', 'mebolanos@cem.edu.co', 'Dirección Académica', 'Administrador'],
-    ['Diego Nicolás Mancera', 'Docente', 'dmancera@cem.edu.co', 'Ciencias', 'Docente'],
-    ['Camilo Almario Zea', 'Docente', 'calmario@cem.edu.co', 'Psicología y Ciencias Sociales', 'Docente'],
-    ['Mauricio Lora Aguirre', 'Docente', 'mlora@cem.edu.co', 'Ciencias Sociales y Música', 'Docente'],
-    ['Valentina Sarria Suárez', 'Docente', 'vsarria@cem.edu.co', 'Psicología', 'Docente'],
-    ['Giovanna Rebolledo', 'Docente', 'grebolledo@cem.edu.co', 'Ciencias de la Salud', 'Docente'],
-    ['Luis Fernando Huertas', 'Docente', 'lhuertas@cem.edu.co', 'Ciencias y Aviación', 'Docente'],
-    ['Yenifer Hernández León', 'Docente', 'yhernandez@cem.edu.co', 'Salud Ocupacional', 'Docente'],
-    ['Juliana León', 'Docente', 'jleon@cem.edu.co', 'Artes', 'Docente'],
-    ['Pablo Forero', 'Docente', 'pforero@cem.edu.co', 'Arquitectura y Psicología', 'Docente'],
-    ['John Alexander Aponte Peña', 'Docente', 'japonte@cem.edu.co', 'Ingeniería de Sistemas', 'Docente'],
-    ['Jorge Mario Bernal', 'Docente', 'jbernal@cem.edu.co', 'Ciencias Económicas y Administrativas', 'Docente'],
-    ['Cristina Crane', 'Docente', 'ccrane@cem.edu.co', 'Música', 'Docente'],
-    ['Ricardo Umaña', 'Docente', 'rumana@cem.edu.co', 'Ciencias Sociales', 'Docente'],
-    ['Maria Paula Ramos', 'Docente', 'mpramos@cem.edu.co', 'Administración', 'Docente'],
-    ['Agudelo Gil Emilia', '11', 'eagudelo@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Camacho Tobón Mariana', '11', 'mcamacho@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Chica Navarro Mateo', '11', 'mchica@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Correa González Juan Andrés', '11', 'jcorrea@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Díaz García Isabela', '11', 'idiaz@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Donado Abella Salomé', '11', 'sdonado@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Duplat Rebolledo Camila', '11', 'cduplat@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Durán Sterling Santiago', '11', 'sduran@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Figueredo Zapata Lucas', '11', 'lfigueredo@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['González Pérez Lorenzo', '11', 'lgonzalez@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Jáuregui Cubillos Samuel', '11', 'sjauregui@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Maldonado Delgado Alejandra', '11', 'amaldonado@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Mejía De Valdenebro Úrsula', '11', 'umejia@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Perdigón Mejía Jacobo', '11', 'jperdigon@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Roldán Acosta Valentina', '11', 'vroldan@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Ruiz Bohórquez Mariana', '11', 'mruiz@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Torres Prada Catalina', '11', 'ctorres@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Tubi Medders Luka', '11', 'ltubi@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Vásquez Velásquez Nicolás', '11', 'nvasquez@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Vidal Herrera Violeta', '11', 'vvidal@cem.edu.co', 'Bachillerato', 'Estudiante'],
-    ['Biblioteca y Centro de Recursos', 'No clases', 'biblioteca@cem.edu.co', 'Biblioteca', 'Personal no clases'],
-    ['Secretaría Académica Ekirayá', 'No clases', 'secretaria@cem.edu.co', 'Administración', 'Personal no clases']
-  ];
-  userSheet.getRange(2, 1, initialUsers.length, 5).setValues(initialUsers);
-}
-
-function inicializarHojaUsuarios() {
-  const sh = obtenerOCrearHojaUsuarios();
-  if (sh.getLastRow() <= 2) {
-    sh.clear();
-    const headers = ['Nombres', 'Curso', 'Correo', 'Sección', 'Perfil'];
-    sh.appendRow(headers);
-    sh.getRange(1, 1, 1, headers.length).setFontWeight('bold');
-    poblarUsuariosInicialesEnHoja(sh);
-  }
-}
-
-function agregarUsuarioEnSheet(params, ssParam) {
-  const userSheet = obtenerOCrearHojaUsuarios(ssParam);
-  if (!userSheet) return;
-  const data = userSheet.getDataRange().getDisplayValues();
-  const headers = data[0].map(function(h) { return String(h).trim(); });
-
-  let rawRowMap = {};
-  if (params.rawRowJson) {
-    try {
-      rawRowMap = JSON.parse(params.rawRowJson);
-    } catch (e) {}
-  } else if (params.rawRow && typeof params.rawRow === 'object') {
-    rawRowMap = params.rawRow;
-  }
-
-  const correoNuevo = String(
-    params.correo || params.email || rawRowMap['Correo'] || rawRowMap['Correo institucional'] || ''
-  ).trim().toLowerCase();
-  if (!correoNuevo) return;
-
-  const nuevaFila = headers.map(function(h) {
-    const norm = h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-    if (/correo|email|mail|cuenta/.test(norm)) return correoNuevo;
-    if (/nombre|estudiante|usuario/.test(norm)) return params.nombres || params.nombre || (rawRowMap && rawRowMap[h]) || '';
-    if (/curso|grado|nivel/.test(norm)) return params.curso || (rawRowMap && rawRowMap[h]) || 'General';
-    if (/seccion|dependencia|area/.test(norm)) return params.seccion || (rawRowMap && rawRowMap[h]) || 'General';
-    if (/perfil|rol|admin|cargo/.test(norm)) return params.perfil || params.rol || (rawRowMap && rawRowMap[h]) || 'Estudiante';
-    if (params[h] !== undefined && String(params[h]).trim() !== '') return String(params[h]).trim();
-    if (rawRowMap && rawRowMap[h] !== undefined) return String(rawRowMap[h]).trim();
-    return '';
-  });
-
-  for (let r = 1; r < data.length; r++) {
-    const rowValues = data[r].map(function(cell) { return String(cell || '').trim().toLowerCase(); });
-    if (rowValues.indexOf(correoNuevo) !== -1) {
-      userSheet.getRange(r + 1, 1, 1, nuevaFila.length).setValues([nuevaFila]);
-      SpreadsheetApp.flush();
-      return;
-    }
-  }
-
-  userSheet.appendRow(nuevaFila);
-  SpreadsheetApp.flush();
-}
-
-function actualizarUsuarioEnSheet(params, ssParam) {
-  const userSheet = obtenerOCrearHojaUsuarios(ssParam);
-  if (!userSheet) return;
-  const data = userSheet.getDataRange().getDisplayValues();
-  if (data.length <= 1) {
-    agregarUsuarioEnSheet(params, ssParam);
-    return;
-  }
-  const headers = data[0].map(function(h) { return String(h).trim(); });
-
-  const targetEmail = String(
-    params.originalCorreo || params.originalEmail || params.correo || params.email || ''
-  ).trim().toLowerCase();
-  const newEmail = String(
-    params.correo || params.email || targetEmail
-  ).trim().toLowerCase();
-
-  let rawRowMap = {};
-  if (params.rawRowJson) {
-    try { rawRowMap = JSON.parse(params.rawRowJson); } catch (e) {}
-  } else if (params.rawRow && typeof params.rawRow === 'object') {
-    rawRowMap = params.rawRow;
-  } else if (params.rowJson) {
-    try { rawRowMap = JSON.parse(params.rowJson); } catch (e) {}
-  }
-
-  // Priorizar estrictamente los datos nuevos editados por el usuario
-  const nuevaFila = headers.map(function(h) {
-    const norm = h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-    if (/correo|email|mail|cuenta/.test(norm)) {
-      return newEmail;
-    }
-    if (/nombre|estudiante|usuario/.test(norm)) {
-      return params.nombres || params.nombre || (rawRowMap && rawRowMap[h]) || '';
-    }
-    if (/curso|grado|nivel/.test(norm)) {
-      return params.curso || (rawRowMap && rawRowMap[h]) || 'General';
-    }
-    if (/seccion|dependencia|area/.test(norm)) {
-      return params.seccion || (rawRowMap && rawRowMap[h]) || 'General';
-    }
-    if (/perfil|rol|admin|cargo|estamento/.test(norm)) {
-      return params.perfil || params.rol || (rawRowMap && rawRowMap[h]) || 'Estudiante';
-    }
-    if (params[h] !== undefined && String(params[h]).trim() !== '') {
-      return String(params[h]).trim();
-    }
-    if (rawRowMap && rawRowMap[h] !== undefined) {
-      return String(rawRowMap[h]).trim();
-    }
-    return '';
-  });
-
-  // Buscar por correo en cualquier columna de la fila
-  let foundRowIdx = -1;
-  for (let r = 1; r < data.length; r++) {
-    const rowValues = data[r].map(function(cell) { return String(cell || '').trim().toLowerCase(); });
-    if (rowValues.indexOf(targetEmail) !== -1 || (newEmail && rowValues.indexOf(newEmail) !== -1)) {
-      foundRowIdx = r;
-      break;
-    }
-  }
-
-  // Si no se halló por correo, buscar por nombre
-  if (foundRowIdx < 1 && params.nombres) {
-    const targetName = String(params.nombres).trim().toLowerCase();
-    for (let r = 1; r < data.length; r++) {
-      const rowValues = data[r].map(function(cell) { return String(cell || '').trim().toLowerCase(); });
-      if (rowValues.indexOf(targetName) !== -1) {
-        foundRowIdx = r;
-        break;
-      }
-    }
-  }
-
-  if (foundRowIdx >= 1) {
-    userSheet.getRange(foundRowIdx + 1, 1, 1, nuevaFila.length).setValues([nuevaFila]);
-  } else {
-    userSheet.appendRow(nuevaFila);
-  }
-  SpreadsheetApp.flush();
-}
-
-function eliminarUsuarioEnSheet(params, ssParam) {
-  const userSheet = obtenerOCrearHojaUsuarios(ssParam);
-  if (!userSheet) return;
-  const data = userSheet.getDataRange().getDisplayValues();
-  if (data.length <= 1) return;
-  const headers = data[0].map(function(h) { return String(h).trim(); });
-  let correoColIdx = headers.findIndex(function(h) {
-    const norm = h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    return /correo|email|mail|cuenta/.test(norm);
-  });
-  if (correoColIdx < 0) {
-    for (let c = 0; c < headers.length; c++) {
-      for (let r = 1; r < Math.min(data.length, 5); r++) {
-        if (String(data[r][c] || '').includes('@')) {
-          correoColIdx = c;
-          break;
-        }
-      }
-      if (correoColIdx >= 0) break;
-    }
-  }
-  if (correoColIdx < 0) correoColIdx = 2;
-  const correoEliminar = String(
-    params.correo || params.email || params.originalCorreo || params.originalEmail || ''
-  ).trim().toLowerCase();
-  if (!correoEliminar) return;
-
-  for (let r = 1; r < data.length; r++) {
-    const c = String(data[r][correoColIdx] || '').trim().toLowerCase();
-    if (c === correoEliminar) {
-      userSheet.deleteRow(r + 1);
-      SpreadsheetApp.flush();
-      return;
-    }
-  }
-}
-
-function sincronizarUnidadesAcademicas(ssParam) {
-  let ss = ssParam;
-  if (!ss) {
-    try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) {}
-  }
-  if (!ss) return;
-  let sheet = obtenerHojaRepositorio(ss, null);
-
-  const expectedHeaders = [
-    'documento_id',
-    'titulo',
-    'autor',
-    'grado',
-    'año',
-    'Unidad Académica',
-    'Linea de investigación',
-    'tipo',
-    'palabras_clave',
-    'resumen',
-    'Asesor(es)',
-    'drive_file_id',
-    'url_documento',
-    'visibilidad',
-    'estado',
-    'fecha_registro',
-    'fecha_actualizacion'
-  ];
-
-  if (!sheet) {
-    sheet = ss.insertSheet('repositorio');
-  }
-
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(expectedHeaders);
-    sheet.getRange(1, 1, 1, expectedHeaders.length).setFontWeight('bold');
-  }
-
-  const repoData = sheet.getDataRange().getDisplayValues();
-  const repoHeaders = repoData[0].map(function(h) { return String(h).trim(); });
-
-  let idColIdx = repoHeaders.findIndex(function(h) { return /^id|id del archivo|id_archivo|documento_id|drive_file_id/i.test(h); });
-  let urlColIdx = repoHeaders.findIndex(function(h) { return /enlace|url|link|drive|url_documento/i.test(h); });
-  let nameColIdx = repoHeaders.findIndex(function(h) { return /nombre del archivo|archivo|file|titulo/i.test(h); });
-
-  const existingKeys = new Set();
-  for (let i = 1; i < repoData.length; i++) {
-    const rowId = idColIdx >= 0 ? String(repoData[i][idColIdx]).trim() : '';
-    const rowUrl = urlColIdx >= 0 ? String(repoData[i][urlColIdx]).trim() : '';
-    const rowName = nameColIdx >= 0 ? String(repoData[i][nameColIdx]).trim() : '';
-    if (rowId) existingKeys.add(rowId);
-    if (rowUrl) existingKeys.add(rowUrl);
-    if (rowName) existingKeys.add(rowName);
-  }
-
-  const rootFolder = DriveApp.getFolderById(ROOT_FOLDER_ID);
-  recorrerCarpetasDrive(rootFolder, [], sheet, repoHeaders, existingKeys);
-  obtenerOCrearHojaUsuarios();
-  SpreadsheetApp.flush();
-}
-
-function recorrerCarpetasDrive(folder, pathParts, sheet, headers, existingKeys) {
-  const files = folder.getFiles();
-  while (files.hasNext()) {
-    const file = files.next();
-    const fileId = file.getId();
-    const fileUrl = file.getUrl();
-    const fileName = file.getName();
-
-    if (existingKeys.has(fileId) || existingKeys.has(fileUrl) || existingKeys.has(fileName)) continue;
-
-    const cleanTitle = fileName
-      .replace(/\.(pdf|docx|doc)$/i, '')
-      .replace(/[_-]+/g, ' ')
-      .trim();
-
-    const unidadAcademica = pathParts.length > 0 ? pathParts[0] : folder.getName();
-    const lineaInvestigacion = pathParts.length > 1 ? pathParts[1] : unidadAcademica;
-    const autor = pathParts.length > 0 ? pathParts[pathParts.length - 1] : 'Estudiante Grado 11';
-    const anioLectivo = String(new Date(file.getDateCreated()).getFullYear());
-    const randomId = String(Math.floor(1000 + Math.random() * 9000));
-
-    const newRow = headers.map(function(headerName) {
-      const h = headerName.toLowerCase();
-      if (h === 'documento_id' || h === 'id') return randomId;
-      if (h === 'titulo' || h.includes('título')) return cleanTitle;
-      if (h === 'autor' || h.includes('estudiante')) return autor;
-      if (h === 'grado') return '11';
-      if (h === 'año' || h === 'ano' || h.includes('lectivo') || h.includes('fecha')) return anioLectivo;
-      if (h === 'unidad académica' || h.includes('unidad') || h === 'area') return unidadAcademica;
-      if (h === 'linea de investigación' || h.includes('linea')) return lineaInvestigacion;
-      if (h === 'tipo') return 'Investigación';
-      if (h === 'palabras_clave' || h.includes('palabras')) return cleanTitle.split(' ').slice(0, 5).join(', ');
-      if (h === 'resumen') return 'Trabajo monográfico desarrollado en la unidad académica ' + unidadAcademica + ' del Colegio Ekirayá.';
-      if (h === 'asesor(es)' || h.includes('asesor')) return 'Docente Ekirayá';
-      if (h === 'drive_file_id' || h.includes('file_id') || h === 'id del archivo') return fileId;
-      if (h === 'url_documento' || h.includes('url') || h.includes('enlace') || h.includes('drive')) return fileUrl;
-      if (h === 'visibilidad') return 'Digital';
-      if (h === 'estado') return 'Finalizado';
-      if (h === 'fecha_registro') return '23 enero 2026';
-      if (h === 'fecha_actualizacion') return '10-04-2026';
-      if (h.includes('archivo') && !h.includes('id')) return fileName;
-      return '';
-    });
-
-    sheet.appendRow(newRow);
-    existingKeys.add(fileId);
-  }
-
-  const subFolders = folder.getFolders();
-  while (subFolders.hasNext()) {
-    const sub = subFolders.next();
-    recorrerCarpetasDrive(sub, pathParts.concat([sub.getName()]), sheet, headers, existingKeys);
-  }
-}
-
-function leerHojaPorTitulos(sheet) {
-  if (!sheet || sheet.getLastRow() <= 1) {
-    return { headers: [], rows: [] };
-  }
-  const values = sheet.getDataRange().getDisplayValues();
-  const rawHeaders = values[0].map(function(h, idx) {
-    return String(h || '').trim() || ('Columna_' + (idx + 1));
-  });
-  const richTextValues = sheet.getDataRange().getRichTextValues();
-  const rows = [];
-
-  for (let r = 1; r < values.length; r++) {
-    const rowValues = values[r];
-    const isEmpty = rowValues.every(function(cell) { return !String(cell || '').trim(); });
-    if (isEmpty) continue;
-
-    const rowObj = {};
-    for (let c = 0; c < rawHeaders.length; c++) {
-      const colTitle = rawHeaders[c];
-      const cellVal = String(rowValues[c] || '').trim();
-      const richLink = richTextValues[r] && richTextValues[r][c] ? richTextValues[r][c].getLinkUrl() : null;
-      if (richLink && !cellVal.startsWith('http')) {
-        rowObj[colTitle + '_url'] = richLink;
-      }
-      rowObj[colTitle] = cellVal;
-    }
-    rows.push(rowObj);
-  }
-  return { headers: rawHeaders, rows: rows };
-}
-
-function procesarSolicitud(params) {
-  params = params || {};
-  const tokenParam = params.token || '';
-  if (INSTITUTIONAL_TOKEN && tokenParam && tokenParam !== INSTITUTIONAL_TOKEN) {
-    const errPayload = JSON.stringify({ error: 'Token no válido' });
-    if (params.callback) {
-      return ContentService.createTextOutput(params.callback + '(' + errPayload + ');')
-        .setMimeType(ContentService.MimeType.JAVASCRIPT);
-    }
-    return ContentService.createTextOutput(errPayload)
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
-  if (params.action === 'ping' || params.action === 'test') {
-    const pingPayload = JSON.stringify({
-      success: true,
-      message: 'Apps Script de Cita Master conectado exitosamente',
-      action: 'ping',
-      timestamp: new Date().toISOString()
-    });
-    if (params.callback) {
-      return ContentService.createTextOutput(params.callback + '(' + pingPayload + ');')
-        .setMimeType(ContentService.MimeType.JAVASCRIPT);
-    }
-    return ContentService.createTextOutput(pingPayload)
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
-  // Obtener libro de cálculo: admite scripts vinculados y scripts independientes (vía ID o URL)
-  let ss = null;
-  try {
-    ss = SpreadsheetApp.getActiveSpreadsheet();
-  } catch (e) {}
-
-  if (!ss) {
-    const sId = params.spreadsheetId || params.sheetId;
-    if (sId) {
-      try { ss = SpreadsheetApp.openById(sId); } catch (e) {}
-    } else if (params.connectionUrl || params.sheetUrl) {
-      try { ss = SpreadsheetApp.openByUrl(params.connectionUrl || params.sheetUrl); } catch (e) {}
-    }
-  }
-
-  if (params.action === 'updateUser') {
-    actualizarUsuarioEnSheet(params, ss);
-  } else if (params.action === 'addUser') {
-    agregarUsuarioEnSheet(params, ss);
-  } else if (params.action === 'deleteUser') {
-    eliminarUsuarioEnSheet(params, ss);
-  }
-
-  let usersSheet = obtenerOCrearHojaUsuarios(ss);
-  let repoSheet = obtenerHojaRepositorio(ss, params.sheet || params.tab || params.repoTabName || 'repositorio');
-
-  // Solo escanear Drive si se solicita explícitamente (syncDrive o triggerDriveScan)
-  if (
-    params.action === 'syncDrive' ||
-    params.action === 'scanDrive' ||
-    params.triggerDriveScan === 'true' ||
-    params.triggerDriveScan === true
-  ) {
-    try {
-      sincronizarUnidadesAcademicas(ss);
-      repoSheet = obtenerHojaRepositorio(ss, params.sheet || params.tab || params.repoTabName || 'repositorio');
-    } catch (err) {
-      // Continúa leyendo las hojas disponibles
-    }
-  }
-
-  const repoData = leerHojaPorTitulos(repoSheet);
-  const usersData = leerHojaPorTitulos(usersSheet);
-
-  const payload = JSON.stringify({
-    success: true,
-    action: params.action || 'syncRepo',
-    folderId: ROOT_FOLDER_ID,
-    syncedAt: new Date().toISOString(),
-    repoSheetName: repoSheet ? repoSheet.getName() : 'repositorio',
-    headers: repoData.headers,
-    rows: repoData.rows,
-    usuariosHeaders: usersData.headers,
-    usuariosRows: usersData.rows,
-    totalMonographs: repoData.rows.length,
-    totalUsers: usersData.rows.length
-  });
-
-  if (params.callback) {
-    return ContentService.createTextOutput(params.callback + '(' + payload + ');')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
-
-  return ContentService.createTextOutput(payload)
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function doGet(e) {
-  const params = (e && e.parameter) ? e.parameter : {};
-  return procesarSolicitud(params);
-}
-
-function doPost(e) {
-  let params = (e && e.parameter) ? e.parameter : {};
-  try {
-    if (e && e.postData && e.postData.contents) {
-      const bodyParams = JSON.parse(e.postData.contents);
-      params = Object.assign({}, params, bodyParams);
-    }
-  } catch (err) {
-    // Usar params de query
-  }
-  return procesarSolicitud(params);
-}`;
 
 /** Extrae el ID de una hoja de Google Sheets desde su URL */
 function extractSpreadsheetId(url: string): string | null {
@@ -1389,9 +778,6 @@ function mergeUsersLists(
   if (sheetUsers && sheetUsers.length > 0) {
     const map = new Map<string, AuthorizedSchoolUser>();
 
-    // El administrador institucional Mauricio Bolaños siempre está garantizado
-    map.set(DEFAULT_AUTHORIZED_USERS[0].correo.toLowerCase(), DEFAULT_AUTHORIZED_USERS[0]);
-
     // Los datos de Google Sheets sobreescriben cualquier copia local (reflejan nombres, curso, rol, etc. editados en Sheets)
     for (const u of sheetUsers) {
       if (u && u.correo) {
@@ -1399,7 +785,11 @@ function mergeUsersLists(
         map.set(key, {
           ...u,
           correo: key,
-          isAdmin: Boolean(u.isAdmin || key === 'mebolanos@cem.edu.co'),
+          isAdmin: Boolean(
+            u.isAdmin ||
+            key === 'mebolanos@cem.edu.co' ||
+            /admin|administrador|coordinador|directivo/i.test(u.perfil || '')
+          ),
           createdInApp: false,
           syncedToSheet: true,
           rawRow: u.rawRow ? { ...u.rawRow } : undefined,
@@ -1415,6 +805,12 @@ function mergeUsersLists(
           map.set(key, u);
         }
       }
+    }
+
+    // Asegurar que mebolanos@cem.edu.co siempre exista como fallback si la hoja no lo tiene
+    const adminKey = 'mebolanos@cem.edu.co';
+    if (!map.has(adminKey)) {
+      map.set(adminKey, DEFAULT_AUTHORIZED_USERS[0]);
     }
 
     return Array.from(map.values());
@@ -3016,6 +2412,11 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       if (effectiveExec && effectiveExec.includes('script.google.com')) {
         const jsonpRes = await callAppsScriptViaBrowserJsonp(effectiveExec, {
           action: 'updateUser',
+          subAction: 'update',
+          manageAction: 'update',
+          spreadsheetId: '1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI',
+          connectionUrl: 'https://docs.google.com/spreadsheets/d/1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI/edit',
+          sheetUrl: 'https://docs.google.com/spreadsheets/d/1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI/edit',
           token: accessToken || 'EKIRAYA-2026',
           originalCorreo: originalEmail,
           originalEmail: originalEmail,
@@ -3142,6 +2543,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       if (effectiveExec && effectiveExec.includes('script.google.com')) {
         await callAppsScriptViaBrowserJsonp(effectiveExec, {
           action: 'deleteUser',
+          subAction: 'delete',
+          spreadsheetId: '1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI',
+          connectionUrl: 'https://docs.google.com/spreadsheets/d/1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI/edit',
+          sheetUrl: 'https://docs.google.com/spreadsheets/d/1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI/edit',
           token: accessToken || 'EKIRAYA-2026',
           correo: emailToDelete,
           email: emailToDelete,
@@ -3890,6 +3295,18 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   // PANTALLA DE CONTROL DE ACCESO: SOLO USUARIOS EN LA HOJA "USUARIOS"
   // ============================================================================
   if (!currentUser) {
+    const adminUser = authorizedUsers.find((u) => u.isAdmin || /admin/i.test(u.perfil));
+    const adminDisplayName = adminUser?.nombres || 'Esteban Bolaños R';
+    const adminEmail = adminUser?.correo || 'mebolanos@cem.edu.co';
+
+    const docenteUser = authorizedUsers.find((u) => !u.isAdmin && /docente/i.test(u.perfil));
+    const docenteDisplayName = docenteUser?.nombres || 'Diego Nicolás Mancera';
+    const docenteEmail = docenteUser?.correo || 'dmancera@cem.edu.co';
+
+    const estudianteUser = authorizedUsers.find((u) => /estudiante/i.test(u.perfil));
+    const estudianteDisplayName = estudianteUser?.nombres || 'Emilia Agudelo Gil';
+    const estudianteEmail = estudianteUser?.correo || 'eagudelo@cem.edu.co';
+
     return (
       <div className="max-w-2xl mx-auto my-6 space-y-6">
         <div className="bg-gradient-to-br from-[#44345c] via-[#664d88] to-[#533e6f] rounded-2xl p-6 sm:p-8 text-white border border-violet-800/40 shadow-md space-y-5">
@@ -3935,100 +3352,51 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               />
 
               <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-                <span className="text-slate-500 font-medium">Accesos de prueba rápidos:</span>
+                <span className="text-slate-500 font-medium">Accesos rápidos institucionales:</span>
                 <button
                   type="button"
-                  onClick={() => setLoginEmailInput('mebolanos@cem.edu.co')}
-                  className="px-2 py-0.5 rounded bg-violet-100 text-violet-900 hover:bg-violet-200 font-semibold"
+                  onClick={() => setLoginEmailInput(adminEmail)}
+                  className="px-2 py-0.5 rounded bg-violet-100 text-violet-900 hover:bg-violet-200 font-semibold cursor-pointer"
                 >
-                  Admin (Mauricio Bolaños)
+                  Admin ({adminDisplayName})
                 </button>
                 <button
                   type="button"
-                  onClick={() => setLoginEmailInput('nlondono@cem.edu.co')}
-                  className="px-2 py-0.5 rounded bg-blue-100 text-blue-900 hover:bg-blue-200 font-medium"
+                  onClick={() => setLoginEmailInput(docenteEmail)}
+                  className="px-2 py-0.5 rounded bg-blue-100 text-blue-900 hover:bg-blue-200 font-medium cursor-pointer"
                 >
-                  Docente (Nicolás Londoño)
+                  Docente ({docenteDisplayName})
                 </button>
                 <button
                   type="button"
-                  onClick={() => setLoginEmailInput('smendoza@cem.edu.co')}
-                  className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 hover:bg-emerald-200 font-medium"
+                  onClick={() => setLoginEmailInput(estudianteEmail)}
+                  className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 hover:bg-emerald-200 font-medium cursor-pointer"
                 >
-                  Estudiante Grado 11° (Sofía Mendoza)
+                  Estudiante ({estudianteDisplayName})
                 </button>
               </div>
             </div>
 
             {loginError && (
-              <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 space-y-2">
+              <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 space-y-1.5">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                  <span>{loginError}</span>
+                  <span className="leading-relaxed">{loginError}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRegisterEmail(loginEmailInput || '');
-                    setShowCreateUserModal(true);
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-800 text-white font-semibold flex items-center gap-1.5 transition-colors cursor-pointer text-xs"
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span>Crear usuario ahora y sincronizar</span>
-                </button>
               </div>
             )}
 
-            <div className="pt-2 border-t border-slate-100 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
-                <span>
-                  Usuarios autorizados activos: <strong className="text-slate-800">{authorizedUsers.length}</strong>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRegisterEmail(loginEmailInput || '');
-                    setShowCreateUserModal(true);
-                  }}
-                  className="text-violet-700 hover:text-violet-950 font-bold underline flex items-center gap-1 cursor-pointer"
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span>Crear nuevo usuario desde la app</span>
-                </button>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full">
-                <button
-                  type="button"
-                  onClick={handleManualSyncNow}
-                  disabled={isSyncing}
-                  title="Sincronizar ahora manualmente con Apps Script y Google Sheets"
-                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-slate-200 shrink-0 cursor-pointer"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar ahora'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowSyncConfigModal(true)}
-                  title="Configurar dirección de implementación de Google Sheets para todas las terminales"
-                  className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-900 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-violet-200 shrink-0 cursor-pointer"
-                >
-                  <Settings className="w-3.5 h-3.5 text-violet-700" />
-                  <span>Configurar Google Sheets</span>
-                </button>
-                <button
-                  type="submit"
-                  className="w-full sm:flex-1 px-5 py-2.5 rounded-xl bg-violet-700 hover:bg-violet-800 text-white text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer"
-                >
-                  <UserCheck className="w-4 h-4 shrink-0" />
-                  <span className="truncate">Ingresar al Repositorio</span>
-                </button>
-              </div>
+            <div className="pt-2 border-t border-slate-100">
+              <button
+                type="submit"
+                className="w-full py-3 px-5 rounded-xl bg-[#664d88] hover:bg-[#533e6f] text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-xs hover:shadow-md cursor-pointer"
+              >
+                <UserCheck className="w-4 h-4 shrink-0" />
+                <span>Ingresar al Repositorio</span>
+              </button>
             </div>
 
-            {/* Indicador de estado de sincronización en vivo cada 10s */}
+            {/* Indicador de estado de sincronización en vivo */}
             <div className="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
               <div className="flex items-center gap-1.5">
                 <span className="relative flex h-2 w-2">
@@ -4044,11 +3412,11 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   ></span>
                 </span>
                 <span className="font-medium text-slate-700">
-                  Sincronización en vivo cada 10s · Multi-terminal activo (50+ equipos)
+                  Sincronización institucional en vivo · Multi-terminal activo
                 </span>
               </div>
               <span>
-                {lastSyncDate ? `Última sincronización: ${lastSyncDate}` : 'Listo para sincronizar'}
+                {lastSyncDate ? `Última sincronización: ${lastSyncDate}` : 'Listo'}
               </span>
             </div>
           </form>

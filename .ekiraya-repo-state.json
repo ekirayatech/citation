@@ -1,10 +1,10 @@
 {
-  "appsScriptExecUrl": "https://script.google.com/macros/s/AKfycbzh-ulwpUB91SlFUiRazxME5kB_jNd_Zak0vzHLcx0CA7jfK8Cd0x3zqrs7jvb55Mw/exechttps://script.ghttps://script.google.com/macros/s/AKfycbzYZxNVX-ytCVkFZ0sm-MABmKEEKOZXcpMrVm4EArfWJXYlRBA7qpJCTLFUG3rR8wM/execoogle.com/macros/s/test/exec",
-  "connectionUrl": "https://docs.google.com/spreadsheets/d/test/edit",
+  "appsScriptExecUrl": "https://script.google.com/macros/s/AKfycbzh-ulwpUB91SlFUiRazxME5kB_jNd_Zak0vzHLcx0CA7jfK8Cd0x3zqrs7jvb55Mw/exec",
+  "connectionUrl": "https://docs.google.com/spreadsheets/d/1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI/edit",
   "repoTabName": "repositorio",
   "accessToken": "EKIRAYA-2026",
-  "lastSyncDate": "6/10/2026, 12:49:47 p. m.",
-  "lastSyncTimestamp": 1791290987597,
+  "lastSyncDate": "7/10/2026, 3:09:07 p. m.",
+  "lastSyncTimestamp": 1791385747987,
   "rawHeaders": [
     "documento_id",
     "titulo",

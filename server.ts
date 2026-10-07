@@ -20,17 +20,30 @@ const __dirname = path.dirname(__filename);
 
 const CMS_FILE_PATH = path.join(__dirname, '.ekiraya-cms-pages.json');
 
+function isForbiddenCmsPage(p: any): boolean {
+  if (!p) return true;
+  const str = `${p.id || ''} ${p.title || ''} ${p.navLabel || ''} ${p.slug || ''}`.toLowerCase();
+  return (
+    str.includes('crono') ||
+    str.includes('línea') ||
+    str.includes('linea') ||
+    str.includes('investiga')
+  );
+}
+
 function loadPersistedCmsPages(): CmsPage[] {
   try {
     if (fs.existsSync(CMS_FILE_PATH)) {
       const raw = fs.readFileSync(CMS_FILE_PATH, 'utf-8');
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) {
+        return parsed.filter((p) => !isForbiddenCmsPage(p));
+      }
     }
   } catch {
     // Ignore error
   }
-  return DEFAULT_CMS_PAGES;
+  return DEFAULT_CMS_PAGES.filter((p) => !isForbiddenCmsPage(p));
 }
 
 function savePersistedCmsPages(pages: CmsPage[]): void {
@@ -105,6 +118,15 @@ interface PersistedRepoState {
 }
 
 const DEFAULT_ADMIN_USER: AuthorizedSchoolUser = DEFAULT_AUTHORIZED_USERS[0];
+
+function extractValidAppsScriptUrl(url: string | undefined | null): string {
+  if (!url) return '';
+  const trimmed = String(url).trim();
+  const match = trimmed.match(/https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec/);
+  if (match) return match[0];
+  if (trimmed.includes('script.google.com')) return trimmed;
+  return '';
+}
 
 function normalizeHeaderKey(str: string): string {
   return String(str || '')
@@ -384,17 +406,18 @@ function mergeUsersLists(
   if (sheetUsers && sheetUsers.length > 0) {
     const map = new Map<string, AuthorizedSchoolUser>();
 
-    // Mauricio Bolaños (admin institucional) siempre preservado
-    map.set(DEFAULT_ADMIN_USER.correo.toLowerCase(), DEFAULT_ADMIN_USER);
-
-    // Los usuarios leídos de Google Sheets tienen prioridad absoluta (reflejan altas, bajas y ediciones en la hoja)
+    // Los usuarios leídos de Google Sheets tienen prioridad absoluta (reflejan nombres, cursos, roles y ediciones en la hoja)
     for (const u of sheetUsers) {
       if (u && u.correo) {
         const key = u.correo.trim().toLowerCase();
         map.set(key, {
           ...u,
           correo: key,
-          isAdmin: Boolean(u.isAdmin || key === 'mebolanos@cem.edu.co'),
+          isAdmin: Boolean(
+            u.isAdmin ||
+            key === 'mebolanos@cem.edu.co' ||
+            /admin|administrador|coordinador|directivo/i.test(u.perfil || '')
+          ),
           createdInApp: false,
           syncedToSheet: true,
           rawRow: u.rawRow ? { ...u.rawRow } : undefined,
@@ -410,6 +433,12 @@ function mergeUsersLists(
           map.set(key, u);
         }
       }
+    }
+
+    // Asegurar que mebolanos@cem.edu.co siempre exista como fallback si la hoja no lo tiene
+    const adminKey = 'mebolanos@cem.edu.co';
+    if (!map.has(adminKey)) {
+      map.set(adminKey, DEFAULT_ADMIN_USER);
     }
 
     return Array.from(map.values());
@@ -544,10 +573,16 @@ async function pushUserToAppsScriptFromServer(
   }
 
   const targetOrigEmail = (originalEmail || user.correo).trim().toLowerCase();
+  const subAction = action === 'updateUser' ? 'update' : 'add';
 
   const query = new URLSearchParams({
     ...extraFields,
     action,
+    subAction,
+    manageAction: subAction,
+    spreadsheetId: '1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI',
+    connectionUrl: 'https://docs.google.com/spreadsheets/d/1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI/edit',
+    sheetUrl: 'https://docs.google.com/spreadsheets/d/1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI/edit',
     token: (token || 'EKIRAYA-2026').trim(),
     curso: user.curso || 'General',
     seccion: user.seccion || 'General',
@@ -570,7 +605,7 @@ async function pushUserToAppsScriptFromServer(
     const getResp = await fetch(fullGetUrl, {
       method: 'GET',
       redirect: 'follow',
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(15000),
       headers: {
         Accept: 'application/json, text/plain, */*',
         'Cache-Control': 'no-cache',
@@ -607,7 +642,7 @@ async function pushUserToAppsScriptFromServer(
     const postResp = await fetch(cleanUrl, {
       method: 'POST',
       redirect: 'follow',
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(15000),
       headers: {
         'Content-Type': 'text/plain;charset=utf-8',
         Accept: 'application/json, text/plain, */*',
@@ -615,6 +650,11 @@ async function pushUserToAppsScriptFromServer(
       body: JSON.stringify({
         ...extraFields,
         action,
+        subAction,
+        manageAction: subAction,
+        spreadsheetId: '1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI',
+        connectionUrl: 'https://docs.google.com/spreadsheets/d/1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI/edit',
+        sheetUrl: 'https://docs.google.com/spreadsheets/d/1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI/edit',
         token: (token || 'EKIRAYA-2026').trim(),
         curso: user.curso || 'General',
         seccion: user.seccion || 'General',
@@ -669,6 +709,9 @@ async function deleteUserFromAppsScript(
   const separator = cleanUrl.includes('?') ? '&' : '?';
   const query = new URLSearchParams({
     action: 'deleteUser',
+    subAction: 'delete',
+    spreadsheetId: '1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI',
+    connectionUrl: 'https://docs.google.com/spreadsheets/d/1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI/edit',
     token: (token || 'EKIRAYA-2026').trim(),
     correo: email,
     email: email,
@@ -679,6 +722,7 @@ async function deleteUserFromAppsScript(
     const resp = await fetch(`${cleanUrl}${separator}${query.toString()}`, {
       method: 'GET',
       redirect: 'follow',
+      signal: AbortSignal.timeout(15000),
       headers: { Accept: 'application/json, text/plain, */*' },
     });
     return resp.ok;
@@ -1276,6 +1320,228 @@ async function startServer() {
       });
     }
   });
+
+  // ============================================================================
+  // ENDPOINTS REST API DE CONTRATO (TAREAS 2 Y 4: getMonografias, checkUserRole, syncDrive, manageUser)
+  // ============================================================================
+
+  // Endpoint: GET /api/repo/getMonografias (y alias /api/repo/monografias)
+  const handleGetMonografias = (_req: express.Request, res: express.Response) => {
+    try {
+      const state = loadPersistedState();
+      res.json({
+        status: 'success',
+        total: state.rawRows.length,
+        headers: state.rawHeaders,
+        data: state.rawRows,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: 'error',
+        message: err instanceof Error ? err.message : 'Error obteniendo monografías',
+      });
+    }
+  };
+  app.get('/api/repo/getMonografias', handleGetMonografias);
+  app.get('/api/repo/monografias', handleGetMonografias);
+
+  // Endpoint: GET /api/repo/checkUserRole (y alias /api/repo/check-user-role)
+  const handleCheckUserRole = (req: express.Request, res: express.Response) => {
+    try {
+      const emailQuery = String(req.query.email || req.query.correo || '').trim().toLowerCase();
+      if (!emailQuery) {
+        res.status(400).json({
+          status: 'error',
+          authorized: false,
+          message: 'Parámetro de correo requerido',
+        });
+        return;
+      }
+
+      const isValidDomain = emailQuery.endsWith('@cem.edu.co') || emailQuery.endsWith('@ekiraya.edu.co');
+      if (!isValidDomain) {
+        res.status(403).json({
+          status: 'error',
+          authorized: false,
+          message: 'Dominio no permitido. Solo se aceptan cuentas institucionales @cem.edu.co o @ekiraya.edu.co',
+          email: emailQuery,
+        });
+        return;
+      }
+
+      const state = loadPersistedState();
+      const user = state.authorizedUsers.find((u) => u.correo.toLowerCase() === emailQuery);
+
+      if (!user) {
+        res.status(404).json({
+          status: 'error',
+          authorized: false,
+          message: `El correo institucional ${emailQuery} no se encuentra registrado en la hoja de usuarios`,
+          email: emailQuery,
+        });
+        return;
+      }
+
+      res.json({
+        status: 'success',
+        authorized: true,
+        email: emailQuery,
+        perfil: user.perfil,
+        isAdmin: user.isAdmin,
+        user,
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: 'error',
+        authorized: false,
+        message: err instanceof Error ? err.message : 'Error verificando rol de usuario',
+      });
+    }
+  };
+  app.get('/api/repo/checkUserRole', handleCheckUserRole);
+  app.get('/api/repo/check-user-role', handleCheckUserRole);
+
+  // Endpoint: POST /api/repo/syncDrive (y alias /api/repo/sync-drive)
+  const handleSyncDrive = async (req: express.Request, res: express.Response) => {
+    try {
+      const state = loadPersistedState();
+      const { email, correo, appsScriptExecUrl, connectionUrl } = req.body || {};
+      const userMail = String(email || correo || '').trim().toLowerCase();
+
+      if (userMail && userMail !== 'mebolanos@cem.edu.co') {
+        const found = state.authorizedUsers.find((u) => u.correo.toLowerCase() === userMail);
+        if (!found || !found.isAdmin) {
+          res.status(403).json({
+            status: 'error',
+            message: 'Acceso denegado: Solo el perfil Administrador puede solicitar sincronización de Drive',
+          });
+          return;
+        }
+      }
+
+      const cleanScript = extractValidAppsScriptUrl(appsScriptExecUrl || state.appsScriptExecUrl);
+      const cleanSheet = String(connectionUrl || state.connectionUrl || '').trim();
+
+      const syncResult = await executeServerSyncLogic({
+        appsScriptExecUrl: cleanScript,
+        connectionUrl: cleanSheet,
+        repoTabName: state.repoTabName || 'repositorio',
+        accessToken: state.accessToken || 'EKIRAYA-2026',
+        triggerDriveScan: true,
+      });
+
+      res.json({
+        status: 'success',
+        message: 'Sincronización de Drive completada exitosamente',
+        totalMonografias: syncResult.state.rawRows.length,
+        totalUsuarios: syncResult.state.authorizedUsers.length,
+        state: syncResult.state,
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: 'error',
+        message: err instanceof Error ? err.message : 'Error sincronizando Drive',
+      });
+    }
+  };
+  app.post('/api/repo/syncDrive', handleSyncDrive);
+  app.post('/api/repo/sync-drive', handleSyncDrive);
+
+  // Endpoint: POST /api/repo/manageUser (y alias /api/repo/manage-user)
+  const handleManageUser = async (req: express.Request, res: express.Response) => {
+    try {
+      const state = loadPersistedState();
+      const { subAction, action, user, email, originalEmail, ...rest } = req.body || {};
+      const targetAction = String(subAction || action || 'add').toLowerCase();
+
+      const cleanScript = extractValidAppsScriptUrl(state.appsScriptExecUrl);
+      const token = state.accessToken || 'EKIRAYA-2026';
+
+      if (targetAction === 'delete' || targetAction === 'deleteuser') {
+        const mailToDelete = String(email || user?.correo || originalEmail || '').trim().toLowerCase();
+        if (!mailToDelete) {
+          res.status(400).json({ status: 'error', message: 'Correo de usuario requerido para eliminación' });
+          return;
+        }
+        if (cleanScript) {
+          await deleteUserFromAppsScript(cleanScript, token, mailToDelete);
+        }
+        const updatedUsers = state.authorizedUsers.filter((u) => u.correo.toLowerCase() !== mailToDelete);
+        const updatedRows = (state.usuariosRows || []).filter((r) => {
+          const em = String(r['correo'] || r['Correo'] || '').trim().toLowerCase();
+          return em !== mailToDelete;
+        });
+        const nextState = {
+          ...state,
+          authorizedUsers: updatedUsers,
+          usuariosRows: updatedRows,
+          lastSyncDate: new Date().toLocaleString('es-CO'),
+          lastSyncTimestamp: Date.now(),
+        };
+        saveAndBroadcastPersistedState(nextState);
+        res.json({ status: 'success', message: `Usuario ${mailToDelete} eliminado`, state: nextState });
+        return;
+      }
+
+      // Add or update
+      const targetUser: AuthorizedSchoolUser = user || {
+        nombres: String(rest.nombres || rest.nombre || '').trim(),
+        correo: String(rest.correo || rest.email || '').trim().toLowerCase(),
+        curso: String(rest.curso || 'General').trim(),
+        seccion: String(rest.seccion || 'General').trim(),
+        perfil: String(rest.perfil || rest.rol || 'Estudiante').trim(),
+        isAdmin: Boolean(rest.isAdmin || rest.correo === 'mebolanos@cem.edu.co'),
+      };
+
+      if (!targetUser.correo || !targetUser.nombres) {
+        res.status(400).json({ status: 'error', message: 'Nombre y correo requeridos' });
+        return;
+      }
+
+      const origMail = String(originalEmail || targetUser.correo).trim().toLowerCase();
+
+      let pushed = false;
+      if (cleanScript) {
+        const pushRes = await pushUserToAppsScriptFromServer(
+          cleanScript,
+          token,
+          targetUser,
+          origMail,
+          targetAction === 'update' || targetAction === 'updateuser' ? 'updateUser' : 'addUser'
+        );
+        pushed = pushRes.pushed;
+      }
+
+      const filtered = state.authorizedUsers.filter(
+        (u) => u.correo.toLowerCase() !== origMail && u.correo.toLowerCase() !== targetUser.correo.toLowerCase()
+      );
+      const updatedUsers = [...filtered, targetUser];
+
+      const nextState = {
+        ...state,
+        authorizedUsers: updatedUsers,
+        lastSyncDate: new Date().toLocaleString('es-CO'),
+        lastSyncTimestamp: Date.now(),
+      };
+      saveAndBroadcastPersistedState(nextState);
+
+      res.json({
+        status: 'success',
+        message: `Usuario ${targetUser.nombres} guardado exitosamente`,
+        pushedToSheet: pushed,
+        user: targetUser,
+        state: nextState,
+      });
+    } catch (err) {
+      res.status(500).json({
+        status: 'error',
+        message: err instanceof Error ? err.message : 'Error en manageUser',
+      });
+    }
+  };
+  app.post('/api/repo/manageUser', handleManageUser);
+  app.post('/api/repo/manage-user', handleManageUser);
 
   // 2D. Crear / Poblar toda la hoja "usuarios" en Google Sheets en un clic
   app.post('/api/repo/init-users-sheet', async (req, res) => {

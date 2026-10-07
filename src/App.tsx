@@ -341,7 +341,7 @@ export default function App() {
     { id: 'universitarios', label: 'Universitarios', icon: <GraduationCap className="w-4 h-4 shrink-0" /> },
     { id: 'taller', label: 'Ejercicios', icon: <ClipboardList className="w-4 h-4 shrink-0" /> },
     ...cmsPages
-      .filter((p) => p.published)
+      .filter((p) => p.published && !isForbiddenCmsPage(p))
       .sort((a, b) => (a.order || 0) - (b.order || 0))
       .map((p) => ({
         id: p.id,
