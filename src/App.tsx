@@ -423,52 +423,98 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAFC] text-[#0F172A]">
-      {/* Top Navigation Bar — Con color institucional #664d88, mayor tamaño visual y totalmente responsive */}
+      {/* Top Navigation Bar — Organizada en 2 niveles claros y limpios sin superposiciones ni barras de desplazamiento incómodas */}
       <header className="sticky top-0 z-40 bg-[#664d88] text-white border-b border-[#533e6f] shadow-md transition-all">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-3.5 min-h-[4.5rem] lg:min-h-[5rem] flex flex-col justify-center">
-          <div className="flex items-center justify-between gap-3 lg:gap-5">
-            {/* Zone 1: Identidad Institucional y Logotipo - Con shrink-0 para nunca perder visibilidad */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Fila 1: Marca Institucional + Acciones de Usuario / CMS */}
+          <div className="py-2.5 sm:py-3 flex items-center justify-between gap-3 border-b border-white/10">
+            {/* Logotipo y Título Principal */}
             <button
               type="button"
               onClick={() => handleSwitchTab('teoria')}
-              className="flex items-center gap-3 text-left focus:outline-none group shrink-0 select-none cursor-pointer"
+              className="flex items-center gap-3 text-left focus:outline-none group select-none cursor-pointer"
               title="Ir al inicio - Colegio Ekirayá Cita Master"
             >
               {!logoFailed ? (
-                <div className="bg-white p-1.5 sm:p-2 rounded-xl shadow-md ring-2 ring-white/30 shrink-0 transition-transform group-hover:scale-105">
+                <div className="bg-white p-1.5 sm:p-2 rounded-xl shadow-xs ring-1 ring-white/30 shrink-0 transition-transform group-hover:scale-105">
                   <img
                     src="https://colegioekiraya.edu.co/wp-content/uploads/2024/09/LOGO-CEM-COLOR-02.png"
                     alt="Logo Colegio Ekirayá"
                     referrerPolicy="no-referrer"
                     onError={() => setLogoFailed(true)}
-                    className="h-9 sm:h-11 lg:h-12 w-auto object-contain"
+                    className="h-8 sm:h-10 w-auto object-contain"
                   />
                 </div>
               ) : (
-                <div className="h-9 w-9 sm:h-11 sm:w-11 lg:h-12 lg:w-12 rounded-xl bg-white text-[#664d88] flex items-center justify-center font-bold text-xs sm:text-sm shadow-md shrink-0 ring-2 ring-white/30">
+                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-white text-[#664d88] flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs shrink-0 ring-1 ring-white/30">
                   CEM
                 </div>
               )}
-              <div className="shrink-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-display text-base sm:text-lg lg:text-xl font-extrabold tracking-tight text-white block leading-tight group-hover:text-[#f8c62e] transition-colors drop-shadow-xs">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-display text-base sm:text-lg lg:text-xl font-extrabold tracking-tight text-white leading-tight group-hover:text-[#f8c62e] transition-colors">
                     Colegio Ekirayá
                   </span>
-                  <span className="px-2 py-0.5 rounded-md bg-[#f8c62e] text-slate-950 font-black text-[10px] sm:text-xs tracking-wide uppercase shadow-xs">
+                  <span className="px-2 py-0.5 rounded-md bg-[#f8c62e] text-slate-950 font-black text-[10px] tracking-wide uppercase shadow-xs">
                     Cita Master
                   </span>
                 </div>
-                <span className="text-[11px] sm:text-xs text-violet-200/90 font-medium tracking-normal block truncate mt-0.5">
+                <span className="hidden sm:block text-[11px] text-violet-200/90 font-medium tracking-normal truncate mt-0.5">
                   Portal Académico &amp; Gestor Bibliográfico
                 </span>
               </div>
             </button>
 
-            {/* Zone 2 (Desktop): Pestañas de Navegación con scroll horizontal si es necesario */}
-            <nav
-              aria-label="Navegación principal"
-              className="hidden lg:flex items-center gap-1.5 xl:gap-2 overflow-x-auto no-scrollbar py-1"
-            >
+            {/* Acciones de Cuenta / CMS / Menú Móvil */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginEmailInput(currentUserEmail);
+                  setIsAuthModalOpen(true);
+                }}
+                className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-semibold text-white transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Cuenta institucional"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+                <span className="hidden md:inline max-w-[130px] lg:max-w-[170px] truncate">{currentUserEmail}</span>
+                {isAdminUser && (
+                  <span className="px-1.5 py-0.5 rounded bg-[#f8c62e] text-slate-950 text-[9px] font-black uppercase">
+                    Admin
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenCmsModal}
+                className="hidden sm:flex px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-semibold text-white transition-all items-center gap-1.5 cursor-pointer"
+                title="Panel de Gestión CMS"
+              >
+                <Layers className="w-3.5 h-3.5 text-[#f8c62e]" />
+                <span className="hidden lg:inline">CMS</span>
+              </button>
+
+              {/* Toggle Menú Móvil */}
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="p-1.5 sm:p-2 rounded-xl text-white hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/40 transition-colors cursor-pointer md:hidden"
+                aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+                aria-expanded={mobileMenuOpen}
+              >
+                {mobileMenuOpen ? (
+                  <X className="w-5 h-5 text-white" />
+                ) : (
+                  <Menu className="w-5 h-5 text-white" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Fila 2 (Desktop & Tablet): Pestañas de Navegación limpias, espaciosas y centradas/distribuidas */}
+          <div className="hidden md:flex items-center justify-between py-2">
+            <nav aria-label="Navegación principal" className="flex items-center gap-2 flex-wrap">
               {navItems.map((item) => {
                 const isActive = activeTab === item.id;
                 return (
@@ -476,10 +522,10 @@ export default function App() {
                     key={item.id}
                     type="button"
                     onClick={() => handleSwitchTab(item.id)}
-                    className={`px-3 py-2 rounded-xl text-xs xl:text-sm font-semibold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+                    className={`px-3.5 py-1.5 rounded-xl text-xs lg:text-sm font-semibold transition-all flex items-center gap-2 cursor-pointer ${
                       isActive
-                        ? 'bg-white text-[#664d88] shadow-sm ring-1 ring-black/5 font-bold'
-                        : 'text-white/85 hover:text-white hover:bg-white/15'
+                        ? 'bg-white text-[#664d88] shadow-sm font-bold ring-1 ring-black/5'
+                        : 'text-white/90 hover:text-white hover:bg-white/15'
                     }`}
                   >
                     {item.icon}
@@ -500,110 +546,16 @@ export default function App() {
               })}
             </nav>
 
-            {/* Zone 3 Desktop: Sesión Institucional y CMS */}
-            <div className="hidden lg:flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginEmailInput(currentUserEmail);
-                  setIsAuthModalOpen(true);
-                }}
-                className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-semibold text-white transition-all flex items-center gap-1.5 cursor-pointer"
-                title="Cambiar o verificar cuenta institucional"
-              >
-                <UserCheck className="w-3.5 h-3.5 text-emerald-300" />
-                <span className="max-w-[140px] truncate">{currentUserEmail}</span>
-                {isAdminUser && (
-                  <span className="px-1.5 py-0.5 rounded bg-[#f8c62e] text-slate-950 text-[9px] font-black uppercase">
-                    Admin
-                  </span>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleOpenCmsModal}
-                className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition-all flex items-center gap-1.5 cursor-pointer"
-                title="Panel de Gestión de Páginas CMS"
-              >
-                <Layers className="w-3.5 h-3.5 text-[#f8c62e]" />
-                <span className="hidden xl:inline">CMS</span>
-              </button>
+            <div className="hidden lg:flex items-center gap-2 text-xs text-violet-200/80">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span>Portal Académico Activo</span>
             </div>
-
-            {/* Zone 4: Toggle Móvil */}
-            <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 lg:hidden">
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginEmailInput(currentUserEmail);
-                  setIsAuthModalOpen(true);
-                }}
-                className="p-2 rounded-xl bg-white/10 text-white text-xs font-bold"
-                title="Cuenta Institucional"
-              >
-                <UserCheck className="w-4 h-4 text-emerald-300" />
-              </button>
-
-              {/* Botón de Menú Móvil */}
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="p-2 rounded-xl text-white hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/40 transition-colors cursor-pointer"
-                aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
-                aria-expanded={mobileMenuOpen}
-              >
-                {mobileMenuOpen ? (
-                  <X className="w-5 h-5 text-white" />
-                ) : (
-                  <Menu className="w-5 h-5 text-white" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Barra de navegación secundaria en móviles: Desplazamiento horizontal fluido (1-tap access) */}
-          <div className="lg:hidden mt-2.5 pt-2 border-t border-white/15">
-            <nav
-              aria-label="Navegación móvil rápida"
-              className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 -mx-1 px-1 scroll-smooth"
-            >
-              {navItems.map((item) => {
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => handleSwitchTab(item.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
-                      isActive
-                        ? 'bg-white text-[#664d88] shadow-xs'
-                        : 'bg-white/10 text-white/90 hover:bg-white/20'
-                    }`}
-                  >
-                    {item.icon}
-                    <span>{item.label}</span>
-                    {item.count !== undefined && item.count > 0 && (
-                      <span
-                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                          isActive
-                            ? 'bg-[#664d88] text-white'
-                            : 'bg-white/25 text-white'
-                        }`}
-                      >
-                        {item.count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </nav>
           </div>
         </div>
 
-        {/* Menú Desplegable Completo en Móviles (al pulsar el ícono de menú) */}
+        {/* Menú Desplegable en Móviles (< md) */}
         {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-[#533e6f] bg-[#533e6f] px-4 py-3 space-y-1.5 shadow-lg animate-in slide-in-from-top-2 duration-150">
+          <div className="md:hidden border-t border-[#533e6f] bg-[#533e6f] px-4 py-3 space-y-1.5 shadow-lg animate-in slide-in-from-top-2 duration-150">
             {navItems.map((item) => {
               const isActive = activeTab === item.id;
               return (
