@@ -353,44 +353,49 @@ export default function App() {
     <div className="min-h-screen flex flex-col bg-[#F8FAFC] text-[#0F172A]">
       {/* Top Navigation Bar — Con color institucional #664d88, mayor tamaño visual y totalmente responsive */}
       <header className="sticky top-0 z-40 bg-[#664d88] text-white border-b border-[#533e6f] shadow-md transition-all">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3.5 sm:py-4 lg:py-4.5 min-h-[4.75rem] lg:min-h-[5.5rem] flex flex-col justify-center">
-          <div className="flex items-center justify-between gap-3 lg:gap-6">
-            {/* Zone 1: Identidad Institucional y Logotipo */}
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-3.5 min-h-[4.5rem] lg:min-h-[5rem] flex flex-col justify-center">
+          <div className="flex items-center justify-between gap-3 lg:gap-5">
+            {/* Zone 1: Identidad Institucional y Logotipo - Con shrink-0 para nunca perder visibilidad */}
             <button
               type="button"
               onClick={() => handleSwitchTab('teoria')}
-              className="flex items-center gap-2.5 sm:gap-3.5 text-left focus:outline-none group min-w-0 flex-1 lg:flex-initial"
+              className="flex items-center gap-3 text-left focus:outline-none group shrink-0 select-none cursor-pointer"
               title="Ir al inicio - Colegio Ekirayá Cita Master"
             >
               {!logoFailed ? (
-                <div className="bg-white/95 p-1.5 sm:p-2 rounded-xl shadow-xs ring-1 ring-white/30 shrink-0 transition-transform group-hover:scale-105">
+                <div className="bg-white p-1.5 sm:p-2 rounded-xl shadow-md ring-2 ring-white/30 shrink-0 transition-transform group-hover:scale-105">
                   <img
                     src="https://colegioekiraya.edu.co/wp-content/uploads/2024/09/LOGO-CEM-COLOR-02.png"
                     alt="Logo Colegio Ekirayá"
                     referrerPolicy="no-referrer"
                     onError={() => setLogoFailed(true)}
-                    className="h-9 sm:h-11 lg:h-13 w-auto object-contain"
+                    className="h-9 sm:h-11 lg:h-12 w-auto object-contain"
                   />
                 </div>
               ) : (
-                <div className="h-9 w-9 sm:h-11 sm:w-11 lg:h-13 lg:w-13 rounded-xl bg-white text-[#664d88] flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs shrink-0 ring-1 ring-white/30">
+                <div className="h-9 w-9 sm:h-11 sm:w-11 lg:h-12 lg:w-12 rounded-xl bg-white text-[#664d88] flex items-center justify-center font-bold text-xs sm:text-sm shadow-md shrink-0 ring-2 ring-white/30">
                   CEM
                 </div>
               )}
-              <div className="min-w-0">
-                <span className="font-display text-base sm:text-lg lg:text-xl font-bold tracking-tight text-white block truncate leading-tight group-hover:text-[#f8c62e] transition-colors">
-                  Colegio Ekirayá · Cita Master
-                </span>
-                <span className="text-[11px] sm:text-xs text-violet-200/90 font-medium tracking-normal hidden xs:block truncate mt-0.5">
-                  Portal Académico &amp; Gestor Bibliográfico · Educación Montessori
+              <div className="shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-display text-base sm:text-lg lg:text-xl font-extrabold tracking-tight text-white block leading-tight group-hover:text-[#f8c62e] transition-colors drop-shadow-xs">
+                    Colegio Ekirayá
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-[#f8c62e] text-slate-950 font-black text-[10px] sm:text-xs tracking-wide uppercase shadow-xs">
+                    Cita Master
+                  </span>
+                </div>
+                <span className="text-[11px] sm:text-xs text-violet-200/90 font-medium tracking-normal block truncate mt-0.5">
+                  Portal Académico &amp; Repositorio de Monografías
                 </span>
               </div>
             </button>
 
-            {/* Zone 2 (Desktop): Pestañas de Navegación con altura visual generosa */}
+            {/* Zone 2 (Desktop): Pestañas de Navegación con scroll horizontal si es necesario */}
             <nav
               aria-label="Navegación principal"
-              className="hidden lg:flex items-center gap-1.5 xl:gap-2"
+              className="hidden lg:flex items-center gap-1.5 xl:gap-2 overflow-x-auto no-scrollbar py-1"
             >
               {navItems.map((item) => {
                 const isActive = activeTab === item.id;
@@ -399,9 +404,9 @@ export default function App() {
                     key={item.id}
                     type="button"
                     onClick={() => handleSwitchTab(item.id)}
-                    className={`px-3.5 py-2 rounded-xl text-xs xl:text-sm font-semibold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
+                    className={`px-3 py-2 rounded-xl text-xs xl:text-sm font-semibold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                       isActive
-                        ? 'bg-white text-[#664d88] shadow-sm ring-1 ring-black/5'
+                        ? 'bg-white text-[#664d88] shadow-sm ring-1 ring-black/5 font-bold'
                         : 'text-white/85 hover:text-white hover:bg-white/15'
                     }`}
                   >
@@ -428,7 +433,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => handleSwitchTab('gestor')}
-                className="px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-bold bg-[#f8c62e] hover:bg-[#e8b524] text-slate-950 border border-[#f8c62e] rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 shadow-xs hover:shadow-md hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
+                className="px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-bold bg-[#f8c62e] hover:bg-[#e8b524] text-slate-950 border border-[#f8c62e] rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap cursor-pointer"
               >
                 <Sparkles className="w-4 h-4 text-amber-950 shrink-0" />
                 <span className="hidden sm:inline">Nueva Cita</span>
@@ -439,7 +444,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="lg:hidden p-2 rounded-xl text-white hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/40 transition-colors"
+                className="lg:hidden p-2 rounded-xl text-white hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/40 transition-colors cursor-pointer"
                 aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
                 aria-expanded={mobileMenuOpen}
               >

@@ -2460,9 +2460,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           action: 'updateUser',
           subAction: 'update',
           manageAction: 'update',
-          spreadsheetId: '1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI',
-          connectionUrl: 'https://docs.google.com/spreadsheets/d/1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI/edit',
-          sheetUrl: 'https://docs.google.com/spreadsheets/d/1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI/edit',
+          spreadsheetId: '1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs',
+          connectionUrl: 'https://docs.google.com/spreadsheets/d/1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs/edit',
+          sheetUrl: 'https://docs.google.com/spreadsheets/d/1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs/edit',
           token: accessToken || 'EKIRAYA-2026',
           originalCorreo: originalEmail,
           originalEmail: originalEmail,
@@ -2590,9 +2590,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         await callAppsScriptViaBrowserJsonp(effectiveExec, {
           action: 'deleteUser',
           subAction: 'delete',
-          spreadsheetId: '1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI',
-          connectionUrl: 'https://docs.google.com/spreadsheets/d/1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI/edit',
-          sheetUrl: 'https://docs.google.com/spreadsheets/d/1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI/edit',
+          spreadsheetId: '1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs',
+          connectionUrl: 'https://docs.google.com/spreadsheets/d/1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs/edit',
+          sheetUrl: 'https://docs.google.com/spreadsheets/d/1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs/edit',
           token: accessToken || 'EKIRAYA-2026',
           correo: emailToDelete,
           email: emailToDelete,
@@ -2704,9 +2704,20 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         authorizedUsers,
         usuariosHeaders,
       });
+
+      // Guardar y sincronizar con el servidor para todas las terminales
+      fetch('/api/repo/import-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          headers: parsed.headers,
+          rows: parsed.rows,
+        }),
+      }).catch(() => {});
+
       setShowQuickPasteModal(false);
       setQuickPasteText('');
-      showToast(`¡${parsed.rows.length} monografías importadas al repositorio!`);
+      showToast(`¡${parsed.rows.length} monografías importadas al repositorio y sincronizadas en tiempo real!`);
     }
   };
 
@@ -3338,259 +3349,105 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   };
 
   // ============================================================================
-  // PANTALLA DE CONTROL DE ACCESO: SOLO USUARIOS EN LA HOJA "USUARIOS"
+  // ACCESO PÚBLICO INSTITUCIONAL DIRECTO + PANEL DE ADMINISTRADOR DEDICADO
   // ============================================================================
-  if (!currentUser) {
-    const adminUser = authorizedUsers.find((u) => u.isAdmin || /admin/i.test(u.perfil));
-    const adminDisplayName = adminUser?.nombres || 'Esteban Bolaños R';
-    const adminEmail = adminUser?.correo || 'mebolanos@cem.edu.co';
-
-    const docenteUser = authorizedUsers.find((u) => !u.isAdmin && /docente/i.test(u.perfil));
-    const docenteDisplayName = docenteUser?.nombres || 'Diego Nicolás Mancera';
-    const docenteEmail = docenteUser?.correo || 'dmancera@cem.edu.co';
-
-    const estudianteUser = authorizedUsers.find((u) => /estudiante/i.test(u.perfil));
-    const estudianteDisplayName = estudianteUser?.nombres || 'Emilia Agudelo Gil';
-    const estudianteEmail = estudianteUser?.correo || 'eagudelo@cem.edu.co';
-
-    return (
-      <div className="max-w-2xl mx-auto my-6 space-y-6">
-        <div className="bg-gradient-to-br from-[#44345c] via-[#664d88] to-[#533e6f] rounded-2xl p-6 sm:p-8 text-white border border-violet-800/40 shadow-md space-y-5">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-violet-100 text-xs font-semibold">
-            <Lock className="w-3.5 h-3.5 text-amber-300" />
-            <span>Acceso Exclusivo · Hoja &ldquo;usuarios&rdquo; Colegio Ekirayá</span>
-          </div>
-
-          <div className="space-y-2">
-            <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight">
-              Repositorio de Monografías — Unidades Académicas
-            </h1>
-            <p className="text-violet-100/90 text-sm leading-relaxed">
-              El acceso al repositorio está habilitado únicamente para los{' '}
-              <strong>estudiantes, docentes, personal de no clases y administradores</strong>{' '}
-              registrados en la hoja <code>usuarios</code> (
-              <em>{usuariosHeaders.join(', ')}</em>).
-            </p>
-          </div>
-
-          <form
-            onSubmit={handleLoginWithUsersSheet}
-            className="bg-white rounded-xl p-5 text-slate-900 space-y-4 shadow-sm"
-          >
-            <div>
-              <label
-                htmlFor="repoUserEmail"
-                className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5"
-              >
-                Correo institucional registrado en la hoja &ldquo;usuarios&rdquo;
-              </label>
-              <input
-                id="repoUserEmail"
-                type="email"
-                value={loginEmailInput}
-                onChange={(e) => {
-                  setLoginEmailInput(e.target.value);
-                  if (loginError) setLoginError(null);
-                }}
-                placeholder="ejemplo: mebolanos@cem.edu.co"
-                className="w-full rounded-xl border border-slate-300 py-2.5 px-3.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-600"
-                autoFocus
-              />
-
-              <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-                <span className="text-slate-500 font-medium">Accesos rápidos institucionales:</span>
-                <button
-                  type="button"
-                  onClick={() => setLoginEmailInput(adminEmail)}
-                  className="px-2 py-0.5 rounded bg-violet-100 text-violet-900 hover:bg-violet-200 font-semibold cursor-pointer"
-                >
-                  Admin ({adminDisplayName})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLoginEmailInput(docenteEmail)}
-                  className="px-2 py-0.5 rounded bg-blue-100 text-blue-900 hover:bg-blue-200 font-medium cursor-pointer"
-                >
-                  Docente ({docenteDisplayName})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLoginEmailInput(estudianteEmail)}
-                  className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 hover:bg-emerald-200 font-medium cursor-pointer"
-                >
-                  Estudiante ({estudianteDisplayName})
-                </button>
-              </div>
-            </div>
-
-            {loginError && (
-              <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 space-y-1.5">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                  <span className="leading-relaxed">{loginError}</span>
-                </div>
-              </div>
-            )}
-
-            <div className="pt-2 border-t border-slate-100">
-              <button
-                type="submit"
-                className="w-full py-3 px-5 rounded-xl bg-[#664d88] hover:bg-[#533e6f] text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-xs hover:shadow-md cursor-pointer"
-              >
-                <UserCheck className="w-4 h-4 shrink-0" />
-                <span>Ingresar al Repositorio</span>
-              </button>
-            </div>
-
-            {/* Indicador de estado de sincronización en vivo */}
-            <div className="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
-              <div className="flex items-center gap-1.5">
-                <span className="relative flex h-2 w-2">
-                  <span
-                    className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                      isRealtimeActive ? 'bg-emerald-400' : 'bg-amber-400'
-                    }`}
-                  ></span>
-                  <span
-                    className={`relative inline-flex rounded-full h-2 w-2 ${
-                      isRealtimeActive ? 'bg-emerald-500' : 'bg-amber-500'
-                    }`}
-                  ></span>
-                </span>
-                <span className="font-medium text-slate-700">
-                  Sincronización institucional en vivo · Multi-terminal activo
-                </span>
-              </div>
-              <span>
-                {lastSyncDate ? `Última sincronización: ${lastSyncDate}` : 'Listo'}
-              </span>
-            </div>
-          </form>
-        </div>
-
-        {renderCreateUserModal()}
-        {renderSyncConfigModal()}
-      </div>
-    );
-  }
-
-  const isAdmin = currentUser.isAdmin;
+  const isAdmin = Boolean(currentUser?.isAdmin || showAdminPanel);
 
   return (
     <div className="space-y-6">
-      {/* ENCABEZADO DEL REPOSITORIO CON PERFIL VALIDADO DESDE LA HOJA "USUARIOS" */}
-      <div className="bg-gradient-to-br from-[#44345c] via-[#664d88] to-[#533e6f] rounded-2xl p-6 sm:p-8 text-white border border-violet-800/40 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2.5 max-w-3xl">
+      {/* ENCABEZADO PRINCIPAL DEL REPOSITORIO — ACCESO PÚBLICO INSTITUCIONAL */}
+      <div className="bg-gradient-to-br from-[#44345c] via-[#664d88] to-[#533e6f] rounded-2xl p-5 sm:p-7 text-white border border-violet-800/40 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div className="space-y-2 max-w-3xl">
             <div className="inline-flex flex-wrap items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-violet-100 text-xs font-semibold">
-              <FolderGit2 className="w-3.5 h-3.5 text-violet-200" />
-              <span>Carpeta: Unidades Académicas ({DRIVE_ROOT_FOLDER_ID})</span>
+              <FolderGit2 className="w-3.5 h-3.5 text-[#f8c62e]" />
+              <span>Carpeta Drive: Unidades Académicas ({DRIVE_ROOT_FOLDER_ID})</span>
               <span aria-hidden="true">·</span>
-              <span>Perfil: {currentUser.perfil}</span>
+              <span className="text-emerald-300 font-bold">Acceso Abierto Institucional</span>
             </div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight">
-              Repositorio de Monografías — Unidades Académicas
+              Repositorio de Monografías — Proyecto de Vida
             </h1>
-            <p className="text-violet-100/90 text-sm sm:text-base leading-relaxed">
-              Búsqueda e indexación por{' '}
+            <p className="text-violet-100/90 text-xs sm:text-sm leading-relaxed">
+              Consulta, búsqueda e indexación por{' '}
               <strong>
-                nombre del archivo, título de la monografía, autor, año lectivo, asignatura y
-                unidad académica
+                título, autor, grado, año, unidad académica, línea de investigación y resumen
               </strong>
-              .
+              . Con visualizador de PDF y generación de citas APA 2026.
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 shrink-0">
-            {isAdmin && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setShowAdminPanel(!showAdminPanel)}
-                  className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-xs ${
-                    showAdminPanel
-                      ? 'bg-[#f8c62e] text-slate-950 font-bold shadow-sm'
-                      : 'bg-white text-violet-950 hover:bg-violet-50'
-                  }`}
-                >
-                  <Settings className="w-4 h-4 text-violet-700" />
-                  <span>
-                    {showAdminPanel
-                      ? 'Ocultar Sección de Administrador'
-                      : 'Abrir Sección de Administrador'}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleManualSyncNow}
-                  disabled={isSyncing}
-                  title="Sincronizar ahora la hoja 'Repositorio' conectando con Apps Script"
-                  className="px-4 py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-600 text-white border border-emerald-400/40 text-xs font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span>
-                    {isSyncing ? 'Sincronizando...' : 'Sincronizar ahora'}
-                  </span>
-                </button>
-              </>
-            )}
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowAdminPanel(!showAdminPanel)}
+              className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs ${
+                showAdminPanel
+                  ? 'bg-[#f8c62e] text-slate-950 font-bold shadow-md'
+                  : 'bg-white text-violet-950 hover:bg-violet-50'
+              }`}
+            >
+              <Settings className="w-4 h-4 text-violet-700" />
+              <span>
+                {showAdminPanel
+                  ? 'Cerrar Panel Administrador'
+                  : '⚙️ Panel de Administración'}
+              </span>
+            </button>
 
             <button
               type="button"
-              onClick={handleLogoutUser}
-              className="px-4 py-2 rounded-xl bg-violet-900/60 hover:bg-violet-900 text-violet-100 border border-violet-500/40 text-xs font-semibold transition-colors flex items-center justify-center gap-2"
+              onClick={handleManualSyncNow}
+              disabled={isSyncing}
+              title="Sincronizar ahora con Google Sheets"
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/40 text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
             >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Cambiar de usuario / Salir</span>
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>
+                {isSyncing ? 'Sincronizando...' : 'Sincronizar Sheets'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowQuickPasteModal(true)}
+              title="Pegar celdas copiadas directamente de Google Sheets"
+              className="px-3.5 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/20 text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Pegar de Sheets</span>
             </button>
           </div>
         </div>
 
-        {/* DATOS DEL USUARIO AUTENTICADO SEGÚN LA HOJA "USUARIOS" */}
-        <div className="mt-5 pt-4 border-t border-white/15 flex flex-wrap items-center justify-between gap-3 text-xs">
+        {/* BARRA DE ESTADO DE LA HOJA Y TOTAL DE MONOGRAFÍAS */}
+        <div className="mt-4 pt-3.5 border-t border-white/15 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-semibold bg-emerald-500/20 text-emerald-100 border border-emerald-400/40">
-              <Unlock className="w-3.5 h-3.5 text-emerald-300" />
-              <span>Nombres: {currentUser.nombres}</span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-bold bg-emerald-500/20 text-emerald-100 border border-emerald-400/30">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+              <span>{rawRows.length} Monografías Disponibles</span>
             </span>
-            <span className="px-2.5 py-1 rounded-lg bg-white/10 text-violet-100">
-              <strong>Curso:</strong> {currentUser.curso}
-            </span>
-            <span className="px-2.5 py-1 rounded-lg bg-white/10 text-violet-100 font-mono">
-              <strong>Correo:</strong> {currentUser.correo}
-            </span>
-            <span className="px-2.5 py-1 rounded-lg bg-white/10 text-violet-100">
-              <strong>Sección:</strong> {currentUser.seccion}
-            </span>
-            <span className="px-2.5 py-1 rounded-lg bg-white/10 text-violet-100">
-              <strong>Perfil:</strong> {currentUser.perfil}
+            <span className="px-2.5 py-1 rounded-lg bg-white/10 text-violet-100 font-mono text-[11px]">
+              ID Hoja: 1CGZ_yTz7WApWBWYJ7N1VnlLxkqLa34wPXqx89ZAoNIs
             </span>
           </div>
 
-          {isAdmin ? (
-            <div className="flex items-center gap-2 text-violet-200">
-              <span className="relative flex h-2 w-2">
-                {isRealtimeActive && (
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                )}
-                <span
-                  className={`relative inline-flex rounded-full h-2 w-2 ${
-                    isRealtimeActive ? 'bg-emerald-400' : 'bg-amber-400'
-                  }`}
-                ></span>
-              </span>
-              <span>
-                Sincronización en tiempo real activa (Google Sheets)
-                {lastSyncDate ? ` · Última: ${lastSyncDate}` : ''}
-              </span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-violet-200">
-              <BookOpen className="w-3.5 h-3.5 text-violet-300" />
-              <span>Colegio Ekirayá · Catálogo Académico de Investigaciones</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2 text-violet-200 text-xs">
+            <span className="relative flex h-2 w-2">
+              {isRealtimeActive && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              )}
+              <span
+                className={`relative inline-flex rounded-full h-2 w-2 ${
+                  isRealtimeActive ? 'bg-emerald-400' : 'bg-amber-400'
+                }`}
+              ></span>
+            </span>
+            <span>
+              Sincronización en vivo
+              {lastSyncDate ? ` · Última: ${lastSyncDate}` : ''}
+            </span>
+          </div>
         </div>
       </div>
 

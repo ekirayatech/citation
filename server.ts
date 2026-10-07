@@ -1721,47 +1721,14 @@ async function startServer() {
     );
 
     let headers: string[] =
-      Array.isArray(clientRawHeaders) && clientRawHeaders.length > 0
-        ? clientRawHeaders
-        : isMonographsSheetData(currentState.rawHeaders, currentState.rawRows)
-        ? currentState.rawHeaders
-        : [];
+      Array.isArray(clientRawHeaders) && clientRawHeaders.length > 0 ? clientRawHeaders : [];
     let rows: Record<string, string>[] =
-      Array.isArray(clientRawRows) && clientRawRows.length > 0
-        ? clientRawRows
-        : isMonographsSheetData(currentState.rawHeaders, currentState.rawRows)
-        ? currentState.rawRows
-        : [];
-    let usuariosHeaders: string[] =
-      Array.isArray(clientUsuariosHeaders) && clientUsuariosHeaders.length > 0
-        ? clientUsuariosHeaders
-        : currentState.usuariosHeaders || DEFAULT_USUARIOS_HEADERS;
-    let usuariosRows: Record<string, string>[] =
-      Array.isArray(clientUsuariosRows) && clientUsuariosRows.length > 0
-        ? clientUsuariosRows
-        : currentState.usuariosRows || [];
-    let sheetUsers: AuthorizedSchoolUser[] =
-      Array.isArray(clientUsuariosRows) &&
-      clientUsuariosRows.length > 0 &&
-      Array.isArray(clientUsuariosHeaders)
-        ? parseUsersSheetRows(clientUsuariosRows, clientUsuariosHeaders)
-        : Array.isArray(clientUsers) && clientUsers.length > 0
-        ? clientUsers
-        : [];
+      Array.isArray(clientRawRows) && clientRawRows.length > 0 ? clientRawRows : [];
     let sheetAccessWarning: string | null = null;
     const cacheBuster = `_t=${Date.now()}`;
 
     // A. Sincronizar con Google Apps Script (/exec) si está configurado
     if (effectiveScriptUrl) {
-      const pendingUsers = baseUsers.filter((u) => u.createdInApp && !u.syncedToSheet);
-      for (const pending of pendingUsers) {
-        const pushRes = await pushUserToAppsScriptFromServer(effectiveScriptUrl, token, pending);
-        if (pushRes.pushed) {
-          pending.syncedToSheet = true;
-          pending.createdInApp = false;
-        }
-      }
-
       try {
         const sep = effectiveScriptUrl.includes('?') ? '&' : '?';
         const actionName = triggerDriveScan ? 'syncDriveAndSheets' : 'syncRepo';
@@ -1820,46 +1787,19 @@ async function startServer() {
         }
 
         if (data) {
-          if (Array.isArray(data?.usuariosRows) && Array.isArray(data?.usuariosHeaders)) {
-            if (data.usuariosHeaders.length > 0) {
-              usuariosHeaders = data.usuariosHeaders.map((h: string) => String(h).trim());
-            }
-            usuariosRows = data.usuariosRows;
-            sheetUsers = parseUsersSheetRows(data.usuariosRows, usuariosHeaders);
-          }
-
-          if (Array.isArray(data?.headers) && Array.isArray(data?.rows)) {
-            const incHeaders = data.headers.map((h: string) => String(h).trim());
-            if (isUsersSheetData(incHeaders, data.rows)) {
-              if (sheetUsers.length <= 1) {
-                usuariosHeaders = incHeaders;
-                usuariosRows = data.rows;
-                sheetUsers = parseUsersSheetRows(data.rows, incHeaders);
-              }
-            } else if (isMonographsSheetData(incHeaders, data.rows)) {
-              headers = incHeaders;
-              rows = data.rows;
-            }
-          }
-
-          // Soporte para versiones anteriores del Apps Script que devolvían { items: [...] }
-          if (Array.isArray(data?.items) && data.items.length > 0 && rows.length === 0) {
+          if (Array.isArray(data?.headers) && Array.isArray(data?.rows) && data.rows.length > 0) {
+            headers = data.headers.map((h: string) => String(h).trim());
+            rows = data.rows;
+          } else if (Array.isArray(data?.data) && Array.isArray(data?.headers) && data.data.length > 0) {
+            headers = data.headers.map((h: string) => String(h).trim());
+            rows = data.data;
+          } else if (Array.isArray(data?.items) && data.items.length > 0) {
             const firstItem = data.items[0];
             if (firstItem && typeof firstItem === 'object') {
-              const itemHeaders = Object.keys(firstItem);
-              if (isUsersSheetData(itemHeaders, data.items)) {
-                usuariosHeaders = itemHeaders;
-                usuariosRows = data.items;
-                sheetUsers = parseUsersSheetRows(data.items, itemHeaders);
-              } else {
-                headers = itemHeaders;
-                rows = data.items;
-              }
+              headers = Object.keys(firstItem);
+              rows = data.items;
             }
           }
-        } else if (sheetUsers.length <= 1) {
-          sheetAccessWarning =
-            'El Web App de Google Apps Script devolvió inicio de sesión. Implementa como "Quién tiene acceso: Cualquier persona".';
         }
       } catch {
         // Continuar con lectura directa de Google Sheets
@@ -1912,63 +1852,19 @@ async function startServer() {
       for (const pUrl of primaryUrls) {
         const resPrimary = await fetchSheetCsv(pUrl);
         if (resPrimary.isHtml) {
-          if (sheetUsers.length <= 1 && rows.length === 0) {
-            sheetAccessWarning =
-              'El archivo de Google Sheets tiene acceso restringido en el servidor. Puedes cambiar Compartir → "Cualquier persona con el enlace (Lector)" o usar "Pegar tabla de Sheets".';
-          }
+          sheetAccessWarning =
+            'El archivo de Google Sheets requiere permisos institucionales. Usa el Web App de Apps Script o "Pegar tabla de Sheets".';
           continue;
         }
         if (resPrimary.headers.length > 0 && resPrimary.rows.length > 0) {
-          if (isUsersSheetData(resPrimary.headers, resPrimary.rows)) {
-            if (sheetUsers.length <= 1) {
-              usuariosHeaders = resPrimary.headers;
-              usuariosRows = resPrimary.rows;
-              sheetUsers = parseUsersSheetRows(resPrimary.rows, resPrimary.headers);
-            }
-            sheetAccessWarning = null;
-          } else if (
-            rows.length === 0 &&
-            isMonographsSheetData(resPrimary.headers, resPrimary.rows)
-          ) {
-            headers = resPrimary.headers;
-            rows = resPrimary.rows;
-            sheetAccessWarning = null;
-          }
+          headers = resPrimary.headers;
+          rows = resPrimary.rows;
+          sheetAccessWarning = null;
+          break;
         }
       }
 
-      // 2. Buscar explícitamente la hoja "usuarios" (usuarios / Usuarios / USUARIOS)
-      if (sheetUsers.length <= 1) {
-        const userTabCandidates = [
-          'usuarios',
-          'Usuarios',
-          'USUARIOS',
-          'usuario',
-          'Usuario',
-          'users',
-          'Users',
-        ];
-        for (const uTab of userTabCandidates) {
-          const uUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
-            uTab
-          )}&${cacheBuster}`;
-          const uRes = await fetchSheetCsv(uUrl);
-          if (
-            !uRes.isHtml &&
-            uRes.headers.length > 0 &&
-            uRes.rows.length > 0 &&
-            isUsersSheetData(uRes.headers, uRes.rows)
-          ) {
-            usuariosHeaders = uRes.headers;
-            usuariosRows = uRes.rows;
-            sheetUsers = parseUsersSheetRows(uRes.rows, uRes.headers);
-            sheetAccessWarning = null;
-            break;
-          }
-        }
-      }
-
-      // 3. Buscar explícitamente la hoja de Monografías ("repositorio", "Repositorio", "Hoja 1", etc.)
+      // 2. Buscar explícitamente en pestañas candidatas si aún no se han obtenido filas
       if (rows.length === 0) {
         const repoTabCandidates = Array.from(
           new Set([
@@ -1996,8 +1892,7 @@ async function startServer() {
           if (
             !rRes.isHtml &&
             rRes.headers.length > 0 &&
-            rRes.rows.length > 0 &&
-            isMonographsSheetData(rRes.headers, rRes.rows)
+            rRes.rows.length > 0
           ) {
             headers = rRes.headers;
             rows = rRes.rows;
@@ -2008,26 +1903,24 @@ async function startServer() {
       }
     }
 
-    const mergedUsers = mergeUsersLists(sheetUsers, baseUsers);
     const nowStr = new Date().toLocaleString('es-CO');
     const nowTs = Date.now();
 
     const nextHeaders =
       headers.length > 0
         ? headers
-        : isMonographsSheetData(currentState.rawHeaders, currentState.rawRows) &&
-            currentState.rawHeaders.length > 0
+        : currentState.rawHeaders && currentState.rawHeaders.length > 0
           ? currentState.rawHeaders
           : DEFAULT_REPO_HEADERS;
     const nextRows =
       rows.length > 0
         ? rows
-        : isMonographsSheetData(currentState.rawHeaders, currentState.rawRows) &&
-            currentState.rawRows.length > 0
+        : currentState.rawRows && currentState.rawRows.length > 0
           ? currentState.rawRows
           : DEFAULT_REPO_ROWS;
 
     const nextState: PersistedRepoState = {
+      ...currentState,
       appsScriptExecUrl: effectiveScriptUrl || currentState.appsScriptExecUrl || '',
       connectionUrl: effectiveSheetUrl || currentState.connectionUrl || '',
       repoTabName: tabName || currentState.repoTabName || 'repositorio',
@@ -2036,16 +1929,12 @@ async function startServer() {
       lastSyncTimestamp: nowTs,
       rawHeaders: nextHeaders,
       rawRows: nextRows,
-      usuariosHeaders,
-      usuariosRows,
-      authorizedUsers: mergedUsers,
     };
 
     saveAndBroadcastPersistedState(nextState);
 
     return {
       ok: true,
-      usersSyncedCount: mergedUsers.length,
       monographsSyncedCount: nextRows.length,
       sheetAccessWarning,
       state: nextState,
@@ -2060,6 +1949,47 @@ async function startServer() {
     } catch (err) {
       res.status(500).json({
         error: err instanceof Error ? err.message : 'Error durante la sincronización',
+      });
+    }
+  });
+
+  // 3.1 Importar o pegar datos directamente desde Google Sheets (TSV / JSON)
+  app.post('/api/repo/import-data', (req, res) => {
+    try {
+      const { headers, rows, rawTsv } = req.body || {};
+      let parsedHeaders = headers;
+      let parsedRows = rows;
+
+      if (typeof rawTsv === 'string' && rawTsv.trim()) {
+        const parsed = parseCsvToRows(rawTsv);
+        parsedHeaders = parsed.headers;
+        parsedRows = parsed.rows;
+      }
+
+      if (!Array.isArray(parsedRows) || parsedRows.length === 0) {
+        res.status(400).json({ error: 'No se encontraron filas válidas para importar' });
+        return;
+      }
+
+      const state = loadPersistedState();
+      const nextHeaders =
+        Array.isArray(parsedHeaders) && parsedHeaders.length > 0
+          ? parsedHeaders.map(String)
+          : state.rawHeaders || DEFAULT_REPO_HEADERS;
+
+      const nextState: PersistedRepoState = {
+        ...state,
+        rawHeaders: nextHeaders,
+        rawRows: parsedRows,
+        lastSyncDate: new Date().toLocaleString('es-CO'),
+        lastSyncTimestamp: Date.now(),
+      };
+
+      saveAndBroadcastPersistedState(nextState, 'IMPORT_DATA');
+      res.json({ ok: true, count: parsedRows.length, state: nextState });
+    } catch (err) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : 'Error importando datos',
       });
     }
   });
