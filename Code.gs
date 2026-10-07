@@ -33,7 +33,7 @@ const CONFIG = {
   REPO_SHEET_NAME: 'repositorio',
   USERS_SHEET_NAME: 'usuarios',
   INSTITUTIONAL_TOKEN: 'EKIRAYA-2026',
-  DOMINIOS_AUTORIZADOS: ['@cem.edu.co', '@ekiraya.edu.co'],
+  DOMINIOS_AUTORIZADOS: ['@cem.edu.co', '@est.cem.edu.co', '@ekiraya.edu.co'],
   VERCEL_ORIGIN: 'https://cotationeki.vercel.app'
 };
 
@@ -102,8 +102,6 @@ const ENCABEZADOS_USUARIOS_ESPERADOS = [
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('📚 Repositorio Ekirayá')
-    .addItem('🔄 Sincronizar Drive (Unidades Académicas)', 'sincronizarRepositorioDrive')
-    .addItem('⏰ Programar trigger automático cada 24h', 'instalarTriggerSincronizacion')
     .addItem('👥 Verificar hojas repositorio y usuarios', 'verificarEstructuraHojas')
     .addToUi();
 }
@@ -595,26 +593,28 @@ function apiCheckUserRole(email, ssParam) {
   }
 
   if (!foundUser) {
-    // Si es el administrador principal mebolanos@cem.edu.co, garantizar acceso
-    if (cleanEmail === 'mebolanos@cem.edu.co') {
-      foundUser = {
-        nombres: 'Esteban Bolaños R',
-        correo: cleanEmail,
-        curso: 'Docente',
-        seccion: 'Academia',
-        perfil: 'Administrador',
-        isAdmin: true
-      };
-      // Registrarlo en la hoja
+    const isStudentDomain = cleanEmail.endsWith('@est.cem.edu.co');
+    const isAdmin = cleanEmail === 'mebolanos@cem.edu.co';
+    const usernamePart = cleanEmail.split('@')[0];
+    const formattedName = usernamePart
+      .split(/[._-]/)
+      .map(function(s) { return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase(); })
+      .join(' ');
+
+    const inferredPerfil = isAdmin ? 'Administrador' : (isStudentDomain ? 'Estudiante' : 'Docente');
+
+    foundUser = {
+      nombres: isAdmin ? 'Esteban Bolaños R' : (formattedName || cleanEmail),
+      correo: cleanEmail,
+      curso: isStudentDomain ? '11°' : 'Docente',
+      seccion: isStudentDomain ? 'Bachillerato' : 'Academia',
+      perfil: inferredPerfil,
+      isAdmin: isAdmin || /admin|administrador/i.test(inferredPerfil)
+    };
+
+    if (isAdmin) {
       hoja.appendRow([foundUser.nombres, foundUser.curso, foundUser.correo, foundUser.seccion, foundUser.perfil]);
       SpreadsheetApp.flush();
-    } else {
-      return {
-        status: 'error',
-        authorized: false,
-        message: 'Tu correo institucional (' + cleanEmail + ') no se encuentra registrado en la hoja "usuarios". Contacta a Coordinación.',
-        email: cleanEmail
-      };
     }
   }
 

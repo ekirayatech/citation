@@ -1359,28 +1359,49 @@ async function startServer() {
         return;
       }
 
-      const isValidDomain = emailQuery.endsWith('@cem.edu.co') || emailQuery.endsWith('@ekiraya.edu.co');
+      const isValidDomain =
+        emailQuery.endsWith('@cem.edu.co') ||
+        emailQuery.endsWith('@est.cem.edu.co') ||
+        emailQuery.endsWith('@ekiraya.edu.co');
+
       if (!isValidDomain) {
         res.status(403).json({
           status: 'error',
           authorized: false,
-          message: 'Dominio no permitido. Solo se aceptan cuentas institucionales @cem.edu.co o @ekiraya.edu.co',
+          message: 'Dominio no permitido. Solo se aceptan cuentas institucionales @cem.edu.co o @est.cem.edu.co',
           email: emailQuery,
         });
         return;
       }
 
       const state = loadPersistedState();
-      const user = state.authorizedUsers.find((u) => u.correo.toLowerCase() === emailQuery);
+      let user = state.authorizedUsers.find((u) => u.correo.toLowerCase() === emailQuery);
 
       if (!user) {
-        res.status(404).json({
-          status: 'error',
-          authorized: false,
-          message: `El correo institucional ${emailQuery} no se encuentra registrado en la hoja de usuarios`,
-          email: emailQuery,
-        });
-        return;
+        const isStudentDomain = emailQuery.endsWith('@est.cem.edu.co');
+        const isAdmin = emailQuery === 'mebolanos@cem.edu.co';
+        const usernamePart = emailQuery.split('@')[0];
+        const formattedName = usernamePart
+          .split(/[._-]/)
+          .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
+          .join(' ');
+
+        const inferredPerfil = isAdmin
+          ? 'Administrador'
+          : isStudentDomain
+          ? 'Estudiante'
+          : 'Docente';
+
+        user = {
+          curso: isStudentDomain ? '11°' : 'Docente',
+          seccion: isStudentDomain ? 'Bachillerato' : 'Academia',
+          nombres: formattedName || emailQuery,
+          correo: emailQuery,
+          perfil: inferredPerfil,
+          isAdmin,
+          createdInApp: true,
+          syncedToSheet: false,
+        };
       }
 
       res.json({

@@ -337,9 +337,7 @@ export default function App() {
       icon: <Sparkles className="w-4 h-4 shrink-0" />,
       count: savedReferences.length,
     },
-    { id: 'repositorio', label: 'Repositorio', icon: <FolderGit2 className="w-4 h-4 shrink-0" /> },
     { id: 'universitarios', label: 'Universitarios', icon: <GraduationCap className="w-4 h-4 shrink-0" /> },
-    { id: 'taller', label: 'Ejercicios', icon: <ClipboardList className="w-4 h-4 shrink-0" /> },
     ...cmsPages
       .filter((p) => p.published && !isForbiddenCmsPage(p))
       .sort((a, b) => (a.order || 0) - (b.order || 0))
@@ -348,6 +346,7 @@ export default function App() {
         label: p.navLabel || p.title,
         icon: renderCmsIcon(p.iconName),
       })),
+    { id: 'repositorio', label: 'Repositorio', icon: <FolderGit2 className="w-4 h-4 shrink-0" /> },
   ];
 
   return (

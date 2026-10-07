@@ -1871,22 +1871,68 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     return syncedMonographs;
   }, [forceShowSamples, syncedMonographs]);
 
-  // Validación contra la hoja "usuarios"
+  // Validación de acceso por dominio institucional (@cem.edu.co / @est.cem.edu.co) y administradores
   const handleLoginWithUsersSheet = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = loginEmailInput.trim().toLowerCase();
     if (!cleanEmail) {
-      setLoginError('Por favor ingresa tu Correo institucional.');
+      setLoginError('Por favor ingresa tu correo institucional (@cem.edu.co o @est.cem.edu.co).');
       return;
     }
 
-    const foundUser = authorizedUsers.find((u) => u.correo.toLowerCase() === cleanEmail);
+    const isInstitutional =
+      cleanEmail.endsWith('@cem.edu.co') ||
+      cleanEmail.endsWith('@est.cem.edu.co') ||
+      cleanEmail.endsWith('@ekiraya.edu.co');
 
-    if (!foundUser) {
+    if (!isInstitutional) {
       setLoginError(
-        'Acceso restringido: Tu Correo institucional no se encuentra registrado en la hoja "usuarios" autorizada del Colegio Ekirayá.'
+        'Acceso restringido: Solo se permite ingresar con correos institucionales autorizados (@cem.edu.co o @est.cem.edu.co).'
       );
       return;
+    }
+
+    // Buscar en la lista de usuarios autorizados
+    let foundUser = authorizedUsers.find(
+      (u) =>
+        u.correo.toLowerCase() === cleanEmail ||
+        (cleanEmail.endsWith('@est.cem.edu.co') &&
+          u.correo.toLowerCase() === cleanEmail.replace('@est.cem.edu.co', '@cem.edu.co')) ||
+        (cleanEmail.endsWith('@cem.edu.co') &&
+          u.correo.toLowerCase() === cleanEmail.replace('@cem.edu.co', '@est.cem.edu.co'))
+    );
+
+    if (!foundUser) {
+      // Acceso directo por dominio institucional
+      const isStudentDomain = cleanEmail.endsWith('@est.cem.edu.co');
+      const isAdminEmail = cleanEmail === 'mebolanos@cem.edu.co';
+      const usernamePart = cleanEmail.split('@')[0];
+      const formattedName = usernamePart
+        .split(/[._-]/)
+        .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
+        .join(' ');
+
+      const inferredPerfil = isAdminEmail
+        ? 'Administrador'
+        : isStudentDomain
+          ? 'Estudiante'
+          : 'Docente';
+
+      foundUser = {
+        curso: isStudentDomain ? '11°' : 'Docente',
+        seccion: isStudentDomain ? 'Bachillerato' : 'Academia',
+        nombres: formattedName || cleanEmail,
+        correo: cleanEmail,
+        perfil: inferredPerfil,
+        isAdmin: isAdminEmail || /admin/i.test(inferredPerfil),
+        createdInApp: true,
+        syncedToSheet: false,
+      };
+
+      setAuthorizedUsers((prev) => [
+        ...prev.filter((u) => u.correo.toLowerCase() !== cleanEmail),
+        foundUser!,
+      ]);
     }
 
     setLoginError(null);
@@ -2169,14 +2215,14 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           );
         }
 
-        // Sincronización bidireccional automática del repositorio y Drive al crear usuario
+        // Sincronización de metadatos con Sheets al crear usuario
         executeSyncWithSheets(
           appsScriptExecUrl,
           connectionUrl,
           accessToken,
           repoTabName,
           updatedLocalUsers,
-          { triggerDriveScan: true, silent: true }
+          { triggerDriveScan: false, silent: true }
         );
       }
     } catch {
@@ -2262,14 +2308,14 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         }),
       });
 
-      // 2. Sincronización bidireccional inmediata con la hoja "repositorio" y Drive
+      // 2. Sincronización con Google Sheets
       await executeSyncWithSheets(
         appsScriptExecUrl,
         connectionUrl,
         accessToken,
         repoTabName,
         updatedUsers,
-        { triggerDriveScan: true }
+        { triggerDriveScan: false }
       );
     } catch {
       // ignore
@@ -2572,14 +2618,14 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         handleLogoutUser();
       }
 
-      // Sincronización en segundo plano
+      // Sincronización en segundo plano con Sheets
       executeSyncWithSheets(
         appsScriptExecUrl,
         connectionUrl,
         accessToken,
         repoTabName,
         updatedUsers,
-        { triggerDriveScan: true, silent: true }
+        { triggerDriveScan: false, silent: true }
       );
     } catch {
       showToast(`Usuario "${nameToDelete}" eliminado de la base local.`);
@@ -3735,27 +3781,6 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                     {isSyncing ? 'Sincronizando...' : 'Sincronizar Sheets (Hoja 1 y Usuarios)'}
                   </span>
                 </button>
-
-                {appsScriptExecUrl.includes('script.google.com') && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      executeSyncWithSheets(
-                        appsScriptExecUrl,
-                        connectionUrl,
-                        accessToken,
-                        repoTabName,
-                        authorizedUsers,
-                        { triggerDriveScan: true }
-                      )
-                    }
-                    disabled={isSyncing}
-                    className="px-3 py-2 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-900 border border-violet-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
-                  >
-                    <FolderGit2 className="w-3.5 h-3.5" />
-                    <span>Escanear Google Drive</span>
-                  </button>
-                )}
               </div>
             </div>
           </div>
@@ -4335,11 +4360,11 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   accessToken,
                   repoTabName,
                   authorizedUsers,
-                  { triggerDriveScan: true, isManual: true }
+                  { triggerDriveScan: false, isManual: true }
                 )
               }
               disabled={isSyncing}
-              title="Sincronizar ahora bidireccionalmente con la hoja 'repositorio' y Google Drive"
+              title="Sincronizar ahora con Google Sheets para actualizar las monografías y usuarios"
               className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-xs shrink-0 cursor-pointer"
             >
               <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
