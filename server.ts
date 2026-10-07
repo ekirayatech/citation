@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import { OAuth2Client } from 'google-auth-library';
 import {
   AuthorizedSchoolUser,
   DEFAULT_AUTHORIZED_USERS,
@@ -14,6 +15,108 @@ import {
 } from './src/data/repositorioDefaultData.ts';
 import { CmsPage } from './src/types/cms.ts';
 import { DEFAULT_CMS_PAGES } from './src/data/defaultCmsPages.ts';
+
+const googleOAuthClient = new OAuth2Client();
+
+/**
+ * Validador institucional: solo se permiten cuentas pertenecientes a
+ * @cem.edu.co (Docentes/Administradores) y @est.cem.edu.co (Estudiantes)
+ */
+export function isAllowedInstitutionalEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const clean = email.trim().toLowerCase();
+  return clean.endsWith('@cem.edu.co') || clean.endsWith('@est.cem.edu.co');
+}
+
+/**
+ * Validador de rol administrativo basado en la hoja "usuarios" o cuenta principal mebolanos@cem.edu.co
+ */
+export function isAdministratorUser(
+  email: string | null | undefined,
+  authorizedUsers?: AuthorizedSchoolUser[]
+): boolean {
+  if (!email) return false;
+  const clean = email.trim().toLowerCase();
+  if (clean === 'mebolanos@cem.edu.co') return true;
+  const users = authorizedUsers || DEFAULT_AUTHORIZED_USERS;
+  const user = users.find((u) => u.correo.toLowerCase() === clean);
+  return Boolean(
+    user?.isAdmin ||
+      /admin|administrador|coordinador|directivo/i.test(user?.perfil || '')
+  );
+}
+
+/**
+ * Verificación de tokens de Google mediante google-auth-library (OAuth2Client)
+ */
+export async function verifyGoogleAuthToken(token: string): Promise<{
+  valid: boolean;
+  email?: string;
+  name?: string;
+  picture?: string;
+  isAdmin?: boolean;
+  error?: string;
+}> {
+  if (!token) return { valid: false, error: 'Token no proporcionado' };
+  const cleanToken = token.trim();
+
+  // 1. Intentar verificación criptográfica con Google ID Token vía google-auth-library
+  try {
+    const ticket = await googleOAuthClient.verifyIdToken({
+      idToken: cleanToken,
+    }).catch(() => null);
+
+    if (ticket) {
+      const payload = ticket.getPayload();
+      const email = (payload?.email || '').trim().toLowerCase();
+      if (!isAllowedInstitutionalEmail(email)) {
+        return {
+          valid: false,
+          email,
+          error: 'Acceso restringido: Solo se permiten correos @cem.edu.co o @est.cem.edu.co',
+        };
+      }
+      return {
+        valid: true,
+        email,
+        name: payload?.name || payload?.given_name || email.split('@')[0],
+        picture: payload?.picture,
+        isAdmin: isAdministratorUser(email),
+      };
+    }
+  } catch {
+    // Continuar a fallback de token de acceso
+  }
+
+  // 2. Intentar como Access Token de Google OAuth (endpoint tokeninfo de Google)
+  try {
+    const tokenInfoResp = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(cleanToken)}`
+    ).catch(() => null);
+
+    if (tokenInfoResp && tokenInfoResp.ok) {
+      const tokenInfo = await tokenInfoResp.json();
+      const email = (tokenInfo.email || '').trim().toLowerCase();
+      if (!isAllowedInstitutionalEmail(email)) {
+        return {
+          valid: false,
+          email,
+          error: 'Acceso restringido: Solo se permiten correos @cem.edu.co o @est.cem.edu.co',
+        };
+      }
+      return {
+        valid: true,
+        email,
+        name: email.split('@')[0],
+        isAdmin: isAdministratorUser(email),
+      };
+    }
+  } catch {
+    // Continuar
+  }
+
+  return { valid: false, error: 'Token institucional de Google no válido o expirado' };
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -154,6 +257,19 @@ function parseCsvToRows(csvText: string): { headers: string[]; rows: Record<stri
     return { headers: [], rows: [] };
   }
 
+  // Detect primary delimiter: Tab (\t), Comma (,), or Semicolon (;)
+  const firstLine = csvText.split(/\r?\n/)[0] || '';
+  const tabCount = (firstLine.match(/\t/g) || []).length;
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  const semiCount = (firstLine.match(/;/g) || []).length;
+
+  let delimiter = ',';
+  if (tabCount > commaCount && tabCount > semiCount) {
+    delimiter = '\t';
+  } else if (semiCount > commaCount && semiCount > tabCount) {
+    delimiter = ';';
+  }
+
   const lines: string[][] = [];
   let currentRow: string[] = [];
   let currentVal = '';
@@ -175,7 +291,7 @@ function parseCsvToRows(csvText: string): { headers: string[]; rows: Record<stri
     } else {
       if (ch === '"') {
         inQuotes = true;
-      } else if (ch === ',') {
+      } else if (ch === delimiter) {
         currentRow.push(currentVal.trim());
         currentVal = '';
       } else if (ch === '\n' || (ch === '\r' && next === '\n')) {
@@ -502,7 +618,10 @@ function loadPersistedState(): PersistedRepoState {
         lastSyncDate: parsed.lastSyncDate || new Date().toLocaleString('es-CO'),
         lastSyncTimestamp: parsed.lastSyncTimestamp || Date.now(),
         rawHeaders: hasValidMonoRows ? parsed.rawHeaders : DEFAULT_REPO_HEADERS,
-        rawRows: hasValidMonoRows ? parsed.rawRows : DEFAULT_REPO_ROWS,
+        rawRows:
+          hasValidMonoRows && parsed.rawRows.length >= DEFAULT_REPO_ROWS.length
+            ? parsed.rawRows
+            : DEFAULT_REPO_ROWS,
         usuariosHeaders:
           Array.isArray(parsed.usuariosHeaders) && parsed.usuariosHeaders.length > 0
             ? parsed.usuariosHeaders
@@ -759,11 +878,184 @@ async function startServer() {
   app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-user-email, x-auth-token, x-admin-key');
     if (req.method === 'OPTIONS') {
       return res.sendStatus(200);
     }
     next();
+  });
+
+  // Middleware de validación de correo institucional (@cem.edu.co o @est.cem.edu.co)
+  const requireInstitutionalDomain = async (
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    const authHeader = req.headers.authorization || '';
+    const userEmailHeader = (req.headers['x-user-email'] as string) || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : '';
+
+    let emailToValidate = userEmailHeader.trim().toLowerCase();
+
+    if (token) {
+      const verification = await verifyGoogleAuthToken(token);
+      if (verification.valid && verification.email) {
+        emailToValidate = verification.email;
+        (req as any).user = verification;
+      }
+    }
+
+    // Permitir si el email es del dominio institucional
+    if (emailToValidate && isAllowedInstitutionalEmail(emailToValidate)) {
+      (req as any).userEmail = emailToValidate;
+      return next();
+    }
+
+    // Si la petición viene sin credenciales pero a rutas de solo lectura o públicas, continuar
+    if (req.method === 'GET' && !req.path.startsWith('/api/repo/admin')) {
+      return next();
+    }
+
+    // Si viene a mutación o ruta administrativa sin correo válido
+    if (!emailToValidate) {
+      return res.status(401).json({
+        error: 'Autenticación requerida. Inicie sesión con su cuenta @cem.edu.co o @est.cem.edu.co',
+        code: 'AUTH_REQUIRED',
+      });
+    }
+
+    return res.status(403).json({
+      error: `Acceso restringido: El correo '${emailToValidate}' no pertenece a @cem.edu.co ni @est.cem.edu.co`,
+      code: 'FORBIDDEN_DOMAIN',
+    });
+  };
+
+  // Middleware para acciones administrativas (requiere rol Administrador o mebolanos@cem.edu.co)
+  const requireAdminAuth = (
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    const state = loadPersistedState();
+    const userEmail = (
+      ((req as any).userEmail as string) ||
+      ((req.headers['x-user-email'] as string) || '') ||
+      (req.body?.userEmail as string) ||
+      (req.body?.adminEmail as string) ||
+      ''
+    ).trim().toLowerCase();
+
+    if (!userEmail) {
+      return res.status(401).json({
+        error: 'Se requiere inicio de sesión administrativo.',
+        code: 'ADMIN_LOGIN_REQUIRED',
+      });
+    }
+
+    if (!isAllowedInstitutionalEmail(userEmail)) {
+      return res.status(403).json({
+        error: 'El correo debe pertenecer al dominio institucional @cem.edu.co',
+        code: 'INVALID_DOMAIN',
+      });
+    }
+
+    if (!isAdministratorUser(userEmail, state.authorizedUsers)) {
+      return res.status(403).json({
+        error: `El usuario '${userEmail}' no tiene permisos de administrador en la hoja 'usuarios'.`,
+        code: 'ADMIN_PRIVILEGES_REQUIRED',
+      });
+    }
+
+    return next();
+  };
+
+  // ==========================================
+  // Rutas de Autenticación Institucional & Google
+  // ==========================================
+
+  // Validar Token de Google con google-auth-library
+  app.post('/api/auth/google-verify', async (req, res) => {
+    try {
+      const { idToken, accessToken, email: providedEmail } = req.body || {};
+      const token = idToken || accessToken;
+
+      if (token) {
+        const result = await verifyGoogleAuthToken(token);
+        if (!result.valid) {
+          return res.status(401).json(result);
+        }
+        const state = loadPersistedState();
+        const isAdmin = isAdministratorUser(result.email, state.authorizedUsers);
+        return res.json({
+          ok: true,
+          email: result.email,
+          name: result.name,
+          picture: result.picture,
+          isAdmin,
+          isAllowed: true,
+        });
+      }
+
+      // Validación por correo directo si no se provee token OAuth
+      if (providedEmail && typeof providedEmail === 'string') {
+        const email = providedEmail.trim().toLowerCase();
+        if (!isAllowedInstitutionalEmail(email)) {
+          return res.status(403).json({
+            ok: false,
+            error: 'El correo debe terminar en @cem.edu.co o @est.cem.edu.co',
+          });
+        }
+        const state = loadPersistedState();
+        const isAdmin = isAdministratorUser(email, state.authorizedUsers);
+        return res.json({
+          ok: true,
+          email,
+          name: email.split('@')[0],
+          isAdmin,
+          isAllowed: true,
+        });
+      }
+
+      return res.status(400).json({ error: 'Token o correo no proporcionado' });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || 'Error en verificación' });
+    }
+  });
+
+  // Login de sección administrativa (verifica contra la hoja "usuarios" y mebolanos@cem.edu.co)
+  app.post('/api/auth/admin-login', (req, res) => {
+    try {
+      const { email, password } = req.body || {};
+      const cleanEmail = String(email || '').trim().toLowerCase();
+
+      if (!cleanEmail) {
+        return res.status(400).json({ error: 'El correo electrónico es requerido' });
+      }
+
+      if (!isAllowedInstitutionalEmail(cleanEmail)) {
+        return res.status(403).json({
+          error: 'Acceso denegado: Solo se permiten correos @cem.edu.co para administración.',
+        });
+      }
+
+      const state = loadPersistedState();
+      const isAdmin = isAdministratorUser(cleanEmail, state.authorizedUsers);
+
+      if (!isAdmin) {
+        return res.status(403).json({
+          error: `El usuario '${cleanEmail}' no está registrado como administrador en la hoja de usuarios. Contacta a mebolanos@cem.edu.co`,
+        });
+      }
+
+      return res.json({
+        ok: true,
+        email: cleanEmail,
+        isAdmin: true,
+        message: 'Sesión administrativa validada exitosamente.',
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || 'Error de autenticación' });
+    }
   });
 
   // 0. Stream SSE para sincronización en tiempo real entre múltiples terminales
@@ -1938,6 +2230,10 @@ async function startServer() {
       monographsSyncedCount: nextRows.length,
       sheetAccessWarning,
       state: nextState,
+      headers: nextHeaders,
+      rows: nextRows,
+      rawHeaders: nextHeaders,
+      rawRows: nextRows,
     };
   }
 

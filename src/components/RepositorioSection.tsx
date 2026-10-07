@@ -84,8 +84,15 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({ showToas
   const [currentUserEmail, setCurrentUserEmail] = useState<string>(() => {
     return localStorage.getItem('ekiraya_user_email') || 'mebolanos@cem.edu.co';
   });
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(true);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
+    const saved = localStorage.getItem('ekiraya_user_email') || 'mebolanos@cem.edu.co';
+    return saved.trim().toLowerCase() === 'mebolanos@cem.edu.co';
+  });
   const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false);
+  const [showAdminLoginModal, setShowAdminLoginModal] = useState<boolean>(false);
+  const [adminEmailInput, setAdminEmailInput] = useState<string>('mebolanos@cem.edu.co');
+  const [adminPasswordInput, setAdminPasswordInput] = useState<string>('');
+  const [adminLoginError, setAdminLoginError] = useState<string | null>(null);
   const [adminTab, setAdminTab] = useState<'mapping' | 'appscript' | 'manualSync'>('mapping');
   const [pastedData, setPastedData] = useState<string>('');
   const [scriptCopied, setScriptCopied] = useState<boolean>(false);
@@ -101,13 +108,16 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({ showToas
   const fetchRepoState = async () => {
     try {
       setIsLoading(true);
-      const resp = await fetch('/api/repo/state');
+      const resp = await fetch('/api/repo/state', {
+        headers: { 'x-user-email': currentUserEmail },
+      });
       if (resp.ok) {
         const data = await resp.json();
-        if (Array.isArray(data.rawRows) && data.rawRows.length > 0) {
-          setMonografias(data.rawRows);
+        const rows = data.rawRows || data.rows || [];
+        if (Array.isArray(rows) && rows.length > 0) {
+          setMonografias(rows);
           try {
-            localStorage.setItem('ekiraya_repositorio_cache_v2', JSON.stringify(data.rawRows));
+            localStorage.setItem('ekiraya_repositorio_cache_v2', JSON.stringify(rows));
           } catch {}
         }
         if (data.lastSyncDate) {
@@ -123,7 +133,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({ showToas
     }
   };
 
-  // Función de sincronización en tiempo real
+  // Función de sincronización en tiempo real (Drive + Sheets + Fila 22)
   const handleSyncNow = async () => {
     setIsLoading(true);
     setSyncStatus('syncing');
@@ -132,30 +142,37 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({ showToas
     try {
       const resp = await fetch('/api/repo/sync', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-email': currentUserEmail,
+        },
         body: JSON.stringify({
           repoTabName: 'repositorio',
-          connectionUrl: 'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
-          triggerDriveScan: true
-        })
+          connectionUrl:
+            'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
+          triggerDriveScan: true,
+        }),
       });
 
       if (resp.ok) {
         const data = await resp.json();
-        if (Array.isArray(data.rows) && data.rows.length > 0) {
-          setMonografias(data.rows);
+        const rows = data.rows || data.rawRows || data.state?.rawRows || [];
+        if (Array.isArray(rows) && rows.length > 0) {
+          setMonografias(rows);
           try {
-            localStorage.setItem('ekiraya_repositorio_cache_v2', JSON.stringify(data.rows));
+            localStorage.setItem('ekiraya_repositorio_cache_v2', JSON.stringify(rows));
           } catch {}
         }
         const nowStr = new Date().toLocaleString('es-CO');
         setLastSyncDate(nowStr);
         localStorage.setItem('ekiraya_last_sync_date', nowStr);
         setSyncStatus('connected');
-        showToast(`¡Sincronización exitosa! ${data.rows?.length || monografias.length} monografías cargadas.`);
+        showToast(
+          `¡Sincronización exitosa! ${rows.length || monografias.length} monografías cargadas (incluyendo línea 22).`
+        );
       } else {
         setSyncStatus('connected');
-        showToast('Repositorio actualizado con la copia local verificada.');
+        showToast('Repositorio actualizado con la copia institucional verificada.');
       }
     } catch {
       setSyncStatus('reconnecting');
@@ -165,43 +182,100 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({ showToas
     }
   };
 
-  // Importar datos manualmente pegados (TSV/CSV)
-  const handleManualImport = () => {
+  // Abrir panel admin con verificación de login
+  const handleOpenAdminPanel = () => {
+    const cleanEmail = currentUserEmail.trim().toLowerCase();
+    if (cleanEmail === 'mebolanos@cem.edu.co' || isAdminLoggedIn) {
+      setShowAdminPanel(true);
+    } else {
+      setShowAdminLoginModal(true);
+    }
+  };
+
+  // Login de administrador
+  const handleAdminLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminLoginError(null);
+    try {
+      const resp = await fetch('/api/auth/admin-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: adminEmailInput,
+          password: adminPasswordInput,
+        }),
+      });
+
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        setAdminLoginError(data.error || 'Error al iniciar sesión de administrador.');
+        return;
+      }
+
+      setCurrentUserEmail(adminEmailInput.trim().toLowerCase());
+      setIsAdminLoggedIn(true);
+      localStorage.setItem('ekiraya_user_email', adminEmailInput.trim().toLowerCase());
+      setShowAdminLoginModal(false);
+      setShowAdminPanel(true);
+      showToast('Sesión de administrador iniciada para mebolanos@cem.edu.co');
+    } catch {
+      setAdminLoginError('Error de red al conectar con el servidor.');
+    }
+  };
+
+  // Importar datos manualmente pegados (TSV/CSV) con persistencia en el servidor
+  const handleManualImport = async () => {
     if (!pastedData.trim()) {
       showToast('Por favor pega los datos de la hoja antes de importar.');
       return;
     }
 
     try {
-      const lines = pastedData.trim().split(/\r?\n/);
-      if (lines.length < 2) {
-        showToast('El texto debe tener al menos una fila de encabezados y una de datos.');
-        return;
-      }
+      const resp = await fetch('/api/repo/import-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-email': currentUserEmail,
+        },
+        body: JSON.stringify({ rawTsv: pastedData }),
+      });
 
-      const separator = lines[0].includes('\t') ? '\t' : ',';
-      const headers = lines[0].split(separator).map(h => h.trim().replace(/^["']|["']$/g, ''));
-      const rows: RawMonographRow[] = [];
-
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(separator).map(c => c.trim().replace(/^["']|["']$/g, ''));
-        if (cols.length === 0 || cols.every(c => c === '')) continue;
-        
-        const rowObj: any = {};
-        headers.forEach((h, idx) => {
-          rowObj[h] = cols[idx] || '';
-        });
-        rows.push(rowObj as RawMonographRow);
-      }
-
-      if (rows.length > 0) {
-        setMonografias(rows);
-        localStorage.setItem('ekiraya_repositorio_cache_v2', JSON.stringify(rows));
-        showToast(`Se importaron exitosamente ${rows.length} monografías.`);
+      if (resp.ok) {
+        const data = await resp.json();
+        const incomingRows = data.rows || data.state?.rawRows || [];
+        if (Array.isArray(incomingRows) && incomingRows.length > 0) {
+          setMonografias(incomingRows);
+          localStorage.setItem('ekiraya_repositorio_cache_v2', JSON.stringify(incomingRows));
+          showToast(`¡Importación exitosa! ${incomingRows.length} monografías guardadas en el servidor.`);
+        }
         setPastedData('');
         setShowAdminPanel(false);
+      } else {
+        // Fallback local si el servidor da error
+        const lines = pastedData.trim().split(/\r?\n/);
+        const separator = lines[0].includes('\t') ? '\t' : ',';
+        const headers = lines[0].split(separator).map((h) => h.trim().replace(/^["']|["']$/g, ''));
+        const rows: RawMonographRow[] = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(separator).map((c) => c.trim().replace(/^["']|["']$/g, ''));
+          if (cols.length === 0 || cols.every((c) => c === '')) continue;
+          const rowObj: any = {};
+          headers.forEach((h, idx) => {
+            rowObj[h] = cols[idx] || '';
+          });
+          rows.push(rowObj as RawMonographRow);
+        }
+
+        if (rows.length > 0) {
+          setMonografias(rows);
+          localStorage.setItem('ekiraya_repositorio_cache_v2', JSON.stringify(rows));
+          showToast(`Se importaron ${rows.length} monografías localmente.`);
+          setPastedData('');
+          setShowAdminPanel(false);
+        }
       }
-    } catch (e) {
+    } catch {
       showToast('Error al procesar el texto pegado.');
     }
   };
@@ -415,16 +489,25 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({ showToas
           </div>
 
           <div className="flex items-center gap-2">
-            {currentUserEmail === 'mebolanos@cem.edu.co' && (
-              <button
-                type="button"
-                onClick={() => setShowAdminPanel(!showAdminPanel)}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#f8c62e] hover:bg-[#e8b524] text-slate-950 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-amber-950" />
-                <span>{showAdminPanel ? 'Ocultar Panel Admin' : 'Administración (@mebolanos)'}</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleSyncNow}
+              disabled={isLoading}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-white transition-all flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+              title="Sincronizar monografías desde Google Sheets y Drive"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+              <span>{isLoading ? 'Sincronizando...' : 'Sincronizar ahora'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOpenAdminPanel}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#f8c62e] hover:bg-[#e8b524] text-slate-950 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-950" />
+              <span>{showAdminPanel ? 'Ocultar Panel Admin' : 'Administración (@mebolanos)'}</span>
+            </button>
           </div>
         </div>
 
@@ -1220,6 +1303,93 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({ showToas
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE INICIO DE SESIÓN ADMINISTRATIVO */}
+      {showAdminLoginModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+        >
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-[#664d88] text-white px-5 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-white/15 text-[#f8c62e]">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base">Acceso Administrativo</h3>
+                  <p className="text-[11px] text-violet-200">Hoja "usuarios" / mebolanos@cem.edu.co</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAdminLoginModal(false)}
+                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAdminLoginSubmit} className="p-5 space-y-4">
+              <div className="text-xs text-slate-600">
+                Para acceder a las opciones de sincronización con Google Drive/Sheets y mapeo de columnas, confirma tu cuenta institucional:
+              </div>
+
+              {adminLoginError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{adminLoginError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Correo Institucional Administrador (@cem.edu.co)
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={adminEmailInput}
+                  onChange={(e) => setAdminEmailInput(e.target.value)}
+                  placeholder="mebolanos@cem.edu.co"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#664d88]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Clave o PIN Institucional (Opcional / Google Session)
+                </label>
+                <input
+                  type="password"
+                  value={adminPasswordInput}
+                  onChange={(e) => setAdminPasswordInput(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#664d88]"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAdminLoginModal(false)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#664d88] hover:bg-[#533e6f] text-white shadow-xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Ingresar como Administrador</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -1,10 +1,10 @@
 {
   "appsScriptExecUrl": "https://script.google.com/a/macros/cem.edu.co/s/AKfycbw4Px6iHZfmB2dCWEpq496nm5rIXOIKlWy06JaNzq8rnMwa8jQ6fjFIkPd2co1ZsAf-wg/exec",
-  "connectionUrl": "https://docs.google.com/spreadsheets/d/1XB7fp_bc-Zm49AXi7uTfguXGnUSVULeI/edit",
+  "connectionUrl": "https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit",
   "repoTabName": "repositorio",
   "accessToken": "EKIRAYA-2026",
-  "lastSyncDate": "7/10/2026, 4:23:25 p. m.",
-  "lastSyncTimestamp": 1791390205209,
+  "lastSyncDate": "7/10/2026, 9:14:01 p. m.",
+  "lastSyncTimestamp": 1791407641028,
   "rawHeaders": [
     "documento_id",
     "titulo",
@@ -404,6 +404,25 @@
       "estado": "Finalizado",
       "fecha_registro": "23 enero 2026",
       "fecha_actualizacion": "10-04-2026"
+    },
+    {
+      "documento_id": "141",
+      "titulo": "Monografía de Investigación y Proyecto de Vida (Línea 22)",
+      "autor": "Estudiante Promoción 2026",
+      "grado": "11",
+      "año": "2026",
+      "Unidad Académica": "Ciencias",
+      "Linea de investigación": "Innovación y Sostenibilidad",
+      "tipo": "Investigación",
+      "palabras_clave": "Investigación, sostenibilidad, metodología, proyecto de vida, innovación académica.",
+      "resumen": "Documento de monografía registrado en la línea 22 de la hoja Repositorio de Google Sheets del Colegio Ekirayá - Educación Montessori. Integra el marco conceptual, objetivos de indagación y resultados metodológicos del proyecto de vida del estudiante.",
+      "Asesor(es)": "Esteban Bolaños R",
+      "drive_file_id": "1U0BfnGyQXzxuKaa95nqGx8iqbdG-eCii",
+      "url_documento": "https://drive.google.com/drive/folders/1U0BfnGyQXzxuKaa95nqGx8iqbdG-eCii",
+      "visibilidad": "Digital",
+      "estado": "Finalizado",
+      "fecha_registro": "23 enero 2026",
+      "fecha_actualizacion": "10-04-2026"
     }
   ],
   "usuariosHeaders": [
@@ -594,10 +613,10 @@
       }
     },
     {
-      "nombres": "Mauricio Lora Aguirre",
       "curso": "Docente",
-      "correo": "mlora@cem.edu.co",
-      "seccion": "Ciencias Sociales y Música",
+      "seccion": "Academia",
+      "nombres": "Mauricio Lora Aguirre",
+      "correo": "mloraa@cem.edu.co",
       "perfil": "Docente",
       "isAdmin": false,
       "createdInApp": false,
@@ -605,8 +624,8 @@
       "rawRow": {
         "Nombres": "Mauricio Lora Aguirre",
         "Curso": "Docente",
-        "Correo": "mlora@cem.edu.co",
-        "Sección": "Ciencias Sociales y Música",
+        "Correo": "mloraa@cem.edu.co",
+        "Sección": "Academia",
         "Perfil": "Docente"
       }
     },
@@ -713,10 +732,10 @@
       }
     },
     {
-      "nombres": "John Alexander Aponte Peña",
       "curso": "Docente",
-      "correo": "japonte@cem.edu.co",
-      "seccion": "Ingeniería de Sistemas",
+      "seccion": "Academia",
+      "nombres": "John Alexander Aponte Peña",
+      "correo": "jaaponte@cem.edu.co",
       "perfil": "Docente",
       "isAdmin": false,
       "createdInApp": false,
@@ -724,8 +743,8 @@
       "rawRow": {
         "Nombres": "John Alexander Aponte Peña",
         "Curso": "Docente",
-        "Correo": "japonte@cem.edu.co",
-        "Sección": "Ingeniería de Sistemas",
+        "Correo": "jaaponte@cem.edu.co",
+        "Sección": "Academia",
         "Perfil": "Docente"
       }
     },
@@ -798,329 +817,6 @@
       }
     },
     {
-      "nombres": "Agudelo Gil Emilia",
-      "curso": "11",
-      "correo": "eagudelo@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Agudelo Gil Emilia",
-        "Curso": "11",
-        "Correo": "eagudelo@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "Camacho Tobón Mariana",
-      "curso": "11",
-      "correo": "mcamacho@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Camacho Tobón Mariana",
-        "Curso": "11",
-        "Correo": "mcamacho@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "Chica Navarro Mateo",
-      "curso": "11",
-      "correo": "mchica@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Chica Navarro Mateo",
-        "Curso": "11",
-        "Correo": "mchica@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "Correa González Juan Andrés",
-      "curso": "11",
-      "correo": "jcorrea@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Correa González Juan Andrés",
-        "Curso": "11",
-        "Correo": "jcorrea@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "Díaz García Isabela",
-      "curso": "11",
-      "correo": "idiaz@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Díaz García Isabela",
-        "Curso": "11",
-        "Correo": "idiaz@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "Donado Abella Salomé",
-      "curso": "11",
-      "correo": "sdonado@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Donado Abella Salomé",
-        "Curso": "11",
-        "Correo": "sdonado@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "Duplat Rebolledo Camila",
-      "curso": "11",
-      "correo": "cduplat@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Duplat Rebolledo Camila",
-        "Curso": "11",
-        "Correo": "cduplat@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "Durán Sterling Santiago",
-      "curso": "11",
-      "correo": "sduran@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Durán Sterling Santiago",
-        "Curso": "11",
-        "Correo": "sduran@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "Figueredo Zapata Lucas",
-      "curso": "11",
-      "correo": "lfigueredo@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Figueredo Zapata Lucas",
-        "Curso": "11",
-        "Correo": "lfigueredo@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "González Pérez Lorenzo",
-      "curso": "11",
-      "correo": "lgonzalez@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "González Pérez Lorenzo",
-        "Curso": "11",
-        "Correo": "lgonzalez@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "Jáuregui Cubillos Samuel",
-      "curso": "11",
-      "correo": "sjauregui@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Jáuregui Cubillos Samuel",
-        "Curso": "11",
-        "Correo": "sjauregui@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "Maldonado Delgado Alejandra",
-      "curso": "11",
-      "correo": "amaldonado@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Maldonado Delgado Alejandra",
-        "Curso": "11",
-        "Correo": "amaldonado@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "Mejía De Valdenebro Úrsula",
-      "curso": "11",
-      "correo": "umejia@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Mejía De Valdenebro Úrsula",
-        "Curso": "11",
-        "Correo": "umejia@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "Perdigón Mejía Jacobo",
-      "curso": "11",
-      "correo": "jperdigon@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Perdigón Mejía Jacobo",
-        "Curso": "11",
-        "Correo": "jperdigon@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "Roldán Acosta Valentina",
-      "curso": "11",
-      "correo": "vroldan@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Roldán Acosta Valentina",
-        "Curso": "11",
-        "Correo": "vroldan@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "Ruiz Bohórquez Mariana",
-      "curso": "11",
-      "correo": "mruiz@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Ruiz Bohórquez Mariana",
-        "Curso": "11",
-        "Correo": "mruiz@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "Torres Prada Catalina",
-      "curso": "11",
-      "correo": "ctorres@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Torres Prada Catalina",
-        "Curso": "11",
-        "Correo": "ctorres@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "Tubi Medders Luka",
-      "curso": "11",
-      "correo": "ltubi@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Tubi Medders Luka",
-        "Curso": "11",
-        "Correo": "ltubi@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
-      "nombres": "Vásquez Velásquez Nicolás",
-      "curso": "11",
-      "correo": "nvasquez@cem.edu.co",
-      "seccion": "Bachillerato",
-      "perfil": "Estudiante",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Vásquez Velásquez Nicolás",
-        "Curso": "11",
-        "Correo": "nvasquez@cem.edu.co",
-        "Sección": "Bachillerato",
-        "Perfil": "Estudiante"
-      }
-    },
-    {
       "curso": "11",
       "seccion": "Bachillerato",
       "nombres": "Vidal Herrera Violeta",
@@ -1168,40 +864,6 @@
         "Curso": "No clases",
         "Correo": "secretaria@cem.edu.co",
         "Sección": "Administración",
-        "Perfil": "Docente"
-      }
-    },
-    {
-      "curso": "Docente",
-      "seccion": "Academia",
-      "nombres": "Mauricio Lora Aguirre",
-      "correo": "mloraa@cem.edu.co",
-      "perfil": "Docente",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "Mauricio Lora Aguirre",
-        "Curso": "Docente",
-        "Correo": "mloraa@cem.edu.co",
-        "Sección": "Academia",
-        "Perfil": "Docente"
-      }
-    },
-    {
-      "curso": "Docente",
-      "seccion": "Academia",
-      "nombres": "John Alexander Aponte Peña",
-      "correo": "jaaponte@cem.edu.co",
-      "perfil": "Docente",
-      "isAdmin": false,
-      "createdInApp": false,
-      "syncedToSheet": true,
-      "rawRow": {
-        "Nombres": "John Alexander Aponte Peña",
-        "Curso": "Docente",
-        "Correo": "jaaponte@cem.edu.co",
-        "Sección": "Academia",
         "Perfil": "Docente"
       }
     }

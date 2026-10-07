@@ -16,6 +16,13 @@ import {
   Globe,
   Star,
   HelpCircle,
+  ShieldCheck,
+  UserCheck,
+  LogIn,
+  LogOut,
+  Lock,
+  AlertCircle,
+  KeyRound,
 } from 'lucide-react';
 import {
   CitationFormData,
@@ -85,6 +92,73 @@ export default function App() {
   });
   const [cmsModalOpen, setCmsModalOpen] = useState<boolean>(false);
   const [cmsEditingPageId, setCmsEditingPageId] = useState<string | null>(null);
+
+  // Autenticación Institucional (@cem.edu.co / @est.cem.edu.co)
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>(() => {
+    return localStorage.getItem('ekiraya_user_email') || 'mebolanos@cem.edu.co';
+  });
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [loginEmailInput, setLoginEmailInput] = useState<string>('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(false);
+
+  const isInstitutionalEmail = (email: string) => {
+    const clean = email.trim().toLowerCase();
+    return clean.endsWith('@cem.edu.co') || clean.endsWith('@est.cem.edu.co');
+  };
+
+  const isAdminUser = currentUserEmail.trim().toLowerCase() === 'mebolanos@cem.edu.co';
+
+  const handleInstitutionalLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    const clean = loginEmailInput.trim().toLowerCase();
+
+    if (!clean) {
+      setAuthError('Por favor ingresa tu correo institucional.');
+      return;
+    }
+
+    if (!isInstitutionalEmail(clean)) {
+      setAuthError(
+        'Acceso restringido: Solo se permiten correos de la comunidad @cem.edu.co (Docentes/Admin) o @est.cem.edu.co (Estudiantes).'
+      );
+      return;
+    }
+
+    try {
+      setAuthLoading(true);
+      const resp = await fetch('/api/auth/google-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: clean }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        setAuthError(data.error || 'Error en la verificación del correo institucional.');
+        return;
+      }
+      setCurrentUserEmail(clean);
+      localStorage.setItem('ekiraya_user_email', clean);
+      setIsAuthModalOpen(false);
+      showToast(`Sesión institucional activa: ${clean}`);
+    } catch {
+      setAuthError('Error al comunicarse con el servidor de autenticación.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleOpenCmsModal = () => {
+    if (!isAdminUser) {
+      setLoginEmailInput('mebolanos@cem.edu.co');
+      setIsAuthModalOpen(true);
+      showToast('Se requiere acceso de Administrador (mebolanos@cem.edu.co) para editar páginas.');
+      return;
+    }
+    setCmsEditingPageId(null);
+    setCmsModalOpen(true);
+  };
 
   // Carga inicial y sincronización de páginas CMS
   useEffect(() => {
@@ -428,8 +502,51 @@ export default function App() {
               })}
             </nav>
 
-            {/* Zone 3: Toggle Móvil */}
+            {/* Zone 3 Desktop: Sesión Institucional y CMS */}
+            <div className="hidden lg:flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginEmailInput(currentUserEmail);
+                  setIsAuthModalOpen(true);
+                }}
+                className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-semibold text-white transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Cambiar o verificar cuenta institucional"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-emerald-300" />
+                <span className="max-w-[140px] truncate">{currentUserEmail}</span>
+                {isAdminUser && (
+                  <span className="px-1.5 py-0.5 rounded bg-[#f8c62e] text-slate-950 text-[9px] font-black uppercase">
+                    Admin
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenCmsModal}
+                className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Panel de Gestión de Páginas CMS"
+              >
+                <Layers className="w-3.5 h-3.5 text-[#f8c62e]" />
+                <span className="hidden xl:inline">CMS</span>
+              </button>
+            </div>
+
+            {/* Zone 4: Toggle Móvil */}
             <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 lg:hidden">
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginEmailInput(currentUserEmail);
+                  setIsAuthModalOpen(true);
+                }}
+                className="p-2 rounded-xl bg-white/10 text-white text-xs font-bold"
+                title="Cuenta Institucional"
+              >
+                <UserCheck className="w-4 h-4 text-emerald-300" />
+              </button>
+
               {/* Botón de Menú Móvil */}
               <button
                 type="button"
@@ -559,6 +676,18 @@ export default function App() {
         )}
 
         {activeTab === 'universitarios' && <UniversitariosSection />}
+
+        {/* Renderizado de páginas dinámicas CMS */}
+        {cmsPages.some((p) => p.id === activeTab) && (
+          <CmsPageView
+            page={cmsPages.find((p) => p.id === activeTab)!}
+            isAdmin={isAdminUser}
+            onEditPage={(p) => {
+              setCmsEditingPageId(p.id);
+              setCmsModalOpen(true);
+            }}
+          />
+        )}
       </main>
 
       {/* Quiet Institutional Footer */}
@@ -570,6 +699,116 @@ export default function App() {
           <p>Probidad Académica · APA 7.ª · MLA 9.ª · Chicago 17.ª · Icontec</p>
         </div>
       </footer>
+
+      {/* Modal de Gestión CMS */}
+      {cmsModalOpen && (
+        <CmsAdminModal
+          isOpen={cmsModalOpen}
+          onClose={() => setCmsModalOpen(false)}
+          pages={cmsPages}
+          onSavePage={handleSaveCmsPage}
+          onDeletePage={handleDeleteCmsPage}
+          initialEditPageId={cmsEditingPageId}
+          showToast={showToast}
+        />
+      )}
+
+      {/* Modal de Validación Institucional y Cambio de Cuenta */}
+      {isAuthModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+        >
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-[#664d88] text-white px-5 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-white/15 text-[#f8c62e]">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base">Acceso Institucional</h3>
+                  <p className="text-[11px] text-violet-200">Colegio Ekirayá · @cem.edu.co / @est.cem.edu.co</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAuthModalOpen(false)}
+                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleInstitutionalLogin} className="p-5 space-y-4">
+              <div className="text-xs text-slate-600 leading-relaxed">
+                El acceso a las monografías, gestor bibliográfico y herramientas de probidad académica está protegido y restringido exclusivamente a miembros de la comunidad con correo <strong>@cem.edu.co</strong> (Docentes y Administradores) o <strong>@est.cem.edu.co</strong> (Estudiantes).
+              </div>
+
+              {authError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{authError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Correo Institucional (@cem.edu.co o @est.cem.edu.co)
+                </label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    required
+                    value={loginEmailInput}
+                    onChange={(e) => setLoginEmailInput(e.target.value)}
+                    placeholder="ej: mebolanos@cem.edu.co o tu-nombre@est.cem.edu.co"
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#664d88]"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1.5 text-xs text-slate-600">
+                <span className="font-bold text-slate-700 block">Acceso rápido para verificación:</span>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setLoginEmailInput('mebolanos@cem.edu.co')}
+                    className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-semibold text-slate-700 hover:bg-[#664d88] hover:text-white transition-colors cursor-pointer"
+                  >
+                    mebolanos@cem.edu.co (Admin)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoginEmailInput('estudiante@est.cem.edu.co')}
+                    className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-semibold text-slate-700 hover:bg-[#664d88] hover:text-white transition-colors cursor-pointer"
+                  >
+                    estudiante@est.cem.edu.co
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAuthModalOpen(false)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#664d88] hover:bg-[#533e6f] text-white shadow-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <UserCheck className="w-4 h-4 text-emerald-300" />
+                  <span>{authLoading ? 'Validando...' : 'Verificar y Continuar'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {toastMessage && (
