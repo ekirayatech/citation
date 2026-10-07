@@ -4067,67 +4067,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       )}
 
       {/* =========================================================================
-          VERIFICACIÓN DE COLUMNAS DE LA HOJA "repositorio" & FILTRO MULTICRITERIO
+          FILTRO MULTICRITERIO Y BÚSQUEDA DEL REPOSITORIO DE MONOGRAFÍAS
          ========================================================================= */}
       <section className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 space-y-4 shadow-2xs">
-        {/* Cabecera de verificación de las 17 columnas de la hoja "repositorio" */}
-        <div className="bg-gradient-to-r from-violet-50 via-purple-50 to-emerald-50 rounded-xl p-3.5 border border-violet-200/80">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Database className="w-4 h-4 text-violet-700 shrink-0" />
-              <span className="text-xs font-bold text-slate-900">
-                Estructura Verificada de la Hoja &ldquo;repositorio&rdquo; (17 Columnas Indexadas)
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowColumnsExplainer(!showColumnsExplainer)}
-              className="text-[11px] font-semibold text-violet-700 hover:text-violet-950 underline"
-            >
-              {showColumnsExplainer ? 'Ocultar detalle de columnas' : 'Ver detalle de columnas'}
-            </button>
-          </div>
-
-          {showColumnsExplainer && (
-            <div className="mt-2.5 pt-2.5 border-t border-violet-200/60 text-[11px] text-slate-700 space-y-2">
-              <p className="leading-relaxed">
-                El filtro y la búsqueda han sido construidos mapeando exactamente cada columna de la hoja <strong>repositorio</strong>:
-              </p>
-              <div className="flex flex-wrap gap-1 font-mono text-[10px]">
-                {[
-                  'documento_id',
-                  'titulo',
-                  'autor',
-                  'grado',
-                  'año',
-                  'Unidad Académica',
-                  'Linea de investigación',
-                  'tipo',
-                  'palabras_clave',
-                  'resumen',
-                  'Asesor(es)',
-                  'drive_file_id',
-                  'url_documento',
-                  'visibilidad',
-                  'estado',
-                  'fecha_registro',
-                  'fecha_actualizacion',
-                ].map((col) => (
-                  <span
-                    key={col}
-                    className="px-2 py-0.5 rounded bg-white text-violet-900 border border-violet-200 shadow-2xs font-semibold"
-                  >
-                    {col}
-                  </span>
-                ))}
-              </div>
-              <p className="text-[10px] text-slate-500 italic">
-                * Sincronización en ambas direcciones: cualquier documento nuevo en Drive o registrado en la app se incorpora a esta hoja al pulsar &ldquo;Sincronizar ahora&rdquo;.
-              </p>
-            </div>
-          )}
-        </div>
-
         {/* Chips de acceso rápido por Unidad Académica */}
         <div className="space-y-1.5">
           <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
