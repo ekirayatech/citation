@@ -108,10 +108,23 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     ? 'Estudiante'
     : 'Docente';
 
-  // Cargar datos al montar
+  // Cargar datos al montar y escuchar actualizaciones en tiempo real entre terminales
   useEffect(() => {
     fetchMonografias();
     fetchUsuarios();
+
+    const handleRepoUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (Array.isArray(customEvent.detail)) {
+        setMonografias(customEvent.detail);
+        localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(customEvent.detail));
+        showToast('¡Repositorio actualizado en tiempo real desde el servidor!');
+      }
+    };
+    window.addEventListener('ekiraya_repo_update', handleRepoUpdate);
+    return () => {
+      window.removeEventListener('ekiraya_repo_update', handleRepoUpdate);
+    };
   }, []);
 
   const fetchMonografias = async () => {

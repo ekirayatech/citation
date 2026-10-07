@@ -226,6 +226,12 @@ export default function App() {
                 localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(cleaned));
               } catch {}
             }
+
+            if (Array.isArray(data?.state?.rawRows)) {
+              window.dispatchEvent(new CustomEvent('ekiraya_repo_update', { detail: data.state.rawRows }));
+            } else if (Array.isArray(data?.rawRows)) {
+              window.dispatchEvent(new CustomEvent('ekiraya_repo_update', { detail: data.rawRows }));
+            }
           } catch {}
         };
         es.onerror = () => {
