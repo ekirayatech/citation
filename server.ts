@@ -612,7 +612,7 @@ function loadPersistedState(): PersistedRepoState {
           process.env.GOOGLE_SHEETS_URL ||
           process.env.SHEETS_CONNECTION_URL ||
           process.env.VITE_GOOGLE_SHEETS_URL ||
-          'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
+          'https://docs.google.com/spreadsheets/d/1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow/edit',
         repoTabName: parsed.repoTabName || process.env.REPO_TAB_NAME || 'repositorio',
         accessToken: parsed.accessToken || process.env.ACCESS_TOKEN || 'EKIRAYA-2026',
         lastSyncDate: parsed.lastSyncDate || new Date().toLocaleString('es-CO'),
@@ -643,7 +643,7 @@ function loadPersistedState(): PersistedRepoState {
       process.env.GOOGLE_SHEETS_URL ||
       process.env.SHEETS_CONNECTION_URL ||
       process.env.VITE_GOOGLE_SHEETS_URL ||
-      'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
+      'https://docs.google.com/spreadsheets/d/1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow/edit',
     repoTabName: process.env.REPO_TAB_NAME || 'repositorio',
     accessToken: process.env.ACCESS_TOKEN || 'EKIRAYA-2026',
     lastSyncDate: new Date().toLocaleString('es-CO'),
@@ -701,9 +701,9 @@ async function pushUserToAppsScriptFromServer(
     action,
     subAction,
     manageAction: subAction,
-    spreadsheetId: '1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0',
-    connectionUrl: 'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
-    sheetUrl: 'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
+    spreadsheetId: '1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow',
+    connectionUrl: 'https://docs.google.com/spreadsheets/d/1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow/edit',
+    sheetUrl: 'https://docs.google.com/spreadsheets/d/1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow/edit',
     token: (token || 'EKIRAYA-2026').trim(),
     curso: user.curso || 'General',
     seccion: user.seccion || 'General',
@@ -773,9 +773,9 @@ async function pushUserToAppsScriptFromServer(
         action,
         subAction,
         manageAction: subAction,
-        spreadsheetId: '1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0',
-        connectionUrl: 'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
-        sheetUrl: 'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
+        spreadsheetId: '1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow',
+        connectionUrl: 'https://docs.google.com/spreadsheets/d/1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow/edit',
+        sheetUrl: 'https://docs.google.com/spreadsheets/d/1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow/edit',
         token: (token || 'EKIRAYA-2026').trim(),
         curso: user.curso || 'General',
         seccion: user.seccion || 'General',
@@ -831,8 +831,8 @@ async function deleteUserFromAppsScript(
   const query = new URLSearchParams({
     action: 'deleteUser',
     subAction: 'delete',
-    spreadsheetId: '1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0',
-    connectionUrl: 'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
+    spreadsheetId: '1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow',
+    connectionUrl: 'https://docs.google.com/spreadsheets/d/1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow/edit',
     token: (token || 'EKIRAYA-2026').trim(),
     correo: email,
     email: email,
@@ -1721,8 +1721,8 @@ async function startServer() {
   const handleSyncDrive = async (req: express.Request, res: express.Response) => {
     try {
       const state = loadPersistedState();
-      const { email, correo, appsScriptExecUrl, connectionUrl } = req.body || {};
-      const userMail = String(email || correo || '').trim().toLowerCase();
+      const { email, correo, userEmail, appsScriptExecUrl, gasWebAppUrl, connectionUrl } = req.body || {};
+      const userMail = String(userEmail || email || correo || '').trim().toLowerCase();
 
       if (userMail && userMail !== 'mebolanos@cem.edu.co') {
         const found = state.authorizedUsers.find((u) => u.correo.toLowerCase() === userMail);
@@ -1735,7 +1735,7 @@ async function startServer() {
         }
       }
 
-      const cleanScript = extractValidAppsScriptUrl(appsScriptExecUrl || state.appsScriptExecUrl);
+      const cleanScript = extractValidAppsScriptUrl(gasWebAppUrl || appsScriptExecUrl || state.appsScriptExecUrl);
       const cleanSheet = String(connectionUrl || state.connectionUrl || '').trim();
 
       const syncResult = await executeServerSyncLogic({

@@ -68,6 +68,8 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   // Modales
   const [previewDoc, setPreviewDoc] = useState<MonografiaItem | null>(null);
   const [isGasCodeModalOpen, setIsGasCodeModalOpen] = useState(false);
+  const [isGasUrlModalOpen, setIsGasUrlModalOpen] = useState(false);
+  const [isImportCsvModalOpen, setIsImportCsvModalOpen] = useState(false);
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [copiedGasCode, setCopiedGasCode] = useState(false);
@@ -76,8 +78,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   const [gasWebAppUrl, setGasWebAppUrl] = useState<string>(() => {
     return localStorage.getItem('ekiraya_gas_webapp_url') || '';
   });
-  const [isEditingGasUrl, setIsEditingGasUrl] = useState(false);
   const [tempGasUrl, setTempGasUrl] = useState(gasWebAppUrl);
+  const [testConnectionStatus, setTestConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [testConnectionMessage, setTestConnectionMessage] = useState<string>('');
+  const [csvPasteText, setCsvPasteText] = useState<string>('');
 
   // Formulario para nuevo usuario
   const [newUser, setNewUser] = useState<Partial<UsuarioItem>>({
@@ -111,13 +115,33 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     ? 'Estudiante'
     : 'Docente';
 
-  // Cargar datos del backend al montar
+  // Cargar datos al montar
   useEffect(() => {
     fetchMonografias();
     fetchUsuarios();
   }, []);
 
   const fetchMonografias = async () => {
+    // 1. Si hay una URL de Google Apps Script configurada, consultar directamente al servidor de Google
+    const activeGasUrl = (gasWebAppUrl || localStorage.getItem('ekiraya_gas_webapp_url') || '').trim();
+    if (activeGasUrl && activeGasUrl.includes('script.google.com')) {
+      try {
+        const getMonoUrl = `${activeGasUrl}${activeGasUrl.includes('?') ? '&' : '?'}action=getMonografias&_t=${Date.now()}`;
+        const monoResp = await fetch(getMonoUrl, { method: 'GET', redirect: 'follow' });
+        if (monoResp.ok) {
+          const result = await monoResp.json();
+          if (result?.status === 'success' && Array.isArray(result.data) && result.data.length > 0) {
+            setMonografias(result.data);
+            localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(result.data));
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Error leyendo directamente de Google Apps Script:', err);
+      }
+    }
+
+    // 2. Si no hay GAS o falló, intentar desde el backend local si existe
     try {
       const resp = await fetch('/api/repositorio/monografias');
       if (resp.ok) {
@@ -128,11 +152,29 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         }
       }
     } catch {
-      // Mantener datos por defecto
+      // Mantener datos locales/cacheados
     }
   };
 
   const fetchUsuarios = async () => {
+    // Si hay Google Apps Script, consultar usuarios directamente
+    const activeGasUrl = (gasWebAppUrl || localStorage.getItem('ekiraya_gas_webapp_url') || '').trim();
+    if (activeGasUrl && activeGasUrl.includes('script.google.com')) {
+      try {
+        const getUsersUrl = `${activeGasUrl}${activeGasUrl.includes('?') ? '&' : '?'}action=getUsers&_t=${Date.now()}`;
+        const usersResp = await fetch(getUsersUrl, { method: 'GET', redirect: 'follow' });
+        if (usersResp.ok) {
+          const result = await usersResp.json();
+          if (result?.status === 'success' && Array.isArray(result.data) && result.data.length > 0) {
+            setUsuarios(result.data);
+            return;
+          }
+        }
+      } catch {
+        // Fallback a backend
+      }
+    }
+
     try {
       const resp = await fetch('/api/repositorio/users');
       if (resp.ok) {
@@ -146,37 +188,231 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     }
   };
 
-  // Sincronización Manual de Google Drive y Sheets
-  const handleSyncDrive = async () => {
+  // Sincronización en vivo con Google Drive y Google Sheets
+  const handleSyncDrive = async (overrideUrl?: string) => {
+    const activeUrl = (overrideUrl || gasWebAppUrl || localStorage.getItem('ekiraya_gas_webapp_url') || '').trim();
+
+    // Si aún no se ha configurado la URL de la Web App de Google, abrir el modal de conexión
+    if (!activeUrl || !activeUrl.includes('script.google.com')) {
+      setTempGasUrl(activeUrl);
+      setIsGasUrlModalOpen(true);
+      showToast('Por favor conecta la URL de tu Google Apps Script para sincronizar en vivo con Drive y Sheets.');
+      return;
+    }
+
     setIsSyncing(true);
+    let liveSyncedFromGoogle = false;
+
     try {
-      const resp = await fetch('/api/repositorio/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userEmail: currentUserEmail,
-          gasWebAppUrl: gasWebAppUrl.trim(),
-        }),
-      });
+      // 1. Invocar sincronización directamente contra el servidor de Google Apps Script (compatible con Vercel)
+      const syncQueryUrl = `${activeUrl}${activeUrl.includes('?') ? '&' : '?'}action=syncDrive&userEmail=${encodeURIComponent(currentUserEmail)}&_t=${Date.now()}`;
 
-      const data = await resp.json();
-
-      if (resp.ok && data.status === 'success') {
-        if (Array.isArray(data.data?.monografias)) {
-          setMonografias(data.data.monografias);
-          localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(data.data.monografias));
-        } else {
-          await fetchMonografias();
+      try {
+        const gasResp = await fetch(syncQueryUrl, {
+          method: 'GET',
+          redirect: 'follow',
+        });
+        if (gasResp.ok) {
+          const gasData = await gasResp.json();
+          if (gasData?.status === 'success') {
+            liveSyncedFromGoogle = true;
+          }
         }
-        showToast('Sincronización completada: Monografías actualizadas desde Google Workspace.');
-      } else {
-        showToast(`Sincronización finalizada: ${data.message || 'Datos actualizados.'}`);
-        await fetchMonografias();
+      } catch (gasErr) {
+        console.warn('Fallo en sincronización directa GAS, intentando lectura:', gasErr);
       }
-    } catch (err) {
-      showToast('Se completó la verificación del Repositorio local.');
+
+      // 2. Leer las monografías actualizadas desde Google Sheets mediante Google Apps Script
+      try {
+        const getMonoUrl = `${activeUrl}${activeUrl.includes('?') ? '&' : '?'}action=getMonografias&_t=${Date.now()}`;
+        const monoResp = await fetch(getMonoUrl, {
+          method: 'GET',
+          redirect: 'follow',
+        });
+        if (monoResp.ok) {
+          const monoResult = await monoResp.json();
+          if (monoResult?.status === 'success' && Array.isArray(monoResult.data)) {
+            setMonografias(monoResult.data);
+            localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(monoResult.data));
+            showToast(`¡Sincronización en vivo con Google completada! Se actualizaron ${monoResult.data.length} monografías desde Sheets y Drive.`);
+            setIsSyncing(false);
+            return;
+          }
+        }
+      } catch (readErr) {
+        console.warn('Error al leer monografías desde Google Apps Script:', readErr);
+      }
+
+      // 3. Fallback: Intentar mediante backend proxy si está disponible (entorno dev local)
+      try {
+        const resp = await fetch('/api/repositorio/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userEmail: currentUserEmail,
+            gasWebAppUrl: activeUrl,
+          }),
+        });
+
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.status === 'success') {
+            if (Array.isArray(data.data?.monografias)) {
+              setMonografias(data.data.monografias);
+              localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(data.data.monografias));
+            } else {
+              await fetchMonografias();
+            }
+            showToast('Sincronización completada exitosamente desde Google Workspace.');
+            setIsSyncing(false);
+            return;
+          }
+        }
+      } catch {
+        // En Vercel el backend no está montado, continuar con reporte claro
+      }
+
+      if (liveSyncedFromGoogle) {
+        showToast('Sincronización ejecutada en Google Drive. Obteniendo datos de Sheets...');
+        await fetchMonografias();
+      } else {
+        showToast('No se pudo conectar con la Web App de Google. Revisa la URL y los permisos en Apps Script.');
+        setIsGasUrlModalOpen(true);
+      }
+    } catch (err: any) {
+      showToast(`Error al sincronizar con Google: ${err.message || 'Verifica la URL de la Web App'}`);
+      setIsGasUrlModalOpen(true);
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  // Probar conexión en vivo con la Web App de Google Apps Script
+  const handleTestGasConnection = async () => {
+    const url = tempGasUrl.trim();
+    if (!url || !url.includes('script.google.com')) {
+      setTestConnectionStatus('error');
+      setTestConnectionMessage('La URL debe comenzar con https://script.google.com/macros/s/.../exec');
+      return;
+    }
+
+    setTestConnectionStatus('testing');
+    setTestConnectionMessage('Conectando con el servidor de Google Apps Script...');
+
+    try {
+      const testUrl = `${url}${url.includes('?') ? '&' : '?'}action=getMonografias&_t=${Date.now()}`;
+      const resp = await fetch(testUrl, { method: 'GET', redirect: 'follow' });
+
+      if (!resp.ok) {
+        throw new Error(`Google respondió con código HTTP ${resp.status}`);
+      }
+
+      const result = await resp.json();
+      if (result && result.status === 'success') {
+        setTestConnectionStatus('success');
+        setTestConnectionMessage(`¡Conexión exitosa! Se leyeron ${result.data?.length || 0} monografías directamente desde tu hoja de Google Sheets.`);
+        if (Array.isArray(result.data) && result.data.length > 0) {
+          setMonografias(result.data);
+          localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(result.data));
+        }
+      } else {
+        setTestConnectionStatus('error');
+        setTestConnectionMessage(result?.message || 'La Web App de Google respondió pero no retornó el formato esperado.');
+      }
+    } catch (err: any) {
+      setTestConnectionStatus('error');
+      setTestConnectionMessage(`Error al conectar con Google: ${err.message || 'Verifica que la Web App esté desplegada con acceso para "Cualquiera".'}`);
+    }
+  };
+
+  // Guardar URL de Google Apps Script y sincronizar de inmediato
+  const handleSaveAndSyncGasUrl = async () => {
+    const cleanUrl = tempGasUrl.trim();
+    if (!cleanUrl || !cleanUrl.includes('script.google.com')) {
+      showToast('Por favor ingresa una URL válida de Google Apps Script (/exec)');
+      return;
+    }
+
+    setGasWebAppUrl(cleanUrl);
+    localStorage.setItem('ekiraya_gas_webapp_url', cleanUrl);
+    setIsGasUrlModalOpen(false);
+    showToast('URL de Google Apps Script guardada.');
+    await handleSyncDrive(cleanUrl);
+  };
+
+  // Importar / Pegar datos directamente de Sheets (TSV / CSV)
+  const handleImportPastedData = () => {
+    const raw = csvPasteText.trim();
+    if (!raw) {
+      showToast('Por favor pega los datos de la hoja de cálculo.');
+      return;
+    }
+
+    try {
+      const lines = raw.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length === 0) return;
+
+      const delimiter = lines[0].includes('\t') ? '\t' : ',';
+      const firstLineTokens = lines[0].split(delimiter).map((t) => t.trim().replace(/^["']|["']$/g, ''));
+
+      const isHeaderRow = firstLineTokens.some((t) =>
+        /documento|titulo|autor|grado|año|ano|unidad|linea|asesor|drive|resumen/i.test(t)
+      );
+
+      const startIndex = isHeaderRow ? 1 : 0;
+      const headers = isHeaderRow
+        ? firstLineTokens
+        : [
+            'documento_id',
+            'titulo',
+            'autor',
+            'grado',
+            'año',
+            'Unidad Académica',
+            'Linea de investigación',
+            'tipo',
+            'palabras_clave',
+            'resumen',
+            'Asesor(es)',
+            'drive_file_id',
+            'url_documento',
+            'visibilidad',
+            'estado',
+            'fecha_registro',
+            'fecha_actualizacion',
+          ];
+
+      const parsedItems: MonografiaItem[] = [];
+
+      for (let i = startIndex; i < lines.length; i++) {
+        const tokens = lines[i].split(delimiter).map((t) => t.trim().replace(/^["']|["']$/g, ''));
+        if (tokens.length === 0 || (tokens.length === 1 && !tokens[0])) continue;
+
+        const item: any = {};
+        headers.forEach((h, hIdx) => {
+          if (h && tokens[hIdx] !== undefined) {
+            item[h] = tokens[hIdx];
+          }
+        });
+
+        // Asegurar título y ID
+        if (!item.titulo && tokens[1]) item.titulo = tokens[1];
+        if (!item.documento_id) item.documento_id = `import_${i}`;
+
+        parsedItems.push(item as MonografiaItem);
+      }
+
+      if (parsedItems.length > 0) {
+        setMonografias(parsedItems);
+        localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(parsedItems));
+        setIsImportCsvModalOpen(false);
+        setCsvPasteText('');
+        showToast(`¡Importación exitosa! Se cargaron ${parsedItems.length} monografías desde Sheets.`);
+      } else {
+        showToast('No se encontraron filas válidas para importar.');
+      }
+    } catch (err: any) {
+      showToast(`Error al procesar los datos: ${err.message}`);
     }
   };
 
@@ -257,7 +493,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     const cleanUrl = tempGasUrl.trim();
     setGasWebAppUrl(cleanUrl);
     localStorage.setItem('ekiraya_gas_webapp_url', cleanUrl);
-    setIsEditingGasUrl(false);
+    setIsGasUrlModalOpen(false);
     showToast('URL de Google Apps Script actualizada.');
   };
 
@@ -433,42 +669,104 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           {/* Barra de Acciones Administrativas (Solo visible para Administradores) */}
           {isAdmin && (
             <div className="mt-6 pt-5 border-t border-white/15 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-[#f8c62e]" />
-                <span className="text-xs font-bold text-violet-100">Panel de Control de Administrador</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-violet-100">
+                  <ShieldCheck className="w-4 h-4 text-[#f8c62e]" />
+                  <span>Admin:</span>
+                </div>
+
+                {/* Badge de Estado de Conexión con Google */}
+                {gasWebAppUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTempGasUrl(gasWebAppUrl);
+                      setTestConnectionStatus('idle');
+                      setTestConnectionMessage('');
+                      setIsGasUrlModalOpen(true);
+                    }}
+                    className="px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[11px] font-bold flex items-center gap-1.5 hover:bg-emerald-500/30 transition-colors cursor-pointer"
+                    title="Google Apps Script conectado. Clic para editar o probar."
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Google Web App Conectada</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTempGasUrl('');
+                      setTestConnectionStatus('idle');
+                      setTestConnectionMessage('');
+                      setIsGasUrlModalOpen(true);
+                    }}
+                    className="px-2.5 py-1 rounded-xl bg-[#f8c62e]/20 text-[#f8c62e] border border-[#f8c62e]/40 text-[11px] font-bold flex items-center gap-1.5 hover:bg-[#f8c62e]/30 transition-colors cursor-pointer"
+                    title="Conectar con Google Apps Script para sincronización en vivo"
+                  >
+                    <AlertCircle className="w-3.5 h-3.5 text-[#f8c62e]" />
+                    <span>Conectar Google Apps Script</span>
+                  </button>
+                )}
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
-                {/* Botón Sincronizar */}
+                {/* Botón Sincronizar en Vivo */}
                 <button
                   type="button"
-                  onClick={handleSyncDrive}
+                  onClick={() => handleSyncDrive()}
                   disabled={isSyncing}
                   className="px-3.5 py-2 rounded-xl bg-[#f8c62e] hover:bg-[#eab308] text-slate-950 font-bold text-xs transition-all flex items-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
-                  title="Escanear Google Drive e indexar nuevos PDFs en Sheets"
+                  title="Sincronizar en vivo con Google Drive y Sheets"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span>{isSyncing ? 'Sincronizando Drive...' : 'Sincronizar Drive'}</span>
+                  <span>{isSyncing ? 'Sincronizando con Google...' : 'Sincronizar Drive & Sheets'}</span>
+                </button>
+
+                {/* Botón Importar / Pegar Datos */}
+                <button
+                  type="button"
+                  onClick={() => setIsImportCsvModalOpen(true)}
+                  className="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  title="Pegar filas copiadas directamente de Google Sheets"
+                >
+                  <FileText className="w-3.5 h-3.5 text-violet-200" />
+                  <span>Pegar de Sheets</span>
+                </button>
+
+                {/* Botón Configurar Web App */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTempGasUrl(gasWebAppUrl);
+                    setTestConnectionStatus('idle');
+                    setTestConnectionMessage('');
+                    setIsGasUrlModalOpen(true);
+                  }}
+                  className="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  title="Configurar URL de Google Apps Script"
+                >
+                  <Globe className="w-3.5 h-3.5 text-[#f8c62e]" />
+                  <span>Conexión Google</span>
                 </button>
 
                 {/* Botón Gestión de Usuarios */}
                 <button
                   type="button"
                   onClick={() => setIsUserManagementOpen(true)}
-                  className="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-bold text-xs transition-all flex items-center gap-2 cursor-pointer"
+                  className="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <Users className="w-3.5 h-3.5" />
-                  <span>Gestión de Usuarios</span>
+                  <span>Usuarios</span>
                 </button>
 
                 {/* Botón Ver Código Apps Script */}
                 <button
                   type="button"
                   onClick={() => setIsGasCodeModalOpen(true)}
-                  className="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-bold text-xs transition-all flex items-center gap-2 cursor-pointer"
+                  className="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <FileCode className="w-3.5 h-3.5 text-[#f8c62e]" />
-                  <span>Código Apps Script (Code.gs)</span>
+                  <span>Code.gs</span>
                 </button>
               </div>
             </div>
@@ -1109,6 +1407,190 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
                 <div className="bg-slate-900 text-slate-100 p-4 rounded-2xl text-xs font-mono max-h-96 overflow-y-auto shadow-inner">
                   <pre className="whitespace-pre-wrap">{GOOGLE_APPS_SCRIPT_CODE}</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. Modal de Conexión en Vivo con Google Apps Script */}
+      {isGasUrlModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150"
+        >
+          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+            <div className="bg-[#664d88] text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-white/15 text-[#f8c62e]">
+                  <Globe className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base leading-tight">
+                    Conectar Servidor de Google (Google Apps Script)
+                  </h3>
+                  <p className="text-[11px] text-violet-200">
+                    Sincronización en vivo entre citationeki.vercel.app, Google Drive y Sheets
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGasUrlModalOpen(false)}
+                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div className="text-xs text-slate-600 space-y-2 leading-relaxed">
+                <p>
+                  Para sincronizar en vivo desde la web desplegada en Vercel con tu Google Sheet y Google Drive,
+                  la app se comunica directamente con la <strong>Web App de Google Apps Script</strong>.
+                </p>
+                <div className="p-3 bg-violet-50 rounded-2xl border border-violet-100 text-[11px] text-[#664d88]">
+                  <strong>ID de tu Google Sheet:</strong>{' '}
+                  <code className="font-mono font-bold">1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow</code>
+                </div>
+              </div>
+
+              {/* Campo para la URL */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  URL de la Web App de Apps Script (/exec)
+                </label>
+                <input
+                  type="url"
+                  value={tempGasUrl}
+                  onChange={(e) => {
+                    setTempGasUrl(e.target.value);
+                    setTestConnectionStatus('idle');
+                    setTestConnectionMessage('');
+                  }}
+                  placeholder="https://script.google.com/macros/s/.../exec"
+                  className="w-full px-3.5 py-2.5 text-xs font-mono rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#664d88]"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Obtenida en Google Sheets &rarr; Extensiones &rarr; Apps Script &rarr; Implementar &rarr; Nueva implementación (Tipo: Aplicación web, Acceso: Cualquiera).
+                </p>
+              </div>
+
+              {/* Resultado de Prueba de Conexión */}
+              {testConnectionStatus !== 'idle' && (
+                <div
+                  className={`p-3.5 rounded-2xl border text-xs flex items-start gap-2.5 ${
+                    testConnectionStatus === 'testing'
+                      ? 'bg-blue-50 border-blue-200 text-blue-800'
+                      : testConnectionStatus === 'success'
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                      : 'bg-red-50 border-red-200 text-red-800'
+                  }`}
+                >
+                  {testConnectionStatus === 'testing' && <RefreshCw className="w-4 h-4 animate-spin shrink-0 mt-0.5" />}
+                  {testConnectionStatus === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />}
+                  {testConnectionStatus === 'error' && <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />}
+                  <span className="leading-tight">{testConnectionMessage}</span>
+                </div>
+              )}
+
+              {/* Botones de Acción */}
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={handleTestGasConnection}
+                  disabled={testConnectionStatus === 'testing' || !tempGasUrl}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Probar Conexión con Google
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveAndSyncGasUrl}
+                  disabled={!tempGasUrl}
+                  className="px-4 py-2 rounded-xl bg-[#664d88] hover:bg-[#533e6f] text-white text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  Guardar y Sincronizar Ahora
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. Modal de Importación Directa / Pegar Datos de Google Sheets */}
+      {isImportCsvModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150"
+        >
+          <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+            <div className="bg-[#664d88] text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-white/15 text-[#f8c62e]">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base leading-tight">
+                    Importar / Pegar Filas de Google Sheets
+                  </h3>
+                  <p className="text-[11px] text-violet-200">
+                    Copia las celdas de la hoja «Repositorio» y pégalas aquí para actualizar en 2 segundos
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsImportCsvModalOpen(false)}
+                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-900 leading-relaxed">
+                <strong>Instrucciones rápidas:</strong> En tu hoja de cálculo, selecciona las filas que deseas actualizar (o toda la hoja con <kbd className="px-1.5 py-0.5 rounded bg-white border border-amber-300 font-mono text-[10px]">Ctrl+A</kbd>), copia (<kbd className="px-1.5 py-0.5 rounded bg-white border border-amber-300 font-mono text-[10px]">Ctrl+C</kbd>) y pega aquí abajo.
+              </div>
+
+              <div>
+                <textarea
+                  rows={8}
+                  value={csvPasteText}
+                  onChange={(e) => setCsvPasteText(e.target.value)}
+                  placeholder="Pega aquí los datos copiados de Google Sheets (formato tabular o CSV)..."
+                  className="w-full p-3 text-xs font-mono rounded-2xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#664d88]"
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                <span className="text-xs text-slate-500">
+                  {csvPasteText ? `${csvPasteText.split('\n').filter(Boolean).length} líneas detectadas` : 'Esperando datos'}
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCsvPasteText('');
+                      setIsImportCsvModalOpen(false);
+                    }}
+                    className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleImportPastedData}
+                    disabled={!csvPasteText.trim()}
+                    className="px-4 py-2 rounded-xl bg-[#664d88] hover:bg-[#533e6f] text-white text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    Actualizar Repositorio
+                  </button>
                 </div>
               </div>
             </div>
