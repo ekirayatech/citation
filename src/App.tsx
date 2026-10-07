@@ -486,10 +486,7 @@ export default function App() {
               )}
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-display text-base sm:text-lg lg:text-xl font-extrabold tracking-tight text-white leading-tight group-hover:text-[#f8c62e] transition-colors">
-                    Colegio Ekirayá
-                  </span>
-                  <span className="px-2 py-0.5 rounded-md bg-[#f8c62e] text-slate-950 font-black text-[10px] tracking-wide uppercase shadow-xs">
+                  <span className="font-display text-base sm:text-lg lg:text-xl font-extrabold tracking-tight text-[#f8c62e] leading-tight group-hover:text-amber-300 transition-colors">
                     Cita Master
                   </span>
                 </div>
