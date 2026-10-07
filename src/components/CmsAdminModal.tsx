@@ -35,6 +35,7 @@ interface CmsAdminModalProps {
   onDeletePage: (pageId: string) => Promise<void>;
   initialEditPageId?: string | null;
   showToast: (msg: string) => void;
+  onLogout?: () => void;
 }
 
 const AVAILABLE_ICONS: { name: CmsIconName; label: string }[] = [
@@ -58,6 +59,7 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
   onDeletePage,
   initialEditPageId,
   showToast,
+  onLogout,
 }) => {
   const [selectedPageId, setSelectedPageId] = useState<string>(
     initialEditPageId || (pages[0]?.id ?? 'new')
@@ -359,13 +361,26 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 text-violet-200 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                className="px-3 py-1.5 text-xs font-bold text-violet-200 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer border border-white/20"
+                title="Cerrar sesión de administrador"
+              >
+                Cerrar Sesión
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 text-violet-200 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Cuerpo Principal del CMS: Dos Columnas (Lista de Pestañas a la izquierda, Editor a la derecha) */}

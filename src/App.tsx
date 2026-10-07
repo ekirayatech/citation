@@ -41,6 +41,7 @@ import { TallerSection } from './components/TallerSection';
 import { UniversitariosSection } from './components/UniversitariosSection';
 import { CmsPageView } from './components/CmsPageView';
 import { CmsAdminModal } from './components/CmsAdminModal';
+import { CmsLoginModal } from './components/CmsLoginModal';
 import { CmsPage, CmsIconName } from './types/cms';
 import { DEFAULT_CMS_PAGES } from './data/defaultCmsPages';
 
@@ -91,6 +92,10 @@ export default function App() {
   });
   const [cmsModalOpen, setCmsModalOpen] = useState<boolean>(false);
   const [cmsEditingPageId, setCmsEditingPageId] = useState<string | null>(null);
+  const [cmsLoginModalOpen, setCmsLoginModalOpen] = useState<boolean>(false);
+  const [isCmsAdminLoggedIn, setIsCmsAdminLoggedIn] = useState<boolean>(() => {
+    return localStorage.getItem('ekiraya_cms_admin_session') === 'true';
+  });
 
   // Autenticación Institucional (@cem.edu.co / @est.cem.edu.co)
   const [currentUserEmail, setCurrentUserEmail] = useState<string>(() => {
@@ -106,7 +111,9 @@ export default function App() {
     return clean.endsWith('@cem.edu.co') || clean.endsWith('@est.cem.edu.co');
   };
 
-  const isAdminUser = currentUserEmail.trim().toLowerCase() === 'mebolanos@cem.edu.co';
+  const isAdminUser =
+    isCmsAdminLoggedIn ||
+    currentUserEmail.trim().toLowerCase() === 'mebolanos@cem.edu.co';
 
   const handleInstitutionalLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,14 +156,29 @@ export default function App() {
   };
 
   const handleOpenCmsModal = () => {
-    if (!isAdminUser) {
-      setLoginEmailInput('mebolanos@cem.edu.co');
-      setIsAuthModalOpen(true);
-      showToast('Se requiere acceso de Administrador (mebolanos@cem.edu.co) para editar páginas.');
+    if (!isCmsAdminLoggedIn) {
+      setCmsLoginModalOpen(true);
       return;
     }
     setCmsEditingPageId(null);
     setCmsModalOpen(true);
+  };
+
+  const handleCmsLoginSuccess = (adminEmail: string) => {
+    setCurrentUserEmail(adminEmail);
+    localStorage.setItem('ekiraya_user_email', adminEmail);
+    localStorage.setItem('ekiraya_cms_admin_session', 'true');
+    setIsCmsAdminLoggedIn(true);
+    setCmsLoginModalOpen(false);
+    setCmsModalOpen(true);
+    showToast(`Acceso administrativo concedido: ${adminEmail}`);
+  };
+
+  const handleCmsLogout = () => {
+    localStorage.removeItem('ekiraya_cms_admin_session');
+    setIsCmsAdminLoggedIn(false);
+    setCmsModalOpen(false);
+    showToast('Sesión administrativa de CMS cerrada.');
   };
 
   // Carga inicial y sincronización de páginas CMS
@@ -629,8 +651,13 @@ export default function App() {
         {cmsPages.some((p) => p.id === activeTab) && (
           <CmsPageView
             page={cmsPages.find((p) => p.id === activeTab)!}
-            isAdmin={isAdminUser}
+            isAdmin={isCmsAdminLoggedIn}
             onEditPage={(p) => {
+              if (!isCmsAdminLoggedIn) {
+                setCmsEditingPageId(p.id);
+                setCmsLoginModalOpen(true);
+                return;
+              }
               setCmsEditingPageId(p.id);
               setCmsModalOpen(true);
             }}
@@ -648,8 +675,16 @@ export default function App() {
         </div>
       </footer>
 
+      {/* Modal de Inicio de Sesión de Administrador CMS */}
+      <CmsLoginModal
+        isOpen={cmsLoginModalOpen}
+        onClose={() => setCmsLoginModalOpen(false)}
+        onLoginSuccess={handleCmsLoginSuccess}
+        currentEmail={currentUserEmail}
+      />
+
       {/* Modal de Gestión CMS */}
-      {cmsModalOpen && (
+      {cmsModalOpen && isCmsAdminLoggedIn && (
         <CmsAdminModal
           isOpen={cmsModalOpen}
           onClose={() => setCmsModalOpen(false)}
@@ -658,6 +693,7 @@ export default function App() {
           onDeletePage={handleDeleteCmsPage}
           initialEditPageId={cmsEditingPageId}
           showToast={showToast}
+          onLogout={handleCmsLogout}
         />
       )}
 
