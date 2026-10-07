@@ -36,7 +36,6 @@ import {
 } from './utils/citationEngine';
 import { TeoriaSection } from './components/TeoriaSection';
 import { Apa2026Section } from './components/Apa2026Section';
-import { RepositorioSection } from './components/RepositorioSection';
 import { GestorSection } from './components/GestorSection';
 import { TallerSection } from './components/TallerSection';
 import { UniversitariosSection } from './components/UniversitariosSection';
@@ -405,7 +404,6 @@ export default function App() {
   const navItems: { id: string; label: string; icon: React.ReactNode; count?: number }[] = [
     { id: 'teoria', label: 'Guía Teórica', icon: <BookOpen className="w-4 h-4 shrink-0" /> },
     { id: 'apa2026', label: 'Normas APA 2026', icon: <FileCheck2 className="w-4 h-4 shrink-0" /> },
-    { id: 'repositorio', label: 'Repositorio', icon: <FolderGit2 className="w-4 h-4 shrink-0" /> },
     {
       id: 'gestor',
       label: 'Gestor',
@@ -653,8 +651,6 @@ export default function App() {
         )}
 
         {activeTab === 'apa2026' && <Apa2026Section />}
-
-        {activeTab === 'repositorio' && <RepositorioSection showToast={showToast} />}
 
         {activeTab === 'taller' && (
           <TallerSection
