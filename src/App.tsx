@@ -32,7 +32,6 @@ import { Apa2026Section } from './components/Apa2026Section';
 import { GestorSection } from './components/GestorSection';
 import { TallerSection } from './components/TallerSection';
 import { UniversitariosSection } from './components/UniversitariosSection';
-import { RepositorioSection } from './components/RepositorioSection';
 import { CmsPageView } from './components/CmsPageView';
 import { CmsAdminModal } from './components/CmsAdminModal';
 import { CmsPage, CmsIconName } from './types/cms';
@@ -346,7 +345,6 @@ export default function App() {
         label: p.navLabel || p.title,
         icon: renderCmsIcon(p.iconName),
       })),
-    { id: 'repositorio', label: 'Repositorio', icon: <FolderGit2 className="w-4 h-4 shrink-0" /> },
   ];
 
   return (
@@ -387,7 +385,7 @@ export default function App() {
                   </span>
                 </div>
                 <span className="text-[11px] sm:text-xs text-violet-200/90 font-medium tracking-normal block truncate mt-0.5">
-                  Portal Académico &amp; Repositorio de Monografías
+                  Portal Académico &amp; Gestor Bibliográfico
                 </span>
               </div>
             </button>
@@ -428,23 +426,13 @@ export default function App() {
               })}
             </nav>
 
-            {/* Zone 3: Botón de Acción Principal y Toggle Móvil */}
-            <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => handleSwitchTab('gestor')}
-                className="px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-bold bg-[#f8c62e] hover:bg-[#e8b524] text-slate-950 border border-[#f8c62e] rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap cursor-pointer"
-              >
-                <Sparkles className="w-4 h-4 text-amber-950 shrink-0" />
-                <span className="hidden sm:inline">Nueva Cita</span>
-                <span className="sm:hidden">Citar</span>
-              </button>
-
+            {/* Zone 3: Toggle Móvil */}
+            <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 lg:hidden">
               {/* Botón de Menú Móvil */}
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="lg:hidden p-2 rounded-xl text-white hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/40 transition-colors cursor-pointer"
+                className="p-2 rounded-xl text-white hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/40 transition-colors cursor-pointer"
                 aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
                 aria-expanded={mobileMenuOpen}
               >
@@ -562,13 +550,6 @@ export default function App() {
             onAddReference={handleAddReference}
             onRemoveReference={handleRemoveReference}
             onClearReferences={handleClearReferences}
-            showToast={showToast}
-          />
-        )}
-
-        {activeTab === 'repositorio' && (
-          <RepositorioSection
-            onCiteMonographInGestor={handleLoadExampleInGestor}
             showToast={showToast}
           />
         )}
