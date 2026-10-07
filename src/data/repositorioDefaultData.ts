@@ -431,25 +431,6 @@ export const DEFAULT_REPO_ROWS: Record<string, string>[] = [
     "estado": "Finalizado",
     "fecha_registro": "23 enero 2026",
     "fecha_actualizacion": "10-04-2026"
-  },
-  {
-    "documento_id": "141",
-    "titulo": "Monografía de Investigación y Proyecto de Vida (Línea 22)",
-    "autor": "Estudiante Promoción 2026",
-    "grado": "11",
-    "año": "2026",
-    "Unidad Académica": "Ciencias",
-    "Linea de investigación": "Innovación y Sostenibilidad",
-    "tipo": "Investigación",
-    "palabras_clave": "Investigación, sostenibilidad, metodología, proyecto de vida, innovación académica.",
-    "resumen": "Documento de monografía registrado en la línea 22 de la hoja Repositorio de Google Sheets del Colegio Ekirayá - Educación Montessori. Integra el marco conceptual, objetivos de indagación y resultados metodológicos del proyecto de vida del estudiante.",
-    "Asesor(es)": "Esteban Bolaños R",
-    "drive_file_id": "1U0BfnGyQXzxuKaa95nqGx8iqbdG-eCii",
-    "url_documento": "https://drive.google.com/drive/folders/1U0BfnGyQXzxuKaa95nqGx8iqbdG-eCii",
-    "visibilidad": "Digital",
-    "estado": "Finalizado",
-    "fecha_registro": "23 enero 2026",
-    "fecha_actualizacion": "10-04-2026"
   }
 ];
 
