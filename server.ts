@@ -1858,6 +1858,32 @@ async function startServer() {
   app.post('/api/repo/manageUser', handleManageUser);
   app.post('/api/repo/manage-user', handleManageUser);
 
+  // Alias endpoints para /api/repositorio/*
+  app.get('/api/repositorio/monografias', handleGetMonografias);
+  app.get('/api/repositorio/check-role', handleCheckUserRole);
+  app.get('/api/repositorio/checkUserRole', handleCheckUserRole);
+  app.post('/api/repositorio/sync', handleSyncDrive);
+  app.post('/api/repositorio/syncDrive', handleSyncDrive);
+  app.get('/api/repositorio/users', (_req, res) => {
+    const state = loadPersistedState();
+    res.json({
+      status: 'success',
+      data: (state.authorizedUsers || DEFAULT_AUTHORIZED_USERS).map((u) => ({
+        Nombres: u.nombres,
+        Curso: u.curso,
+        Correo: u.correo,
+        Sección: u.seccion,
+        Perfil: u.perfil,
+        isAdmin: u.isAdmin,
+      })),
+    });
+  });
+  app.post('/api/repositorio/users', handleManageUser);
+  app.delete('/api/repositorio/users/:email', (req, res) => {
+    req.body = { ...req.body, email: req.params.email, action: 'delete' };
+    handleManageUser(req, res);
+  });
+
   // 2D. Crear / Poblar toda la hoja "usuarios" en Google Sheets en un clic
   app.post('/api/repo/init-users-sheet', async (req, res) => {
     try {

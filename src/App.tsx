@@ -39,6 +39,7 @@ import { Apa2026Section } from './components/Apa2026Section';
 import { GestorSection } from './components/GestorSection';
 import { TallerSection } from './components/TallerSection';
 import { UniversitariosSection } from './components/UniversitariosSection';
+import { RepositorioSection } from './components/RepositorioSection';
 import { CmsPageView } from './components/CmsPageView';
 import { CmsAdminModal } from './components/CmsAdminModal';
 import { CmsLoginModal } from './components/CmsLoginModal';
@@ -441,6 +442,11 @@ export default function App() {
         label: p.navLabel || p.title,
         icon: renderCmsIcon(p.iconName),
       })),
+    {
+      id: 'repositorio',
+      label: 'Repositorio',
+      icon: <FolderGit2 className="w-4 h-4 shrink-0" />,
+    },
   ];
 
   return (
@@ -674,6 +680,14 @@ export default function App() {
         )}
 
         {activeTab === 'universitarios' && <UniversitariosSection />}
+
+        {activeTab === 'repositorio' && (
+          <RepositorioSection
+            showToast={showToast}
+            currentUserEmail={currentUserEmail}
+            isAdminLoggedIn={isCmsAdminLoggedIn}
+          />
+        )}
 
         {/* Renderizado de páginas dinámicas CMS */}
         {cmsPages.some((p) => p.id === activeTab) && (
