@@ -409,8 +409,11 @@ export default function App() {
   const handleSaveCmsPage = async (page: CmsPage) => {
     const resp = await fetch('/api/cms/pages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(page),
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-email': currentUserEmail,
+      },
+      body: JSON.stringify({ ...page, userEmail: currentUserEmail }),
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => null);
@@ -430,6 +433,9 @@ export default function App() {
   const handleDeleteCmsPage = async (pageId: string) => {
     const resp = await fetch(`/api/cms/pages/${encodeURIComponent(pageId)}`, {
       method: 'DELETE',
+      headers: {
+        'x-user-email': currentUserEmail,
+      },
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => null);

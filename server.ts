@@ -1031,7 +1031,7 @@ async function startServer() {
   });
 
   // Login de sección administrativa (verifica contra la hoja "usuarios" y mebolanos@cem.edu.co)
-  app.post('/api/auth/admin-login', (req, res) => {
+  app.post('/api/auth/admin-login', async (req, res) => {
     try {
       const { email, password } = req.body || {};
       const cleanEmail = String(email || '').trim().toLowerCase();
@@ -1046,10 +1046,30 @@ async function startServer() {
         });
       }
 
-      const state = loadPersistedState();
-      const user = (state.authorizedUsers || []).find(
+      let state = loadPersistedState();
+      let user = (state.authorizedUsers || []).find(
         (u) => u.correo && u.correo.toLowerCase() === cleanEmail
       );
+
+      // Si no se localiza el usuario en caché local y existe conexión con Google Sheets, realizar refresco asíncrono en vivo
+      if (!user && (state.appsScriptExecUrl || state.connectionUrl)) {
+        try {
+          await executeServerSyncLogic({ triggerDriveScan: false });
+          state = loadPersistedState();
+          user = (state.authorizedUsers || []).find(
+            (u) => u.correo && u.correo.toLowerCase() === cleanEmail
+          );
+        } catch {
+          // Continuar con validación sobre estado cargado
+        }
+      }
+
+      const isAdmin = isAdministratorUser(cleanEmail, state.authorizedUsers);
+      if (!isAdmin && cleanEmail !== 'mebolanos@cem.edu.co') {
+        return res.status(403).json({
+          error: `El usuario '${cleanEmail}' no está registrado como Administrador en la hoja 'Usuarios' de Google Sheets.`,
+        });
+      }
 
       const sheetPass = user?.pass || (user?.rawRow ? (user.rawRow['Pass'] || user.rawRow['pass'] || user.rawRow['contraseña'] || user.rawRow['clave']) : '');
       const expectedPassword = process.env.ADMIN_PASSWORD || 'CitaMaster2026*';
@@ -1062,7 +1082,7 @@ async function startServer() {
       }
 
       if (!passwordValid) {
-        if (password === expectedPassword || password === 'admin1234' || user || cleanEmail === 'mebolanos@cem.edu.co') {
+        if (password === expectedPassword || password === 'admin1234') {
           passwordValid = true;
         }
       }
@@ -1237,7 +1257,7 @@ async function startServer() {
   });
 
   // CMS: Crear o actualizar una página dinámica
-  app.post('/api/cms/pages', (req, res) => {
+  app.post('/api/cms/pages', requireAdminAuth, (req, res) => {
     try {
       const pageData: CmsPage = req.body;
       if (!pageData || !pageData.id || !pageData.title) {
@@ -1278,7 +1298,7 @@ async function startServer() {
   });
 
   // CMS: Eliminar una página dinámica
-  app.delete('/api/cms/pages/:id', (req, res) => {
+  app.delete('/api/cms/pages/:id', requireAdminAuth, (req, res) => {
     try {
       const { id } = req.params;
       const existingPages = loadPersistedCmsPages();
