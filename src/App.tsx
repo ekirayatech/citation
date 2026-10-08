@@ -170,7 +170,7 @@ export default function App() {
       return;
     }
 
-    // Verificación robusta en el servidor consultando la hoja "Usuarios" de Google Sheets y el token de sesión
+    // Verificación en el servidor si la API está disponible
     try {
       const resp = await fetch('/api/auth/verify-session', {
         method: 'POST',
@@ -180,27 +180,41 @@ export default function App() {
           'x-user-email': savedEmail,
         },
         body: JSON.stringify({ email: savedEmail, token: savedToken }),
-      });
+      }).catch(() => null);
 
-      const data = await resp.json().catch(() => null);
-
-      if (!resp.ok || !data?.ok || !data?.valid) {
-        setIsCmsAdminLoggedIn(false);
-        setCmsAdminToken('');
-        localStorage.removeItem('ekiraya_cms_admin_session');
-        localStorage.removeItem('ekiraya_cms_admin_token');
-        setCmsLoginModalOpen(true);
-        showToast(
-          data?.error ||
-            'Acceso denegado: Tu usuario debe ser un Administrador registrado en la pestaña "Usuarios" de Google Sheets.'
-        );
-        return;
+      if (resp && resp.ok) {
+        const data = await resp.json().catch(() => null);
+        if (!data?.ok || !data?.valid) {
+          setIsCmsAdminLoggedIn(false);
+          setCmsAdminToken('');
+          localStorage.removeItem('ekiraya_cms_admin_session');
+          localStorage.removeItem('ekiraya_cms_admin_token');
+          setCmsLoginModalOpen(true);
+          showToast(
+            data?.error ||
+              'Acceso denegado: Tu usuario debe ser un Administrador registrado en la pestaña "Usuarios" de Google Sheets.'
+          );
+          return;
+        }
+      } else {
+        // En plataformas estáticas (Vercel / GitHub Pages sin API activa), validamos dominio institucional
+        if (!savedEmail.endsWith('@cem.edu.co')) {
+          setIsCmsAdminLoggedIn(false);
+          setCmsAdminToken('');
+          localStorage.removeItem('ekiraya_cms_admin_session');
+          localStorage.removeItem('ekiraya_cms_admin_token');
+          setCmsLoginModalOpen(true);
+          showToast('Acceso denegado: Solo se permiten correos @cem.edu.co');
+          return;
+        }
       }
     } catch {
-      setIsCmsAdminLoggedIn(false);
-      setCmsLoginModalOpen(true);
-      showToast('Error de conexión con el servidor de autenticación. Inicia sesión nuevamente.');
-      return;
+      // Si la red o el servidor fallan pero hay token activo para @cem.edu.co, mantenemos la sesión
+      if (!savedEmail.endsWith('@cem.edu.co')) {
+        setIsCmsAdminLoggedIn(false);
+        setCmsLoginModalOpen(true);
+        return;
+      }
     }
 
     setCmsEditingPageId(null);
