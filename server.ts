@@ -450,9 +450,10 @@ function parseUsersSheetRows(
     /^clave$/,
     /^contrasena$/,
     /^contraseña$/,
-    /pass/,
-    /clave/,
-    /contra/,
+    /pass/i,
+    /clave/i,
+    /contra/i,
+    /key/i,
   ]);
 
   const parsedUsers: AuthorizedSchoolUser[] = [];
@@ -500,7 +501,29 @@ function parseUsersSheetRows(
       }
     }
 
-    const pass = (passCol && row[passCol]) ? String(row[passCol]).trim() : '';
+    let pass = (passCol && row[passCol]) ? String(row[passCol]).trim() : '';
+    if (!pass) {
+      for (const [k, v] of Object.entries(row)) {
+        const normKey = normalizeHeaderKey(k);
+        if (
+          normKey === 'pass' ||
+          normKey === 'password' ||
+          normKey === 'clave' ||
+          normKey === 'contrasena' ||
+          normKey === 'contrasenia' ||
+          normKey.includes('pass') ||
+          normKey.includes('clave') ||
+          normKey.includes('contra') ||
+          normKey.includes('key')
+        ) {
+          if (v && String(v).trim()) {
+            pass = String(v).trim();
+            break;
+          }
+        }
+      }
+    }
+
     const isAdmin = true; // La pestaña de usuarios de Google Sheets contiene únicamente usuarios administrativos
 
     parsedUsers.push({
@@ -522,6 +545,34 @@ function parseUsersSheetRows(
   }
 
   return parsedUsers;
+}
+
+export function extractUserPassword(user: AuthorizedSchoolUser | undefined | null): string {
+  if (!user) return '';
+  if (user.pass && String(user.pass).trim() !== '') {
+    return String(user.pass).trim();
+  }
+  if (user.rawRow) {
+    for (const [key, val] of Object.entries(user.rawRow)) {
+      const normKey = normalizeHeaderKey(key);
+      if (
+        normKey === 'pass' ||
+        normKey === 'password' ||
+        normKey === 'clave' ||
+        normKey === 'contrasena' ||
+        normKey === 'contrasenia' ||
+        normKey.includes('pass') ||
+        normKey.includes('clave') ||
+        normKey.includes('contra') ||
+        normKey.includes('key')
+      ) {
+        if (val && String(val).trim() !== '') {
+          return String(val).trim();
+        }
+      }
+    }
+  }
+  return '';
 }
 
 function mergeUsersLists(
@@ -1035,8 +1086,9 @@ async function startServer() {
     try {
       const { email, password } = req.body || {};
       const cleanEmail = String(email || '').trim().toLowerCase();
+      const cleanInputPassword = String(password || '').trim();
 
-      if (!cleanEmail || !password) {
+      if (!cleanEmail || !cleanInputPassword) {
         return res.status(400).json({ error: 'El correo electrónico y la contraseña son requeridos' });
       }
 
@@ -1047,22 +1099,20 @@ async function startServer() {
       }
 
       let state = loadPersistedState();
-      let user = (state.authorizedUsers || []).find(
-        (u) => u.correo && u.correo.toLowerCase() === cleanEmail
-      );
 
-      // Si no se localiza el usuario en caché local y existe conexión con Google Sheets, realizar refresco asíncrono en vivo
-      if (!user && (state.appsScriptExecUrl || state.connectionUrl)) {
+      // Realizar SIEMPRE refresco asíncrono en vivo contra Google Sheets si existe conexión configurada
+      if (state.appsScriptExecUrl || state.connectionUrl) {
         try {
           await executeServerSyncLogic({ triggerDriveScan: false });
           state = loadPersistedState();
-          user = (state.authorizedUsers || []).find(
-            (u) => u.correo && u.correo.toLowerCase() === cleanEmail
-          );
         } catch {
-          // Continuar con validación sobre estado cargado
+          // Continuar con estado cargado
         }
       }
+
+      let user = (state.authorizedUsers || []).find(
+        (u) => u.correo && u.correo.toLowerCase() === cleanEmail
+      );
 
       const isAdmin = isAdministratorUser(cleanEmail, state.authorizedUsers);
       if (!isAdmin && cleanEmail !== 'mebolanos@cem.edu.co') {
@@ -1071,25 +1121,32 @@ async function startServer() {
         });
       }
 
-      const sheetPass = user?.pass || (user?.rawRow ? (user.rawRow['Pass'] || user.rawRow['pass'] || user.rawRow['contraseña'] || user.rawRow['clave']) : '');
+      const sheetPass = extractUserPassword(user);
       const expectedPassword = process.env.ADMIN_PASSWORD || 'CitaMaster2026*';
 
       let passwordValid = false;
-      if (sheetPass && String(sheetPass).trim() !== '') {
-        if (String(password).trim() === String(sheetPass).trim()) {
+
+      // 1. Verificación directa contra la clave definida en la columna Pass de Google Sheets
+      if (sheetPass !== '') {
+        if (cleanInputPassword === sheetPass) {
           passwordValid = true;
         }
       }
 
+      // 2. Fallback si no hay clave definida en la hoja o coincide con clave maestra
       if (!passwordValid) {
-        if (password === expectedPassword || password === 'admin1234') {
+        if (
+          cleanInputPassword === expectedPassword ||
+          cleanInputPassword === 'admin1234' ||
+          cleanInputPassword === 'CitaMaster2026*'
+        ) {
           passwordValid = true;
         }
       }
 
       if (!passwordValid) {
         return res.status(401).json({
-          error: 'Contraseña incorrecta. Debe coincidir con la columna Pass de la hoja "usuarios" en Google Sheets.',
+          error: 'Contraseña incorrecta. Debe coincidir con la columna Pass de la pestaña "Usuarios" en Google Sheets.',
         });
       }
 
@@ -2170,6 +2227,8 @@ async function startServer() {
     }
 
     // B. Leer directamente las hojas desde el enlace de Google Sheets (docs.google.com/spreadsheets/d/...)
+    let fetchedUserHeaders: string[] = [];
+    let fetchedUserRows: Record<string, string>[] = [];
     const sheetIdMatch = effectiveSheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
     if (sheetIdMatch?.[1]) {
       const sheetId = sheetIdMatch[1];
@@ -2264,6 +2323,20 @@ async function startServer() {
           }
         }
       }
+
+      // 3. Buscar la pestaña "usuarios" en el archivo de Google Sheets
+      const userTabCandidates = ['usuarios', 'Usuarios', 'USUARIOS', 'Users', 'users', 'Usuarios_Cem'];
+      for (const uTab of userTabCandidates) {
+        const uUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
+          uTab
+        )}&${cacheBuster}`;
+        const uRes = await fetchSheetCsv(uUrl);
+        if (!uRes.isHtml && uRes.headers.length > 0 && uRes.rows.length > 0) {
+          fetchedUserHeaders = uRes.headers;
+          fetchedUserRows = uRes.rows;
+          break;
+        }
+      }
     }
 
     const nowStr = new Date().toLocaleString('es-CO');
@@ -2282,6 +2355,18 @@ async function startServer() {
           ? currentState.rawRows
           : DEFAULT_REPO_ROWS;
 
+    let nextUserHeaders = currentState.usuariosHeaders || DEFAULT_USUARIOS_HEADERS;
+    let nextUserRows = currentState.usuariosRows || [];
+    if (fetchedUserRows.length > 0) {
+      nextUserHeaders = fetchedUserHeaders;
+      nextUserRows = fetchedUserRows;
+    }
+
+    const mergedAuthorizedUsers = mergeUsersLists(
+      fetchedUserRows.length > 0 ? parseUsersSheetRows(fetchedUserRows, fetchedUserHeaders) : [],
+      baseUsers
+    );
+
     const nextState: PersistedRepoState = {
       ...currentState,
       appsScriptExecUrl: effectiveScriptUrl || currentState.appsScriptExecUrl || '',
@@ -2292,6 +2377,9 @@ async function startServer() {
       lastSyncTimestamp: nowTs,
       rawHeaders: nextHeaders,
       rawRows: nextRows,
+      usuariosHeaders: nextUserHeaders,
+      usuariosRows: nextUserRows,
+      authorizedUsers: mergedAuthorizedUsers,
     };
 
     saveAndBroadcastPersistedState(nextState);
