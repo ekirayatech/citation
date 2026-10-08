@@ -10,6 +10,8 @@ import {
   Layers,
   FileText,
   AlertTriangle,
+  AlertCircle,
+  FileCheck2,
   HelpCircle,
   Download,
   LayoutGrid,
@@ -26,6 +28,225 @@ import {
   Copy,
 } from 'lucide-react';
 import { CmsPage, CmsBlock, CmsBlockType, CmsIconName, CmsBlockItem } from '../types/cms';
+
+export interface ApaValidationError {
+  field: string;
+  message: string;
+  blockIndex?: number;
+  itemIndex?: number;
+}
+
+export function validateCmsPageApaMetadata(formData: Partial<CmsPage>): ApaValidationError[] {
+  const errors: ApaValidationError[] = [];
+
+  // 1. Título Principal
+  const title = formData.title?.trim() || '';
+  if (!title) {
+    errors.push({
+      field: 'title',
+      message: 'El Título Principal es obligatorio para el registro académico.',
+    });
+  } else {
+    if (title.length < 3) {
+      errors.push({
+        field: 'title',
+        message: 'El Título Principal debe contener al menos 3 caracteres.',
+      });
+    }
+    if (title.endsWith('.')) {
+      errors.push({
+        field: 'title',
+        message: 'Norma APA 7.ª ed. (Sección 2.27): Los títulos de sección y encabezados no deben finalizar con punto final (.).',
+      });
+    }
+    if (title === title.toUpperCase() && title.length > 5 && /[A-Z]/.test(title)) {
+      errors.push({
+        field: 'title',
+        message: 'Norma APA 7.ª ed.: Los títulos no deben redactarse completamente en MAYÚSCULAS. Usa estilo Título o Estilo Oración.',
+      });
+    }
+  }
+
+  // 2. Nombre Corto (Nav Label)
+  const navLabel = formData.navLabel?.trim() || '';
+  if (!navLabel) {
+    errors.push({
+      field: 'navLabel',
+      message: 'El Nombre Corto de Pestaña es obligatorio.',
+    });
+  } else if (navLabel.length > 30) {
+    errors.push({
+      field: 'navLabel',
+      message: 'El Nombre Corto excede los 30 caracteres máximos recomendados para pestañas del menú.',
+    });
+  }
+
+  // 3. Slug
+  const slug = formData.slug?.trim() || '';
+  if (!slug) {
+    errors.push({
+      field: 'slug',
+      message: 'El Identificador de Enlace (Slug) es obligatorio.',
+    });
+  } else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+    errors.push({
+      field: 'slug',
+      message: 'El Slug debe contener únicamente minúsculas, números y guiones (ej: guias-apa-2026).',
+    });
+  }
+
+  // 4. Subtítulo (si existe)
+  if (formData.subtitle && formData.subtitle.trim().endsWith('..')) {
+    errors.push({
+      field: 'subtitle',
+      message: 'El subtítulo contiene puntos duplicados al final (..). Ajusta el formato tipográfico APA.',
+    });
+  }
+
+  // 5. Bloques de Contenido
+  const blocks = formData.blocks || [];
+  if (blocks.length === 0) {
+    errors.push({
+      field: 'blocks',
+      message: 'Debes incluir al menos un bloque de contenido informativo o académico en esta pestaña.',
+    });
+  }
+
+  blocks.forEach((block, bIdx) => {
+    if (block.title && block.title.trim().endsWith('.')) {
+      errors.push({
+        field: `block-${bIdx}-title`,
+        blockIndex: bIdx,
+        message: `Bloque ${bIdx + 1} ("${block.title}"): Según reglas de encabezado APA 7, el título no debe llevar punto final (.).`,
+      });
+    }
+
+    if ((block.type === 'paragraph' || block.type === 'alert') && (!block.content || !block.content.trim())) {
+      errors.push({
+        field: `block-${bIdx}-content`,
+        blockIndex: bIdx,
+        message: `Bloque ${bIdx + 1}: El contenido del ${block.type === 'alert' ? 'Aviso' : 'Párrafo'} no puede estar en blanco.`,
+      });
+    }
+
+    if (block.type === 'cards' || block.type === 'accordion' || block.type === 'download_links') {
+      if (!block.items || block.items.length === 0) {
+        errors.push({
+          field: `block-${bIdx}-items`,
+          blockIndex: bIdx,
+          message: `Bloque ${bIdx + 1}: Debe contar con al menos un elemento o recurso.`,
+        });
+      } else {
+        block.items.forEach((item, iIdx) => {
+          if (!item.title || !item.title.trim()) {
+            errors.push({
+              field: `block-${bIdx}-item-${iIdx}-title`,
+              blockIndex: bIdx,
+              itemIndex: iIdx,
+              message: `Bloque ${bIdx + 1}, Elemento ${iIdx + 1}: El título del elemento es obligatorio.`,
+            });
+          } else if (item.title.trim().endsWith('.')) {
+            errors.push({
+              field: `block-${bIdx}-item-${iIdx}-title`,
+              blockIndex: bIdx,
+              itemIndex: iIdx,
+              message: `Bloque ${bIdx + 1}, Elemento ${iIdx + 1}: El título no debe finalizar en punto (.).`,
+            });
+          }
+
+          if (item.linkUrl && item.linkUrl.trim()) {
+            const url = item.linkUrl.trim();
+            if (url !== '#' && !url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('/')) {
+              errors.push({
+                field: `block-${bIdx}-item-${iIdx}-url`,
+                blockIndex: bIdx,
+                itemIndex: iIdx,
+                message: `Bloque ${bIdx + 1}, Elemento ${iIdx + 1}: La URL ("${url}") debe iniciar con "https://" o "http://" según normas de enlace APA.`,
+              });
+            } else if (url.endsWith('.')) {
+              errors.push({
+                field: `block-${bIdx}-item-${iIdx}-url`,
+                blockIndex: bIdx,
+                itemIndex: iIdx,
+                message: `Bloque ${bIdx + 1}, Elemento ${iIdx + 1}: La URL no debe finalizar con punto (.), ya que daña el enlace web.`,
+              });
+            }
+          }
+        });
+      }
+    }
+  });
+
+  return errors;
+}
+
+export function autoFixApaMetadata(formData: Partial<CmsPage>): Partial<CmsPage> {
+  const fixTitle = (str: string) => {
+    let cleaned = str.trim();
+    while (cleaned.endsWith('.')) {
+      cleaned = cleaned.slice(0, -1).trim();
+    }
+    if (cleaned === cleaned.toUpperCase() && cleaned.length > 3) {
+      cleaned = cleaned.toLowerCase().replace(/(^\w|\s\w)/g, (m) => m.toUpperCase());
+    }
+    return cleaned;
+  };
+
+  const fixUrl = (urlStr: string) => {
+    let u = urlStr.trim();
+    while (u.endsWith('.')) {
+      u = u.slice(0, -1).trim();
+    }
+    if (u.startsWith('www.')) {
+      u = `https://${u}`;
+    }
+    return u;
+  };
+
+  const fixedTitle = formData.title ? fixTitle(formData.title) : formData.title;
+  const fixedNavLabel = formData.navLabel ? formData.navLabel.trim() : formData.navLabel;
+  const fixedSlug = (formData.slug || 'seccion')
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, '-')
+    .replace(/-+/g, '-');
+
+  let fixedSubtitle = formData.subtitle?.trim() || '';
+  while (fixedSubtitle.endsWith('..')) {
+    fixedSubtitle = fixedSubtitle.slice(0, -1).trim();
+  }
+
+  const fixedBlocks = (formData.blocks || []).map((b) => {
+    const blockCopy = { ...b };
+    if (blockCopy.title) {
+      blockCopy.title = fixTitle(blockCopy.title);
+    }
+    if (blockCopy.subtitle) {
+      blockCopy.subtitle = fixTitle(blockCopy.subtitle);
+    }
+    if (blockCopy.items) {
+      blockCopy.items = blockCopy.items.map((item) => {
+        const itemCopy = { ...item };
+        if (itemCopy.title) {
+          itemCopy.title = fixTitle(itemCopy.title);
+        }
+        if (itemCopy.linkUrl) {
+          itemCopy.linkUrl = fixUrl(itemCopy.linkUrl);
+        }
+        return itemCopy;
+      });
+    }
+    return blockCopy;
+  });
+
+  return {
+    ...formData,
+    title: fixedTitle,
+    navLabel: fixedNavLabel,
+    slug: fixedSlug,
+    subtitle: fixedSubtitle,
+    blocks: fixedBlocks,
+  };
+}
 
 interface CmsAdminModalProps {
   isOpen: boolean;
@@ -66,6 +287,8 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
   );
   const [isCreatingNew, setIsCreatingNew] = useState<boolean>(!initialEditPageId && pages.length === 0);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [apaErrors, setApaErrors] = useState<ApaValidationError[]>([]);
+  const [hasAttemptedSave, setHasAttemptedSave] = useState<boolean>(false);
 
   // Formulario de edición de página
   const activePage = pages.find((p) => p.id === selectedPageId);
@@ -84,6 +307,22 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
       blocks: [],
     };
   });
+
+  // Validar metadatos en tiempo real
+  useEffect(() => {
+    const errs = validateCmsPageApaMetadata(formData);
+    setApaErrors(errs);
+  }, [formData]);
+
+  const getFieldError = (fieldKey: string) => {
+    return apaErrors.find((e) => e.field === fieldKey)?.message;
+  };
+
+  const handleApplyApaAutoFix = () => {
+    const fixed = autoFixApaMetadata(formData);
+    setFormData(fixed);
+    showToast('✨ Metadatos corregidos automáticamente según Normas APA 7.ª ed.');
+  };
 
   // Sincronizar selección cuando se abre el modal o cambia initialEditPageId
   useEffect(() => {
@@ -280,8 +519,12 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
   };
 
   const handleSaveCurrentPage = async () => {
-    if (!formData.title?.trim() || !formData.navLabel?.trim()) {
-      showToast('Por favor asigna un título y un nombre de pestaña válido.');
+    setHasAttemptedSave(true);
+    const errors = validateCmsPageApaMetadata(formData);
+    setApaErrors(errors);
+
+    if (errors.length > 0) {
+      showToast(`⚠️ No se puede guardar: Se encontraron ${errors.length} error(es) de metadatos o formato APA.`);
       return;
     }
 
@@ -291,9 +534,9 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
         .toLowerCase()
         .replace(/[^a-z0-9_-]/g, '-')
         .replace(/-+/g, '-'),
-      title: formData.title.trim(),
-      navLabel: formData.navLabel.trim(),
-      subtitle: formData.subtitle?.trim() || '',
+      title: (formData.title || '').trim(),
+      navLabel: (formData.navLabel || '').trim(),
+      subtitle: (formData.subtitle || '').trim(),
       iconName: formData.iconName || 'FileText',
       published: Boolean(formData.published !== false),
       order: Number(formData.order) || 10,
@@ -308,6 +551,7 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
       await onSavePage(pageToSave);
       setIsCreatingNew(false);
       setSelectedPageId(pageToSave.id);
+      setHasAttemptedSave(false);
       showToast(`Pestaña "${pageToSave.navLabel}" guardada y sincronizada para todos los dispositivos`);
     } catch (err: any) {
       showToast(err.message || 'Error al guardar la página en el CMS');
@@ -455,6 +699,56 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
 
           {/* Columna Derecha: Editor de Contenidos */}
           <div className="md:col-span-8 p-4 sm:p-6 overflow-y-auto space-y-5 bg-white">
+            {/* Panel de Validación de Metadatos y Normas APA */}
+            <div
+              className={`p-3.5 rounded-xl border text-xs transition-all space-y-2 ${
+                apaErrors.length === 0
+                  ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+                  : 'bg-amber-50/90 border-amber-300 text-amber-900'
+              }`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 font-bold text-xs sm:text-sm">
+                  {apaErrors.length === 0 ? (
+                    <>
+                      <FileCheck2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Metadatos Validados (Cumple Normas APA 7.ª Edición)</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>
+                        Se detectaron {apaErrors.length} observación(es) de metadatos o formato APA
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {apaErrors.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleApplyApaAutoFix}
+                    className="px-2.5 py-1 text-xs font-bold bg-[#664d88] hover:bg-[#533e6f] text-white rounded-lg flex items-center gap-1 shadow-xs transition-colors shrink-0 cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-[#f8c62e]" />
+                    <span>Auto-corregir APA</span>
+                  </button>
+                )}
+              </div>
+
+              {apaErrors.length > 0 ? (
+                <ul className="list-disc list-inside space-y-1 text-[11px] text-amber-950 font-medium pt-1 border-t border-amber-200/80">
+                  {apaErrors.map((err, idx) => (
+                    <li key={idx}>{err.message}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[11px] text-emerald-800">
+                  Todos los títulos, identificadores y enlaces cumplen con las reglas institucionales de redacción académica sin puntos finales en encabezados ni enlaces con errores de protocolo.
+                </p>
+              )}
+            </div>
+
             <div className="space-y-4 pb-4 border-b border-slate-200">
               <div className="flex items-center justify-between gap-3">
                 <h4 className="font-bold text-base text-slate-900 flex items-center gap-2">
@@ -497,8 +791,17 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
                     value={formData.title || ''}
                     onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
                     placeholder="Ej. Convocatoria y Fechas Clave 2026"
-                    className="w-full text-xs sm:text-sm px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#664d88]"
+                    className={`w-full text-xs sm:text-sm px-3 py-2 rounded-xl border focus:outline-none focus:ring-2 ${
+                      getFieldError('title')
+                        ? 'border-red-400 bg-red-50/20 focus:ring-red-500'
+                        : 'border-slate-300 focus:ring-[#664d88]'
+                    }`}
                   />
+                  {getFieldError('title') && (
+                    <p className="text-[11px] text-red-600 font-semibold mt-1">
+                      {getFieldError('title')}
+                    </p>
+                  )}
                 </div>
 
                 <div className="sm:col-span-4">
@@ -510,8 +813,17 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
                     value={formData.navLabel || ''}
                     onChange={(e) => setFormData((prev) => ({ ...prev, navLabel: e.target.value }))}
                     placeholder="Ej. Convocatoria"
-                    className="w-full text-xs sm:text-sm px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#664d88]"
+                    className={`w-full text-xs sm:text-sm px-3 py-2 rounded-xl border focus:outline-none focus:ring-2 ${
+                      getFieldError('navLabel')
+                        ? 'border-red-400 bg-red-50/20 focus:ring-red-500'
+                        : 'border-slate-300 focus:ring-[#664d88]'
+                    }`}
                   />
+                  {getFieldError('navLabel') && (
+                    <p className="text-[11px] text-red-600 font-semibold mt-1">
+                      {getFieldError('navLabel')}
+                    </p>
+                  )}
                 </div>
 
                 <div className="sm:col-span-4">
@@ -542,8 +854,17 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
                     value={formData.slug || ''}
                     onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
                     placeholder="convocatoria-2026"
-                    className="w-full text-xs sm:text-sm px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#664d88] font-mono text-slate-600"
+                    className={`w-full text-xs sm:text-sm px-3 py-2 rounded-xl border focus:outline-none focus:ring-2 font-mono ${
+                      getFieldError('slug')
+                        ? 'border-red-400 bg-red-50/20 focus:ring-red-500 text-red-700'
+                        : 'border-slate-300 focus:ring-[#664d88] text-slate-600'
+                    }`}
                   />
+                  {getFieldError('slug') && (
+                    <p className="text-[11px] text-red-600 font-semibold mt-1">
+                      {getFieldError('slug')}
+                    </p>
+                  )}
                 </div>
 
                 <div className="sm:col-span-3">
@@ -572,8 +893,17 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
                     value={formData.subtitle || ''}
                     onChange={(e) => setFormData((prev) => ({ ...prev, subtitle: e.target.value }))}
                     placeholder="Resumen o propósito para los estudiantes..."
-                    className="w-full text-xs sm:text-sm px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#664d88]"
+                    className={`w-full text-xs sm:text-sm px-3 py-2 rounded-xl border focus:outline-none focus:ring-2 ${
+                      getFieldError('subtitle')
+                        ? 'border-red-400 bg-red-50/20 focus:ring-red-500'
+                        : 'border-slate-300 focus:ring-[#664d88]'
+                    }`}
                   />
+                  {getFieldError('subtitle') && (
+                    <p className="text-[11px] text-red-600 font-semibold mt-1">
+                      {getFieldError('subtitle')}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
