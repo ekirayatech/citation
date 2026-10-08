@@ -125,6 +125,7 @@ const CMS_FILE_PATH = path.join(__dirname, '.ekiraya-cms-pages.json');
 
 function isForbiddenCmsPage(p: any): boolean {
   if (!p) return true;
+  if (p.id && String(p.id).startsWith('cms-')) return false;
   const str = `${p.id || ''} ${p.title || ''} ${p.navLabel || ''} ${p.slug || ''}`.toLowerCase();
   return (
     str.includes('crono') ||
