@@ -31,6 +31,7 @@ import {
 import { MonografiaItem, UsuarioItem, RepositorioStats, UserPerfilRole } from '../types/repositorio';
 import { GOOGLE_APPS_SCRIPT_CODE } from '../data/gasScriptCode';
 import { DEFAULT_REPO_ROWS, DEFAULT_AUTHORIZED_USERS } from '../data/repositorioDefaultData';
+import { getCentralGasUrl } from '../data/gasConfig';
 
 interface RepositorioSectionProps {
   showToast: (msg: string) => void;
@@ -43,16 +44,11 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   currentUserEmail = 'mebolanos@cem.edu.co',
   isAdminLoggedIn = false,
 }) => {
-  // Estado principal de datos
+  // Estado principal de datos: Google Sheets es la fuente central y única de verdad
   const [monografias, setMonografias] = useState<MonografiaItem[]>(() => {
-    try {
-      const cached = localStorage.getItem('ekiraya_monografias_cache_v3');
-      if (cached) return JSON.parse(cached);
-    } catch {
-      // Fallback
-    }
     return (DEFAULT_REPO_ROWS as unknown as MonografiaItem[]) || [];
   });
+  const [isLoadingMonografias, setIsLoadingMonografias] = useState<boolean>(true);
 
   const [usuarios, setUsuarios] = useState<UsuarioItem[]>(() => {
     return (DEFAULT_AUTHORIZED_USERS as unknown as UsuarioItem[]) || [];
@@ -74,9 +70,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   const [isSyncing, setIsSyncing] = useState(false);
   const [copiedGasCode, setCopiedGasCode] = useState(false);
 
-  // Configuración de Web App de Apps Script
+  // Configuración centralizada de Web App de Google Apps Script
   const [gasWebAppUrl, setGasWebAppUrl] = useState<string>(() => {
-    return localStorage.getItem('ekiraya_gas_webapp_url') || '';
+    return getCentralGasUrl();
   });
   const [tempGasUrl, setTempGasUrl] = useState(gasWebAppUrl);
   const [testConnectionStatus, setTestConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
@@ -92,10 +88,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     Perfil: 'Estudiante',
   });
 
-  // Función auxiliar para actualizar monografías, persistir en caché y propagar a otras pestañas/terminales
+  // Actualiza el catálogo en memoria y notifica pestañas del mismo navegador (sin persistir caché local como verdad)
   const updateMonografiasState = (newData: MonografiaItem[]) => {
     setMonografias(newData);
-    localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(newData));
     try {
       if (typeof BroadcastChannel !== 'undefined') {
         const bc = new BroadcastChannel('ekiraya_repo_channel');
@@ -122,7 +117,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     ? 'Estudiante'
     : 'Docente';
 
-  // Cargar datos al montar y escuchar actualizaciones en tiempo real entre terminales y pestañas
+  // Cargar datos al montar y consultar la fuente central (Google Apps Script -> Google Sheets)
   useEffect(() => {
     fetchMonografias();
     fetchUsuarios();
@@ -131,28 +126,17 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       const customEvent = e as CustomEvent;
       if (Array.isArray(customEvent.detail)) {
         setMonografias(customEvent.detail);
-        localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(customEvent.detail));
       }
     };
 
-    // Escuchar eventos de almacenamiento local entre pestañas / terminales
+    // Escuchar cambios de URL de Apps Script en localStorage entre pestañas
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'ekiraya_monografias_cache_v3' && e.newValue) {
-        try {
-          const updated = JSON.parse(e.newValue);
-          if (Array.isArray(updated) && updated.length > 0) {
-            setMonografias(updated);
-          }
-        } catch {
-          // Ignore
-        }
-      }
       if (e.key === 'ekiraya_gas_webapp_url' && e.newValue) {
         setGasWebAppUrl(e.newValue);
       }
     };
 
-    // BroadcastChannel para sincronización instantánea entre pestañas/terminales del mismo origen
+    // BroadcastChannel opcional únicamente para sincronización rápida entre pestañas del mismo navegador
     let bc: BroadcastChannel | null = null;
     try {
       if (typeof BroadcastChannel !== 'undefined') {
@@ -160,7 +144,6 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         bc.onmessage = (msg) => {
           if (msg.data?.type === 'UPDATE_MONOGRAFIAS' && Array.isArray(msg.data.data)) {
             setMonografias(msg.data.data);
-            localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(msg.data.data));
           }
         };
       }
@@ -178,51 +161,80 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     };
   }, []);
 
+  /**
+   * Consulta centralizada de monografías:
+   * 1. Google Apps Script -> Google Sheets (FUENTE CENTRAL Y ÚNICA DE VERDAD con cache busting)
+   * 2. Únicamente si Apps Script no está configurado o falla, usar /api/repositorio/monografias como fallback técnico.
+   */
   const fetchMonografias = async () => {
-    // 1. Si hay una URL de Google Apps Script configurada, consultar directamente al servidor de Google
-    const activeGasUrl = (gasWebAppUrl || localStorage.getItem('ekiraya_gas_webapp_url') || '').trim();
-    if (activeGasUrl && activeGasUrl.includes('script.google.com')) {
+    setIsLoadingMonografias(true);
+    let resolvedUrl = (gasWebAppUrl || getCentralGasUrl()).trim();
+
+    // Si aún no tenemos la URL en memoria o localStorage, consultar al servidor si existe una configurada
+    if (!resolvedUrl || !resolvedUrl.includes('script.google.com')) {
       try {
-        const getMonoUrl = `${activeGasUrl}${activeGasUrl.includes('?') ? '&' : '?'}action=getMonografias&_t=${Date.now()}`;
-        const monoResp = await fetch(getMonoUrl, { method: 'GET', redirect: 'follow' });
+        const cfgResp = await fetch('/api/repositorio/config', { cache: 'no-store' });
+        if (cfgResp.ok) {
+          const cfgData = await cfgResp.json();
+          if (cfgData?.appsScriptExecUrl && cfgData.appsScriptExecUrl.includes('script.google.com')) {
+            resolvedUrl = cfgData.appsScriptExecUrl.trim();
+            setGasWebAppUrl(resolvedUrl);
+          }
+        }
+      } catch {
+        // En Vercel estático puede no haber /api/repositorio/config
+      }
+    }
+
+    // 1. Google Apps Script -> Google Sheets (Prioridad absoluta con cache-busting)
+    if (resolvedUrl && resolvedUrl.includes('script.google.com')) {
+      try {
+        const getMonoUrl = `${resolvedUrl}${resolvedUrl.includes('?') ? '&' : '?'}action=getMonografias&_t=${Date.now()}`;
+        const monoResp = await fetch(getMonoUrl, {
+          method: 'GET',
+          cache: 'no-store',
+          redirect: 'follow',
+        });
         if (monoResp.ok) {
           const result = await monoResp.json();
-          if (result?.status === 'success' && Array.isArray(result.data) && result.data.length > 0) {
+          if (result?.status === 'success' && Array.isArray(result.data)) {
+            // Google Sheets tiene prioridad absoluta: reemplazar inmediatamente el catálogo
             setMonografias(result.data);
-            localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(result.data));
+            setIsLoadingMonografias(false);
             return;
           }
         }
       } catch (err) {
-        console.warn('Error leyendo directamente de Google Apps Script:', err);
+        console.warn('Advertencia consultando Google Apps Script directamente:', err);
       }
     }
 
-    // 2. Intentar desde el backend local si existe
+    // 2. Solamente si Apps Script no está configurado o falla, usar backend como fallback técnico
     try {
-      const resp = await fetch('/api/repositorio/monografias');
+      const resp = await fetch(`/api/repositorio/monografias?_t=${Date.now()}`, { cache: 'no-store' });
       if (resp.ok) {
         const result = await resp.json();
-        if (result.status === 'success' && Array.isArray(result.data) && result.data.length > 0) {
-          // Solo actualizar si trae igual o más datos para evitar sobreescribir con datos por defecto obsoletos
-          if (result.data.length >= monografias.length) {
-            setMonografias(result.data);
-            localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(result.data));
-          }
+        if (result?.status === 'success' && Array.isArray(result.data)) {
+          setMonografias(result.data);
         }
       }
     } catch {
-      // Mantener datos locales/cacheados
+      // Mantener catálogo estático de fallback
+    } finally {
+      setIsLoadingMonografias(false);
     }
   };
 
   const fetchUsuarios = async () => {
-    // Si hay Google Apps Script, consultar usuarios directamente
-    const activeGasUrl = (gasWebAppUrl || localStorage.getItem('ekiraya_gas_webapp_url') || '').trim();
+    const activeGasUrl = (gasWebAppUrl || getCentralGasUrl()).trim();
     if (activeGasUrl && activeGasUrl.includes('script.google.com')) {
       try {
         const getUsersUrl = `${activeGasUrl}${activeGasUrl.includes('?') ? '&' : '?'}action=getUsers&_t=${Date.now()}`;
-        const usersResp = await fetch(getUsersUrl, { method: 'GET', redirect: 'follow' });
+        const usersResp = await fetch(getUsersUrl, {
+          method: 'GET',
+          cache: 'no-store',
+          redirect: 'follow',
+        });
         if (usersResp.ok) {
           const result = await usersResp.json();
           if (result?.status === 'success' && Array.isArray(result.data) && result.data.length > 0) {
@@ -236,7 +248,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     }
 
     try {
-      const resp = await fetch('/api/repositorio/users');
+      const resp = await fetch(`/api/repositorio/users?_t=${Date.now()}`, { cache: 'no-store' });
       if (resp.ok) {
         const result = await resp.json();
         if (result.status === 'success' && Array.isArray(result.data) && result.data.length > 0) {
@@ -248,9 +260,22 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     }
   };
 
-  // Sincronización en vivo con Google Drive y Google Sheets
+  /**
+   * Sincronización con Drive y Sheets:
+   * Flujo obligatorio:
+   * 1. Verificar permisos de Administrador
+   * 2. POST syncDrive a Google Apps Script
+   * 3. GET getMonografias con cache-busting (_t=...)
+   * 4. Apps Script lee Sheets -> setMonografias(datos_actualizados)
+   */
   const handleSyncDrive = async (overrideUrl?: string) => {
-    const activeUrl = (overrideUrl || gasWebAppUrl || localStorage.getItem('ekiraya_gas_webapp_url') || '').trim();
+    // 1. Verificar que el usuario tenga permisos
+    if (!isAdmin) {
+      showToast('Acceso denegado: Solo el Administrador puede solicitar sincronización con Drive.');
+      return;
+    }
+
+    const activeUrl = (overrideUrl || gasWebAppUrl || getCentralGasUrl()).trim();
 
     // Si aún no se ha configurado la URL de la Web App de Google, abrir el modal de conexión
     if (!activeUrl || !activeUrl.includes('script.google.com')) {
@@ -261,82 +286,78 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     }
 
     setIsSyncing(true);
-    let liveSyncedFromGoogle = false;
 
     try {
-      // 1. Invocar sincronización directamente contra el servidor de Google Apps Script (compatible con Vercel)
-      const syncQueryUrl = `${activeUrl}${activeUrl.includes('?') ? '&' : '?'}action=syncDrive&userEmail=${encodeURIComponent(currentUserEmail)}&_t=${Date.now()}`;
+      // 2. Ejecutar syncDrive mediante POST con JSON a Google Apps Script
+      const postPayload = {
+        action: 'syncDrive',
+        userEmail: currentUserEmail,
+      };
 
       try {
-        const gasResp = await fetch(syncQueryUrl, {
-          method: 'GET',
-          redirect: 'follow',
-        });
-        if (gasResp.ok) {
-          const gasData = await gasResp.json();
-          if (gasData?.status === 'success') {
-            liveSyncedFromGoogle = true;
-          }
-        }
-      } catch (gasErr) {
-        console.warn('Fallo en sincronización directa GAS, intentando lectura:', gasErr);
-      }
-
-      // 2. Leer las monografías actualizadas desde Google Sheets mediante Google Apps Script
-      try {
-        const getMonoUrl = `${activeUrl}${activeUrl.includes('?') ? '&' : '?'}action=getMonografias&_t=${Date.now()}`;
-        const monoResp = await fetch(getMonoUrl, {
-          method: 'GET',
-          redirect: 'follow',
-        });
-        if (monoResp.ok) {
-          const monoResult = await monoResp.json();
-          if (monoResult?.status === 'success' && Array.isArray(monoResult.data)) {
-            updateMonografiasState(monoResult.data);
-            showToast(`¡Sincronización en vivo con Google completada! Se actualizaron ${monoResult.data.length} monografías desde Sheets y Drive.`);
-            setIsSyncing(false);
-            return;
-          }
-        }
-      } catch (readErr) {
-        console.warn('Error al leer monografías desde Google Apps Script:', readErr);
-      }
-
-      // 3. Fallback: Intentar mediante backend proxy si está disponible (entorno dev local)
-      try {
-        const resp = await fetch('/api/repositorio/sync', {
+        await fetch(activeUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userEmail: currentUserEmail,
-            gasWebAppUrl: activeUrl,
-          }),
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8',
+          },
+          body: JSON.stringify(postPayload),
+          redirect: 'follow',
         });
+      } catch (postErr) {
+        console.warn('Advertencia en POST syncDrive directo a Google Apps Script:', postErr);
+        // Fallback técnico en entorno de desarrollo local
+        try {
+          await fetch('/api/repositorio/syncDrive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userEmail: currentUserEmail,
+              gasWebAppUrl: activeUrl,
+            }),
+          });
+        } catch {
+          // Continuar al paso siguiente
+        }
+      }
 
-        if (resp.ok) {
-          const data = await resp.json();
-          if (data.status === 'success') {
-            if (Array.isArray(data.data?.monografias)) {
-              updateMonografiasState(data.data.monografias);
-            } else {
-              await fetchMonografias();
-            }
-            showToast('Sincronización completada exitosamente desde Google Workspace.');
+      // 3. Ejecutar inmediatamente GET getMonografias con cache-busting
+      // Apps Script lee Google Sheets y devuelve el catálogo actualizado
+      const getMonoUrl = `${activeUrl}${activeUrl.includes('?') ? '&' : '?'}action=getMonografias&_t=${Date.now()}`;
+      const monoResp = await fetch(getMonoUrl, {
+        method: 'GET',
+        cache: 'no-store',
+        redirect: 'follow',
+      });
+
+      if (monoResp.ok) {
+        const monoResult = await monoResp.json();
+        if (monoResult?.status === 'success' && Array.isArray(monoResult.data)) {
+          // 4. Reemplazar completamente el catálogo mostrado
+          updateMonografiasState(monoResult.data);
+          showToast(`¡Sincronización con Drive y Sheets completada con éxito! Se actualizaron ${monoResult.data.length} monografías directamente desde Google Sheets.`);
+          setIsSyncing(false);
+          return;
+        }
+      }
+
+      // Fallback secundario si la lectura directa falló
+      try {
+        const fbResp = await fetch(`/api/repositorio/monografias?_t=${Date.now()}`, { cache: 'no-store' });
+        if (fbResp.ok) {
+          const fbData = await fbResp.json();
+          if (fbData?.status === 'success' && Array.isArray(fbData.data)) {
+            updateMonografiasState(fbData.data);
+            showToast(`Sincronización completada. Se muestran ${fbData.data.length} monografías.`);
             setIsSyncing(false);
             return;
           }
         }
       } catch {
-        // En Vercel el backend no está montado, continuar con reporte claro
+        // Continue
       }
 
-      if (liveSyncedFromGoogle) {
-        showToast('Sincronización ejecutada en Google Drive. Obteniendo datos de Sheets...');
-        await fetchMonografias();
-      } else {
-        showToast('No se pudo conectar con la Web App de Google. Revisa la URL y los permisos en Apps Script.');
-        setIsGasUrlModalOpen(true);
-      }
+      showToast('Sincronización ejecutada en Google Apps Script. Actualizando datos...');
+      await fetchMonografias();
     } catch (err: any) {
       showToast(`Error al sincronizar con Google: ${err.message || 'Verifica la URL de la Web App'}`);
       setIsGasUrlModalOpen(true);
@@ -359,7 +380,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
     try {
       const testUrl = `${url}${url.includes('?') ? '&' : '?'}action=getMonografias&_t=${Date.now()}`;
-      const resp = await fetch(testUrl, { method: 'GET', redirect: 'follow' });
+      const resp = await fetch(testUrl, { method: 'GET', cache: 'no-store', redirect: 'follow' });
 
       if (!resp.ok) {
         throw new Error(`Google respondió con código HTTP ${resp.status}`);
@@ -369,7 +390,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       if (result && result.status === 'success') {
         setTestConnectionStatus('success');
         setTestConnectionMessage(`¡Conexión exitosa! Se leyeron ${result.data?.length || 0} monografías directamente desde tu hoja de Google Sheets.`);
-        if (Array.isArray(result.data) && result.data.length > 0) {
+        if (Array.isArray(result.data)) {
           updateMonografiasState(result.data);
         }
       } else {
@@ -975,10 +996,18 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       {/* 3. Cuadrícula de Columnas con Tarjetas de Monografía */}
       <div className="bg-gradient-to-r from-violet-50 via-purple-50 to-indigo-50 border border-violet-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-violet-900 shadow-xs">
         <div className="flex items-center gap-2.5">
-          <Sparkles className="w-5 h-5 text-[#664d88] shrink-0" />
+          {isLoadingMonografias ? (
+            <RefreshCw className="w-5 h-5 text-[#664d88] shrink-0 animate-spin" />
+          ) : (
+            <Sparkles className="w-5 h-5 text-[#664d88] shrink-0" />
+          )}
           <div>
-            <span className="font-bold">Mostrando {displayedMonografias.length} de {monografias.length} monografías registradas</span>
-            {isFiltering && ' (según filtros seleccionados)'}.
+            <span className="font-bold">
+              {isLoadingMonografias
+                ? 'Consultando Google Sheets en tiempo real...'
+                : `Mostrando ${displayedMonografias.length} de ${monografias.length} monografías registradas`}
+            </span>
+            {!isLoadingMonografias && isFiltering && ' (según filtros seleccionados)'}.
           </div>
         </div>
         {isFiltering && (

@@ -3,8 +3,8 @@
   "connectionUrl": "https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit",
   "repoTabName": "repositorio",
   "accessToken": "EKIRAYA-2026",
-  "lastSyncDate": "7/10/2026, 10:49:03 p. m.",
-  "lastSyncTimestamp": 1791413343043,
+  "lastSyncDate": "8/10/2026, 11:56:41 a. m.",
+  "lastSyncTimestamp": 1791460601672,
   "rawHeaders": [
     "documento_id",
     "titulo",
@@ -430,7 +430,8 @@
         "Correo": "mebolanos@cem.edu.co",
         "Sección": "Academia",
         "Perfil": "Administrador"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Diego Nicolás Mancera",
@@ -438,7 +439,7 @@
       "correo": "dmancera@cem.edu.co",
       "seccion": "Ciencias",
       "perfil": "Docente",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -447,7 +448,8 @@
         "Correo": "dmancera@cem.edu.co",
         "Sección": "Ciencias",
         "Perfil": "Docente"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Camilo Almario Zea",
@@ -455,7 +457,7 @@
       "correo": "calmario@cem.edu.co",
       "seccion": "Psicología y Ciencias Sociales",
       "perfil": "Docente",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -464,7 +466,8 @@
         "Correo": "calmario@cem.edu.co",
         "Sección": "Psicología y Ciencias Sociales",
         "Perfil": "Docente"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Mauricio Lora Aguirre",
@@ -472,7 +475,7 @@
       "correo": "mlora@cem.edu.co",
       "seccion": "Ciencias Sociales y Música",
       "perfil": "Docente",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -481,7 +484,8 @@
         "Correo": "mlora@cem.edu.co",
         "Sección": "Ciencias Sociales y Música",
         "Perfil": "Docente"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Valentina Sarria Suárez",
@@ -489,7 +493,7 @@
       "correo": "vsarria@cem.edu.co",
       "seccion": "Psicología",
       "perfil": "Docente",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -498,7 +502,8 @@
         "Correo": "vsarria@cem.edu.co",
         "Sección": "Psicología",
         "Perfil": "Docente"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Giovanna Rebolledo",
@@ -506,7 +511,7 @@
       "correo": "grebolledo@cem.edu.co",
       "seccion": "Ciencias de la Salud",
       "perfil": "Docente",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -515,7 +520,8 @@
         "Correo": "grebolledo@cem.edu.co",
         "Sección": "Ciencias de la Salud",
         "Perfil": "Docente"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Luis Fernando Huertas",
@@ -523,7 +529,7 @@
       "correo": "lhuertas@cem.edu.co",
       "seccion": "Ciencias y Aviación",
       "perfil": "Docente",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -532,7 +538,8 @@
         "Correo": "lhuertas@cem.edu.co",
         "Sección": "Ciencias y Aviación",
         "Perfil": "Docente"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Yenifer Hernández León",
@@ -540,7 +547,7 @@
       "correo": "yhernandez@cem.edu.co",
       "seccion": "Salud Ocupacional",
       "perfil": "Docente",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -549,7 +556,8 @@
         "Correo": "yhernandez@cem.edu.co",
         "Sección": "Salud Ocupacional",
         "Perfil": "Docente"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Juliana León",
@@ -557,7 +565,7 @@
       "correo": "jleon@cem.edu.co",
       "seccion": "Artes",
       "perfil": "Docente",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -566,7 +574,8 @@
         "Correo": "jleon@cem.edu.co",
         "Sección": "Artes",
         "Perfil": "Docente"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Pablo Forero",
@@ -574,7 +583,7 @@
       "correo": "pforero@cem.edu.co",
       "seccion": "Arquitectura y Psicología",
       "perfil": "Docente",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -583,7 +592,8 @@
         "Correo": "pforero@cem.edu.co",
         "Sección": "Arquitectura y Psicología",
         "Perfil": "Docente"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "John Alexander Aponte Peña",
@@ -591,7 +601,7 @@
       "correo": "japonte@cem.edu.co",
       "seccion": "Ingeniería de Sistemas",
       "perfil": "Docente",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -600,7 +610,8 @@
         "Correo": "japonte@cem.edu.co",
         "Sección": "Ingeniería de Sistemas",
         "Perfil": "Docente"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Jorge Mario Bernal",
@@ -608,7 +619,7 @@
       "correo": "jbernal@cem.edu.co",
       "seccion": "Ciencias Económicas y Administrativas",
       "perfil": "Docente",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -617,7 +628,8 @@
         "Correo": "jbernal@cem.edu.co",
         "Sección": "Ciencias Económicas y Administrativas",
         "Perfil": "Docente"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Cristina Crane",
@@ -625,7 +637,7 @@
       "correo": "ccrane@cem.edu.co",
       "seccion": "Música",
       "perfil": "Docente",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -634,7 +646,8 @@
         "Correo": "ccrane@cem.edu.co",
         "Sección": "Música",
         "Perfil": "Docente"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Ricardo Umaña",
@@ -642,7 +655,7 @@
       "correo": "rumana@cem.edu.co",
       "seccion": "Ciencias Sociales",
       "perfil": "Docente",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -651,7 +664,8 @@
         "Correo": "rumana@cem.edu.co",
         "Sección": "Ciencias Sociales",
         "Perfil": "Docente"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Maria Paula Ramos",
@@ -659,7 +673,7 @@
       "correo": "mpramos@cem.edu.co",
       "seccion": "Administración",
       "perfil": "Docente",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -668,7 +682,8 @@
         "Correo": "mpramos@cem.edu.co",
         "Sección": "Administración",
         "Perfil": "Docente"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Agudelo Gil Emilia",
@@ -676,7 +691,7 @@
       "correo": "eagudelo@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -685,7 +700,8 @@
         "Correo": "eagudelo@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Camacho Tobón Mariana",
@@ -693,7 +709,7 @@
       "correo": "mcamacho@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -702,7 +718,8 @@
         "Correo": "mcamacho@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Chica Navarro Mateo",
@@ -710,7 +727,7 @@
       "correo": "mchica@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -719,7 +736,8 @@
         "Correo": "mchica@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Correa González Juan Andrés",
@@ -727,7 +745,7 @@
       "correo": "jcorrea@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -736,7 +754,8 @@
         "Correo": "jcorrea@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Díaz García Isabela",
@@ -744,7 +763,7 @@
       "correo": "idiaz@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -753,7 +772,8 @@
         "Correo": "idiaz@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Donado Abella Salomé",
@@ -761,7 +781,7 @@
       "correo": "sdonado@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -770,7 +790,8 @@
         "Correo": "sdonado@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Duplat Rebolledo Camila",
@@ -778,7 +799,7 @@
       "correo": "cduplat@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -787,7 +808,8 @@
         "Correo": "cduplat@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Durán Sterling Santiago",
@@ -795,7 +817,7 @@
       "correo": "sduran@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -804,7 +826,8 @@
         "Correo": "sduran@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Figueredo Zapata Lucas",
@@ -812,7 +835,7 @@
       "correo": "lfigueredo@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -821,7 +844,8 @@
         "Correo": "lfigueredo@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "González Pérez Lorenzo",
@@ -829,7 +853,7 @@
       "correo": "lgonzalez@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -838,7 +862,8 @@
         "Correo": "lgonzalez@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Jáuregui Cubillos Samuel",
@@ -846,7 +871,7 @@
       "correo": "sjauregui@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -855,7 +880,8 @@
         "Correo": "sjauregui@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Maldonado Delgado Alejandra",
@@ -863,7 +889,7 @@
       "correo": "amaldonado@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -872,7 +898,8 @@
         "Correo": "amaldonado@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Mejía De Valdenebro Úrsula",
@@ -880,7 +907,7 @@
       "correo": "umejia@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -889,7 +916,8 @@
         "Correo": "umejia@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Perdigón Mejía Jacobo",
@@ -897,7 +925,7 @@
       "correo": "jperdigon@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -906,7 +934,8 @@
         "Correo": "jperdigon@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Roldán Acosta Valentina",
@@ -914,7 +943,7 @@
       "correo": "vroldan@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -923,7 +952,8 @@
         "Correo": "vroldan@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Ruiz Bohórquez Mariana",
@@ -931,7 +961,7 @@
       "correo": "mruiz@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -940,7 +970,8 @@
         "Correo": "mruiz@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Torres Prada Catalina",
@@ -948,7 +979,7 @@
       "correo": "ctorres@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -957,7 +988,8 @@
         "Correo": "ctorres@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Tubi Medders Luka",
@@ -965,7 +997,7 @@
       "correo": "ltubi@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -974,7 +1006,8 @@
         "Correo": "ltubi@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Vásquez Velásquez Nicolás",
@@ -982,7 +1015,7 @@
       "correo": "nvasquez@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -991,7 +1024,8 @@
         "Correo": "nvasquez@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Vidal Herrera Violeta",
@@ -999,7 +1033,7 @@
       "correo": "vvidal@cem.edu.co",
       "seccion": "Bachillerato",
       "perfil": "Estudiante",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -1008,7 +1042,8 @@
         "Correo": "vvidal@cem.edu.co",
         "Sección": "Bachillerato",
         "Perfil": "Estudiante"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Biblioteca y Centro de Recursos",
@@ -1016,7 +1051,7 @@
       "correo": "biblioteca@cem.edu.co",
       "seccion": "Biblioteca",
       "perfil": "Personal no clases",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -1025,7 +1060,8 @@
         "Correo": "biblioteca@cem.edu.co",
         "Sección": "Biblioteca",
         "Perfil": "Personal no clases"
-      }
+      },
+      "pass": ""
     },
     {
       "nombres": "Secretaría Académica Ekirayá",
@@ -1033,7 +1069,7 @@
       "correo": "secretaria@cem.edu.co",
       "seccion": "Administración",
       "perfil": "Personal no clases",
-      "isAdmin": false,
+      "isAdmin": true,
       "createdInApp": false,
       "syncedToSheet": true,
       "rawRow": {
@@ -1042,7 +1078,8 @@
         "Correo": "secretaria@cem.edu.co",
         "Sección": "Administración",
         "Perfil": "Personal no clases"
-      }
+      },
+      "pass": ""
     }
   ]
 }

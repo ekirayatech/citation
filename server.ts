@@ -2087,6 +2087,14 @@ async function startServer() {
   app.post('/api/repo/manage-user', handleManageUser);
 
   // Alias endpoints para /api/repositorio/*
+  app.get('/api/repositorio/config', (_req, res) => {
+    const state = loadPersistedState();
+    res.json({
+      status: 'success',
+      appsScriptExecUrl: state.appsScriptExecUrl || process.env.VITE_APPS_SCRIPT_URL || '',
+      connectionUrl: state.connectionUrl || '',
+    });
+  });
   app.get('/api/repositorio/monografias', handleGetMonografias);
   app.get('/api/repositorio/check-role', handleCheckUserRole);
   app.get('/api/repositorio/checkUserRole', handleCheckUserRole);
