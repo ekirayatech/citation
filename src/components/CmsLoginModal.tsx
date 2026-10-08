@@ -13,7 +13,7 @@ import {
 interface CmsLoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLoginSuccess: (adminEmail: string) => void;
+  onLoginSuccess: (adminEmail: string, token: string) => void;
   currentEmail?: string;
 }
 
@@ -62,8 +62,8 @@ export const CmsLoginModal: React.FC<CmsLoginModalProps> = ({
 
       const data = await resp.json().catch(() => null);
 
-      if (resp.ok && data?.ok && data?.isAdmin) {
-        onLoginSuccess(cleanEmail);
+      if (resp.ok && data?.ok && data?.isAdmin && data?.token) {
+        onLoginSuccess(cleanEmail, data.token);
         return;
       }
 

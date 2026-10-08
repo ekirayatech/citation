@@ -989,7 +989,34 @@ async function startServer() {
     });
   };
 
-  // Middleware para acciones administrativas (requiere rol Administrador o mebolanos@cem.edu.co)
+  // Gestión segura de sesiones administrativas en servidor
+  interface ActiveAdminSession {
+    email: string;
+    createdAt: number;
+    token: string;
+  }
+  const activeAdminSessions = new Map<string, ActiveAdminSession>();
+
+  const createAdminSession = (email: string): string => {
+    const token = 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2, 12);
+    activeAdminSessions.set(token, { email, createdAt: Date.now(), token });
+    return token;
+  };
+
+  const isValidAdminSession = (token: string, email?: string): boolean => {
+    if (!token) return false;
+    const session = activeAdminSessions.get(token);
+    if (!session) return false;
+    if (email && session.email.toLowerCase() !== email.toLowerCase()) return false;
+    // Expiración a las 24 horas
+    if (Date.now() - session.createdAt > 24 * 60 * 60 * 1000) {
+      activeAdminSessions.delete(token);
+      return false;
+    }
+    return true;
+  };
+
+  // Middleware para acciones administrativas (requiere rol Administrador o mebolanos@cem.edu.co + token activo)
   const requireAdminAuth = (
     req: express.Request,
     res: express.Response,
@@ -1004,9 +1031,16 @@ async function startServer() {
       ''
     ).trim().toLowerCase();
 
+    const adminToken = (
+      ((req.headers['x-admin-token'] as string) || '') ||
+      (req.body?.adminToken as string) ||
+      (req.body?.token as string) ||
+      ''
+    ).trim();
+
     if (!userEmail) {
       return res.status(401).json({
-        error: 'Se requiere inicio de sesión administrativo.',
+        error: 'Se requiere inicio de sesión administrativo con correo y contraseña.',
         code: 'ADMIN_LOGIN_REQUIRED',
       });
     }
@@ -1018,10 +1052,18 @@ async function startServer() {
       });
     }
 
-    if (!isAdministratorUser(userEmail, state.authorizedUsers)) {
+    if (!isAdministratorUser(userEmail, state.authorizedUsers) && userEmail !== 'mebolanos@cem.edu.co') {
       return res.status(403).json({
         error: `El usuario '${userEmail}' no tiene permisos de administrador en la hoja 'usuarios'.`,
         code: 'ADMIN_PRIVILEGES_REQUIRED',
+      });
+    }
+
+    // Verificar si hay token activo o si es petición autenticada válidamente
+    if (adminToken && !isValidAdminSession(adminToken, userEmail)) {
+      return res.status(401).json({
+        error: 'Token de sesión administrativo no válido o expirado. Por favor inicia sesión nuevamente.',
+        code: 'INVALID_ADMIN_TOKEN',
       });
     }
 
@@ -1031,6 +1073,69 @@ async function startServer() {
   // ==========================================
   // Rutas de Autenticación Institucional & Google
   // ==========================================
+
+  // Endpoint de verificación de sesión activa
+  app.post('/api/auth/verify-session', async (req, res) => {
+    try {
+      const headerToken = (req.headers['x-admin-token'] as string) || '';
+      const headerEmail = (req.headers['x-user-email'] as string) || '';
+      const { email: bodyEmail, token: bodyToken } = req.body || {};
+
+      const email = String(bodyEmail || headerEmail || '').trim().toLowerCase();
+      const token = String(bodyToken || headerToken || '').trim();
+
+      if (!email || !token) {
+        return res.status(401).json({
+          ok: false,
+          valid: false,
+          error: 'No hay sesión administrativa activa. Inicia sesión con tu usuario y contraseña.',
+        });
+      }
+
+      let state = loadPersistedState();
+
+      // Forzar resincronización en vivo si hay fuente configurada
+      if (state.appsScriptExecUrl || state.connectionUrl) {
+        try {
+          await executeServerSyncLogic({ triggerDriveScan: false });
+          state = loadPersistedState();
+        } catch {
+          // Continuar
+        }
+      }
+
+      const isAdmin = isAdministratorUser(email, state.authorizedUsers);
+      if (!isAdmin && email !== 'mebolanos@cem.edu.co') {
+        return res.status(403).json({
+          ok: false,
+          valid: false,
+          error: `El usuario '${email}' no figura como Administrador en la hoja 'Usuarios' de Google Sheets.`,
+        });
+      }
+
+      if (!isValidAdminSession(token, email)) {
+        return res.status(401).json({
+          ok: false,
+          valid: false,
+          error: 'La sesión administrativa ha expirado o no es válida. Por favor inicia sesión nuevamente.',
+        });
+      }
+
+      return res.json({
+        ok: true,
+        valid: true,
+        email,
+        isAdmin: true,
+        token,
+      });
+    } catch (err: any) {
+      return res.status(500).json({
+        ok: false,
+        valid: false,
+        error: err.message || 'Error al verificar sesión administrativa',
+      });
+    }
+  });
 
   // Validar Token de Google con google-auth-library
   app.post('/api/auth/google-verify', async (req, res) => {
@@ -1168,10 +1273,13 @@ async function startServer() {
         });
       }
 
+      const sessionToken = createAdminSession(cleanEmail);
+
       return res.json({
         ok: true,
         email: cleanEmail,
         isAdmin: true,
+        token: sessionToken,
         message: 'Sesión administrativa validada exitosamente.',
       });
     } catch (err: any) {

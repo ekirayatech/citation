@@ -95,6 +95,9 @@ export default function App() {
   const [cmsModalOpen, setCmsModalOpen] = useState<boolean>(false);
   const [cmsEditingPageId, setCmsEditingPageId] = useState<string | null>(null);
   const [cmsLoginModalOpen, setCmsLoginModalOpen] = useState<boolean>(false);
+  const [cmsAdminToken, setCmsAdminToken] = useState<string>(() => {
+    return localStorage.getItem('ekiraya_cms_admin_token') || '';
+  });
   const [isCmsAdminLoggedIn, setIsCmsAdminLoggedIn] = useState<boolean>(() => {
     return localStorage.getItem('ekiraya_cms_admin_session') === 'true';
   });
@@ -158,35 +161,57 @@ export default function App() {
   };
 
   const handleOpenCmsModal = async () => {
-    if (!isCmsAdminLoggedIn) {
+    const savedToken = cmsAdminToken || localStorage.getItem('ekiraya_cms_admin_token') || '';
+    const savedEmail = currentUserEmail || localStorage.getItem('ekiraya_user_email') || 'mebolanos@cem.edu.co';
+
+    if (!savedToken || !isCmsAdminLoggedIn) {
+      setIsCmsAdminLoggedIn(false);
       setCmsLoginModalOpen(true);
       return;
     }
-    // Verificación robusta en el servidor consultando la hoja "Usuarios" de Google Sheets
+
+    // Verificación robusta en el servidor consultando la hoja "Usuarios" de Google Sheets y el token de sesión
     try {
-      const resp = await fetch('/api/auth/google-verify', {
+      const resp = await fetch('/api/auth/verify-session', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: currentUserEmail }),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': savedToken,
+          'x-user-email': savedEmail,
+        },
+        body: JSON.stringify({ email: savedEmail, token: savedToken }),
       });
+
       const data = await resp.json().catch(() => null);
-      if (!resp.ok || !data?.ok || !data?.isAdmin) {
+
+      if (!resp.ok || !data?.ok || !data?.valid) {
         setIsCmsAdminLoggedIn(false);
+        setCmsAdminToken('');
         localStorage.removeItem('ekiraya_cms_admin_session');
+        localStorage.removeItem('ekiraya_cms_admin_token');
         setCmsLoginModalOpen(true);
-        showToast('Verificación de administrador fallida: el usuario no está registrado en la hoja "Usuarios".');
+        showToast(
+          data?.error ||
+            'Acceso denegado: Tu usuario debe ser un Administrador registrado en la pestaña "Usuarios" de Google Sheets.'
+        );
         return;
       }
     } catch {
-      // En caso de red offline temporal, mantenemos sesión si ya estaba validada
+      setIsCmsAdminLoggedIn(false);
+      setCmsLoginModalOpen(true);
+      showToast('Error de conexión con el servidor de autenticación. Inicia sesión nuevamente.');
+      return;
     }
+
     setCmsEditingPageId(null);
     setCmsModalOpen(true);
   };
 
-  const handleCmsLoginSuccess = (adminEmail: string) => {
+  const handleCmsLoginSuccess = (adminEmail: string, token: string) => {
     setCurrentUserEmail(adminEmail);
+    setCmsAdminToken(token);
     localStorage.setItem('ekiraya_user_email', adminEmail);
+    localStorage.setItem('ekiraya_cms_admin_token', token);
     localStorage.setItem('ekiraya_cms_admin_session', 'true');
     setIsCmsAdminLoggedIn(true);
     setCmsLoginModalOpen(false);
@@ -196,7 +221,9 @@ export default function App() {
 
   const handleCmsLogout = () => {
     localStorage.removeItem('ekiraya_cms_admin_session');
+    localStorage.removeItem('ekiraya_cms_admin_token');
     setIsCmsAdminLoggedIn(false);
+    setCmsAdminToken('');
     setCmsModalOpen(false);
     showToast('Sesión administrativa de CMS cerrada.');
   };
@@ -407,16 +434,26 @@ export default function App() {
   };
 
   const handleSaveCmsPage = async (page: CmsPage) => {
+    const token = cmsAdminToken || localStorage.getItem('ekiraya_cms_admin_token') || '';
     const resp = await fetch('/api/cms/pages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-user-email': currentUserEmail,
+        'x-admin-token': token,
       },
-      body: JSON.stringify({ ...page, userEmail: currentUserEmail }),
+      body: JSON.stringify({ ...page, userEmail: currentUserEmail, adminToken: token }),
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => null);
+      if (resp.status === 401 || resp.status === 403) {
+        setIsCmsAdminLoggedIn(false);
+        setCmsAdminToken('');
+        localStorage.removeItem('ekiraya_cms_admin_session');
+        localStorage.removeItem('ekiraya_cms_admin_token');
+        setCmsModalOpen(false);
+        setCmsLoginModalOpen(true);
+      }
       throw new Error(err?.error || 'Error al guardar la página');
     }
     const data = await resp.json();
@@ -431,14 +468,24 @@ export default function App() {
   };
 
   const handleDeleteCmsPage = async (pageId: string) => {
+    const token = cmsAdminToken || localStorage.getItem('ekiraya_cms_admin_token') || '';
     const resp = await fetch(`/api/cms/pages/${encodeURIComponent(pageId)}`, {
       method: 'DELETE',
       headers: {
         'x-user-email': currentUserEmail,
+        'x-admin-token': token,
       },
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => null);
+      if (resp.status === 401 || resp.status === 403) {
+        setIsCmsAdminLoggedIn(false);
+        setCmsAdminToken('');
+        localStorage.removeItem('ekiraya_cms_admin_session');
+        localStorage.removeItem('ekiraya_cms_admin_token');
+        setCmsModalOpen(false);
+        setCmsLoginModalOpen(true);
+      }
       throw new Error(err?.error || 'Error al eliminar la página');
     }
     const data = await resp.json();
