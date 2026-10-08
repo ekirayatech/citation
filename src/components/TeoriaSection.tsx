@@ -428,14 +428,6 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
               <Sparkles className="w-4 h-4 text-violet-700" />
               Abrir Gestor Cita Master
             </button>
-            <button
-              type="button"
-              onClick={onNavigateToTaller}
-              className="px-4 py-2.5 bg-violet-800/60 hover:bg-violet-800 text-white border border-violet-500/40 font-medium text-xs sm:text-sm rounded-xl transition-colors flex items-center gap-2 whitespace-nowrap"
-            >
-              Ir a Ejercicios y Test
-              <ArrowRight className="w-4 h-4" />
-            </button>
           </div>
         </div>
       </div>
