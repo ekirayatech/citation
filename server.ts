@@ -1849,10 +1849,13 @@ async function startServer() {
   // ============================================================================
 
   // Endpoint: GET /api/repo/getMonografias (y alias /api/repo/monografias) con consulta en tiempo real a Google Sheets/Apps Script
-  const handleGetMonografias = async (_req: express.Request, res: express.Response) => {
+  const handleGetMonografias = async (req: express.Request, res: express.Response) => {
     try {
       const state = loadPersistedState();
-      const scriptUrl = extractValidAppsScriptUrl(state.appsScriptExecUrl);
+      const clientGasUrl = String(req.query.gasWebAppUrl || req.headers['x-gas-url'] || '').trim();
+      const scriptUrl = extractValidAppsScriptUrl(
+        clientGasUrl || state.appsScriptExecUrl || process.env.VITE_APPS_SCRIPT_URL || process.env.VITE_GAS_WEBAPP_URL
+      );
       if (scriptUrl) {
         try {
           const sep = scriptUrl.includes('?') ? '&' : '?';
@@ -1860,7 +1863,7 @@ async function startServer() {
           const resp = await fetch(liveUrl, {
             method: 'GET',
             redirect: 'follow',
-            signal: AbortSignal.timeout(5000),
+            signal: AbortSignal.timeout(6000),
           });
           const text = await resp.text();
           if (text && !isHtmlContent(text)) {

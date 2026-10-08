@@ -187,7 +187,8 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
     // Fallback técnico si Apps Script no está disponible
     try {
-      const resp = await fetch(`/api/repositorio/monografias?_t=${Date.now()}`, { cache: 'no-store' });
+      const activeGasUrl = (gasWebAppUrl || getCentralGasUrl()).trim();
+      const resp = await fetch(`/api/repositorio/monografias?_t=${Date.now()}&gasWebAppUrl=${encodeURIComponent(activeGasUrl)}`, { cache: 'no-store' });
       if (resp.ok) {
         const result = await resp.json();
         if (result?.status === 'success' && Array.isArray(result.data)) {
