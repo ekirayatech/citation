@@ -65,10 +65,8 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
   const userRole = useMemo(() => {
     if (isAdmin) return 'Administrador';
-    const clean = (currentUserEmail || '').trim().toLowerCase();
-    if (clean.endsWith('@est.cem.edu.co')) return 'Estudiante';
-    return 'Docente';
-  }, [isAdmin, currentUserEmail]);
+    return 'Usuario Ekirayá';
+  }, [isAdmin]);
 
   // Filtros
   const [searchQuery, setSearchQuery] = useState('');
@@ -109,7 +107,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     setMonografias(newData);
   };
 
-  // Cargar datos al montar consultando directamente la URL de Apps Script con _t=${Date.now()}
+  // Cargar datos al montar y sincronización en tiempo real (polling + eventos + focus)
   useEffect(() => {
     fetchMonografias();
     fetchUsuarios();
@@ -123,8 +121,23 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
     window.addEventListener('ekiraya_repo_update', handleRepoUpdate);
 
+    // Polling cada 8 segundos para asegurar tiempo real en todos los navegadores y dispositivos (infraestructura distribuida/Vercel)
+    const intervalId = setInterval(() => {
+      fetchMonografias();
+      fetchUsuarios();
+    }, 8000);
+
+    // Refrescar al enfocar la pestaña o ventana
+    const handleFocus = () => {
+      fetchMonografias();
+      fetchUsuarios();
+    };
+    window.addEventListener('focus', handleFocus);
+
     return () => {
       window.removeEventListener('ekiraya_repo_update', handleRepoUpdate);
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
     };
   }, []);
 
