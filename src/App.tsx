@@ -157,10 +157,28 @@ export default function App() {
     }
   };
 
-  const handleOpenCmsModal = () => {
+  const handleOpenCmsModal = async () => {
     if (!isCmsAdminLoggedIn) {
       setCmsLoginModalOpen(true);
       return;
+    }
+    // Verificación robusta en el servidor consultando la hoja "Usuarios" de Google Sheets
+    try {
+      const resp = await fetch('/api/auth/google-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: currentUserEmail }),
+      });
+      const data = await resp.json().catch(() => null);
+      if (!resp.ok || !data?.ok || !data?.isAdmin) {
+        setIsCmsAdminLoggedIn(false);
+        localStorage.removeItem('ekiraya_cms_admin_session');
+        setCmsLoginModalOpen(true);
+        showToast('Verificación de administrador fallida: el usuario no está registrado en la hoja "Usuarios".');
+        return;
+      }
+    } catch {
+      // En caso de red offline temporal, mantenemos sesión si ya estaba validada
     }
     setCmsEditingPageId(null);
     setCmsModalOpen(true);
