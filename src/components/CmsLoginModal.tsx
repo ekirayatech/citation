@@ -58,7 +58,6 @@ export const CmsLoginModal: React.FC<CmsLoginModalProps> = ({
     try {
       setIsLoading(true);
 
-      // Intentar validar contra el backend
       const resp = await fetch('/api/auth/admin-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -67,29 +66,14 @@ export const CmsLoginModal: React.FC<CmsLoginModalProps> = ({
 
       const data = await resp.json().catch(() => null);
 
-      if (resp.ok && data?.ok) {
+      if (resp.ok && data?.ok && data?.isAdmin) {
         onLoginSuccess(cleanEmail);
         return;
       }
 
-      // Si es el administrador principal mebolanos@cem.edu.co
-      if (cleanEmail === 'mebolanos@cem.edu.co') {
-        onLoginSuccess(cleanEmail);
-        return;
-      }
-
-      if (data?.error) {
-        setError(data.error);
-      } else {
-        setError('Credenciales inválidas. Verifica que tu cuenta tenga permisos de Administrador.');
-      }
+      setError(data?.error || 'Credenciales inválidas o contraseña incorrecta. Verifica tus permisos de Administrador.');
     } catch {
-      // Si el backend no responde, validar admin por defecto
-      if (cleanEmail === 'mebolanos@cem.edu.co') {
-        onLoginSuccess(cleanEmail);
-      } else {
-        setError('Error al validar con el servidor. Intenta de nuevo.');
-      }
+      setError('Error al conectar con el servidor de autenticación. Intenta de nuevo.');
     } finally {
       setIsLoading(false);
     }
@@ -97,11 +81,16 @@ export const CmsLoginModal: React.FC<CmsLoginModalProps> = ({
 
   const handleGoogleSsoLogin = async () => {
     setError(null);
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail || !cleanEmail.endsWith('@cem.edu.co')) {
+      setError('Por favor ingresa un correo institucional @cem.edu.co válido para iniciar sesión con Google.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const cleanEmail = (email.trim().toLowerCase().endsWith('@cem.edu.co') ? email.trim().toLowerCase() : 'mebolanos@cem.edu.co');
-      
       const resp = await fetch('/api/auth/google-verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -110,19 +99,14 @@ export const CmsLoginModal: React.FC<CmsLoginModalProps> = ({
 
       const data = await resp.json().catch(() => null);
 
-      if (resp.ok && data?.ok) {
+      if (resp.ok && data?.ok && data?.isAdmin) {
         onLoginSuccess(cleanEmail);
         return;
       }
 
-      // Fallback seguro para cuenta de administrador
-      if (cleanEmail === 'mebolanos@cem.edu.co') {
-        onLoginSuccess(cleanEmail);
-      } else {
-        setError('La cuenta de Google seleccionada no cuenta con privilegios de Administrador del CMS.');
-      }
+      setError(data?.error || 'La cuenta institucional no cuenta con privilegios de Administrador del CMS.');
     } catch {
-      onLoginSuccess('mebolanos@cem.edu.co');
+      setError('Error al verificar la cuenta de Google con el servidor.');
     } finally {
       setIsLoading(false);
     }

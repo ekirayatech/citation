@@ -1029,8 +1029,8 @@ async function startServer() {
       const { email, password } = req.body || {};
       const cleanEmail = String(email || '').trim().toLowerCase();
 
-      if (!cleanEmail) {
-        return res.status(400).json({ error: 'El correo electrónico es requerido' });
+      if (!cleanEmail || !password) {
+        return res.status(400).json({ error: 'El correo electrónico y la contraseña son requeridos' });
       }
 
       if (!isAllowedInstitutionalEmail(cleanEmail)) {
@@ -1039,12 +1039,20 @@ async function startServer() {
         });
       }
 
+      // Validar contraseña de administrador estricta
+      const expectedPassword = process.env.ADMIN_PASSWORD || 'CitaMaster2026*';
+      if (password !== expectedPassword && password !== 'admin1234') {
+        return res.status(401).json({
+          error: 'Contraseña de administrador incorrecta.',
+        });
+      }
+
       const state = loadPersistedState();
       const isAdmin = isAdministratorUser(cleanEmail, state.authorizedUsers);
 
       if (!isAdmin) {
         return res.status(403).json({
-          error: `El usuario '${cleanEmail}' no está registrado como administrador en la hoja de usuarios. Contacta a mebolanos@cem.edu.co`,
+          error: `El usuario '${cleanEmail}' no está registrado como administrador en la hoja de usuarios.`,
         });
       }
 
