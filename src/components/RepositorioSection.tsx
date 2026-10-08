@@ -623,27 +623,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
   };
 
-  // Si el usuario no pertenece a la comunidad educativa
-  if (!isAllowedDomain) {
-    return (
-      <div className="max-w-2xl mx-auto my-12 p-8 bg-white rounded-3xl shadow-xl border border-red-200 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
-          <Lock className="w-8 h-8" />
-        </div>
-        <h2 className="text-2xl font-black text-slate-900 mb-2">Acceso Restringido al Repositorio</h2>
-        <p className="text-slate-600 text-sm mb-6 leading-relaxed">
-          El Repositorio de Monografías y Proyectos de Vida es de uso exclusivo para estudiantes,
-          docentes y personal directivo del <strong>Colegio Ekirayá</strong>.
-          <br />
-          Solo se permiten cuentas con dominio <code>@cem.edu.co</code> o <code>@est.cem.edu.co</code>.
-        </p>
-        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-700">
-          Cuenta detectada: <strong>{currentUserEmail || 'No autenticado'}</strong>
-        </div>
-      </div>
-    );
-  }
-
+  // Todos los usuarios pueden ver el repositorio (las herramientas administrativas están protegidas por isAdmin)
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
       {/* 1. Header Principal del Repositorio */}
