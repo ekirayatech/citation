@@ -242,27 +242,27 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
    * y seguidamente ejecuta una consulta GET fresca para actualizar la interfaz,
    * eliminando cualquier lógica de combinación o caché local.
    */
+    /**
+   * Sincronización estricta POST-then-GET: Realiza POST para sincronizar Drive
+   * y seguidamente consulta GET fresca a getMonografias, sobrescribiendo
+   * por completo el estado monografias e ignorando cualquier estado local anterior.
+   */
   const handleSyncDrive = async (overrideUrl?: string) => {
     if (isSyncing) {
       return;
     }
-
     if (!isAdmin) {
       showToast('Acceso denegado: Solo el Administrador puede solicitar sincronización.');
       return;
     }
-
     const activeUrl = (overrideUrl || gasWebAppUrl || getCentralGasUrl()).trim();
-
     if (!activeUrl || !activeUrl.includes('script.google.com')) {
       setTempGasUrl(activeUrl);
       setIsGasUrlModalOpen(true);
       showToast('Por favor conecta la URL de tu Google Apps Script para sincronizar.');
       return;
     }
-
     setIsSyncing(true);
-
     try {
       // 1. POST para el endpoint de sincronización
       const syncUrl = `${activeUrl}${activeUrl.includes('?') ? '&' : '?'}action=syncDrive&_t=${Date.now()}`;
@@ -275,7 +275,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         // Ignorar errores de CORS en POST hacia Apps Script
       });
 
-      // 2. Consulta GET fresca para actualizar la interfaz
+      // 2. Consulta GET fresca inmediata a 'getMonografias'
       const getMonoUrl = `${activeUrl}${activeUrl.includes('?') ? '&' : '?'}action=getMonografias&_t=${Date.now()}`;
       const monoResp = await fetch(getMonoUrl, {
         method: 'GET',
@@ -286,6 +286,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       if (monoResp.ok) {
         const monoResult = await monoResp.json();
         if (monoResult?.status === 'success' && Array.isArray(monoResult.data)) {
+          // Sobrescribir por completo el estado monografias con los datos del servidor, ignorando estado local previo
           setMonografias(monoResult.data);
           setCurrentPage(1);
           showToast(`¡Sincronización completada! Se cargaron ${monoResult.data.length} registros.`);
@@ -293,7 +294,6 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           return;
         }
       }
-
       await fetchMonografias();
       showToast('Sincronización completada correctamente.');
     } catch (err: any) {
@@ -303,7 +303,6 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     }
   };
 
-  // Probar conexión en vivo con la Web App de Google Apps Script
   const handleTestGasConnection = async () => {
     const url = tempGasUrl.trim();
     if (!url || !url.includes('script.google.com')) {
