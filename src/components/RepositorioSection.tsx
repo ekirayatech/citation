@@ -91,6 +91,21 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     Sección: 'Bachillerato',
     Perfil: 'Estudiante',
   });
+
+  // Función auxiliar para actualizar monografías, persistir en caché y propagar a otras pestañas/terminales
+  const updateMonografiasState = (newData: MonografiaItem[]) => {
+    setMonografias(newData);
+    localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(newData));
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('ekiraya_repo_channel');
+        bc.postMessage({ type: 'UPDATE_MONOGRAFIAS', data: newData });
+        bc.close();
+      }
+    } catch {
+      // Ignore
+    }
+  };
   const [userActionError, setUserActionError] = useState<string | null>(null);
 
   // Verificación de autenticación y rol
@@ -107,7 +122,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     ? 'Estudiante'
     : 'Docente';
 
-  // Cargar datos al montar y escuchar actualizaciones en tiempo real entre terminales
+  // Cargar datos al montar y escuchar actualizaciones en tiempo real entre terminales y pestañas
   useEffect(() => {
     fetchMonografias();
     fetchUsuarios();
@@ -117,12 +132,49 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       if (Array.isArray(customEvent.detail)) {
         setMonografias(customEvent.detail);
         localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(customEvent.detail));
-        showToast('¡Repositorio actualizado en tiempo real desde el servidor!');
       }
     };
+
+    // Escuchar eventos de almacenamiento local entre pestañas / terminales
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'ekiraya_monografias_cache_v3' && e.newValue) {
+        try {
+          const updated = JSON.parse(e.newValue);
+          if (Array.isArray(updated) && updated.length > 0) {
+            setMonografias(updated);
+          }
+        } catch {
+          // Ignore
+        }
+      }
+      if (e.key === 'ekiraya_gas_webapp_url' && e.newValue) {
+        setGasWebAppUrl(e.newValue);
+      }
+    };
+
+    // BroadcastChannel para sincronización instantánea entre pestañas/terminales del mismo origen
+    let bc: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel('ekiraya_repo_channel');
+        bc.onmessage = (msg) => {
+          if (msg.data?.type === 'UPDATE_MONOGRAFIAS' && Array.isArray(msg.data.data)) {
+            setMonografias(msg.data.data);
+            localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(msg.data.data));
+          }
+        };
+      }
+    } catch {
+      // Ignore
+    }
+
     window.addEventListener('ekiraya_repo_update', handleRepoUpdate);
+    window.addEventListener('storage', handleStorageChange);
+
     return () => {
       window.removeEventListener('ekiraya_repo_update', handleRepoUpdate);
+      window.removeEventListener('storage', handleStorageChange);
+      if (bc) bc.close();
     };
   }, []);
 
@@ -146,14 +198,17 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       }
     }
 
-    // 2. Si no hay GAS o falló, intentar desde el backend local si existe
+    // 2. Intentar desde el backend local si existe
     try {
       const resp = await fetch('/api/repositorio/monografias');
       if (resp.ok) {
         const result = await resp.json();
         if (result.status === 'success' && Array.isArray(result.data) && result.data.length > 0) {
-          setMonografias(result.data);
-          localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(result.data));
+          // Solo actualizar si trae igual o más datos para evitar sobreescribir con datos por defecto obsoletos
+          if (result.data.length >= monografias.length) {
+            setMonografias(result.data);
+            localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(result.data));
+          }
         }
       }
     } catch {
@@ -237,8 +292,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         if (monoResp.ok) {
           const monoResult = await monoResp.json();
           if (monoResult?.status === 'success' && Array.isArray(monoResult.data)) {
-            setMonografias(monoResult.data);
-            localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(monoResult.data));
+            updateMonografiasState(monoResult.data);
             showToast(`¡Sincronización en vivo con Google completada! Se actualizaron ${monoResult.data.length} monografías desde Sheets y Drive.`);
             setIsSyncing(false);
             return;
@@ -263,8 +317,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           const data = await resp.json();
           if (data.status === 'success') {
             if (Array.isArray(data.data?.monografias)) {
-              setMonografias(data.data.monografias);
-              localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(data.data.monografias));
+              updateMonografiasState(data.data.monografias);
             } else {
               await fetchMonografias();
             }
@@ -317,8 +370,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         setTestConnectionStatus('success');
         setTestConnectionMessage(`¡Conexión exitosa! Se leyeron ${result.data?.length || 0} monografías directamente desde tu hoja de Google Sheets.`);
         if (Array.isArray(result.data) && result.data.length > 0) {
-          setMonografias(result.data);
-          localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(result.data));
+          updateMonografiasState(result.data);
         }
       } else {
         setTestConnectionStatus('error');
@@ -408,8 +460,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       }
 
       if (parsedItems.length > 0) {
-        setMonografias(parsedItems);
-        localStorage.setItem('ekiraya_monografias_cache_v3', JSON.stringify(parsedItems));
+        updateMonografiasState(parsedItems);
         setIsImportCsvModalOpen(false);
         setCsvPasteText('');
         showToast(`¡Importación exitosa! Se cargaron ${parsedItems.length} monografías desde Sheets.`);
@@ -589,9 +640,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     selectedAnio !== 'TODOS' ||
     selectedGrado !== 'TODOS';
 
-  const displayedMonografias = isFiltering
-    ? filteredMonografias
-    : filteredMonografias.slice(0, 3);
+  const displayedMonografias = filteredMonografias;
 
   // Si el usuario no pertenece a la comunidad educativa
   if (!isAllowedDomain) {
@@ -924,19 +973,29 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       </div>
 
       {/* 3. Cuadrícula de Columnas con Tarjetas de Monografía */}
-      {!isFiltering && monografias.length > 3 && (
-        <div className="bg-gradient-to-r from-violet-50 via-purple-50 to-indigo-50 border border-violet-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-violet-900 shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <Sparkles className="w-5 h-5 text-[#664d88] shrink-0" />
-            <div>
-              <span className="font-bold">Vista de prueba (3 monografías visibles de {monografias.length}):</span> Usa los filtros de Unidad Académica, Año, Grado o la barra de búsqueda para explorar todas las monografías según tu criterio.
-            </div>
+      <div className="bg-gradient-to-r from-violet-50 via-purple-50 to-indigo-50 border border-violet-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-violet-900 shadow-xs">
+        <div className="flex items-center gap-2.5">
+          <Sparkles className="w-5 h-5 text-[#664d88] shrink-0" />
+          <div>
+            <span className="font-bold">Mostrando {displayedMonografias.length} de {monografias.length} monografías registradas</span>
+            {isFiltering && ' (según filtros seleccionados)'}.
           </div>
-          <span className="px-3 py-1 rounded-xl bg-[#664d88]/10 text-[#664d88] font-bold shrink-0">
-            Filtra para ver más
-          </span>
         </div>
-      )}
+        {isFiltering && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedUnidad('TODAS');
+              setSelectedAnio('TODOS');
+              setSelectedGrado('TODOS');
+              setSearchQuery('');
+            }}
+            className="px-3 py-1.5 rounded-xl bg-[#664d88] text-white font-bold hover:bg-[#533e6f] transition-colors cursor-pointer shrink-0"
+          >
+            Limpiar Filtros
+          </button>
+        )}
+      </div>
 
       {filteredMonografias.length === 0 ? (
         <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-sm">
