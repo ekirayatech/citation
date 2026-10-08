@@ -1851,40 +1851,27 @@ async function startServer() {
   // Endpoint: GET /api/repo/getMonografias (y alias /api/repo/monografias) con consulta en tiempo real a Google Sheets/Apps Script
   const handleGetMonografias = async (req: express.Request, res: express.Response) => {
     try {
-      const state = loadPersistedState();
       const clientGasUrl = String(req.query.gasWebAppUrl || req.headers['x-gas-url'] || '').trim();
-      const scriptUrl = extractValidAppsScriptUrl(
-        clientGasUrl || state.appsScriptExecUrl || process.env.VITE_APPS_SCRIPT_URL || process.env.VITE_GAS_WEBAPP_URL
-      );
-      if (scriptUrl) {
-        try {
-          const sep = scriptUrl.includes('?') ? '&' : '?';
-          const liveUrl = `${scriptUrl}${sep}action=getMonografias&_t=${Date.now()}`;
-          const resp = await fetch(liveUrl, {
-            method: 'GET',
-            redirect: 'follow',
-            signal: AbortSignal.timeout(6000),
-          });
-          const text = await resp.text();
-          if (text && !isHtmlContent(text)) {
-            const json = JSON.parse(text);
-            if (json?.status === 'success' && Array.isArray(json.data)) {
-              res.json({
-                status: 'success',
-                total: json.data.length,
-                headers: json.headers || state.rawHeaders,
-                data: json.data,
-                timestamp: new Date().toISOString(),
-                source: 'live_google_sheets',
-              });
-              return;
-            }
-          }
-        } catch {
-          // Fallback a estado local si la red falla
-        }
+      
+      // Intentar obtener datos frescos mediante la lógica unificada de sincronización con Google Sheets / Apps Script
+      const syncResult = await executeServerSyncLogic({
+        appsScriptExecUrl: clientGasUrl,
+        triggerDriveScan: false,
+      });
+
+      if (syncResult && syncResult.ok && Array.isArray(syncResult.rows) && syncResult.rows.length > 0) {
+        res.json({
+          status: 'success',
+          total: syncResult.rows.length,
+          headers: syncResult.headers || DEFAULT_REPO_HEADERS,
+          data: syncResult.rows,
+          timestamp: new Date().toISOString(),
+          source: 'live_google_sheets_sync',
+        });
+        return;
       }
 
+      const state = loadPersistedState();
       res.json({
         status: 'success',
         total: state.rawRows.length,
@@ -1894,9 +1881,14 @@ async function startServer() {
         source: 'local_state',
       });
     } catch (err) {
-      res.status(500).json({
-        status: 'error',
-        message: err instanceof Error ? err.message : 'Error obteniendo monografías',
+      const state = loadPersistedState();
+      res.json({
+        status: 'success',
+        total: state.rawRows.length,
+        headers: state.rawHeaders,
+        data: state.rawRows,
+        timestamp: new Date().toISOString(),
+        source: 'fallback_state',
       });
     }
   };
