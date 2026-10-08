@@ -344,51 +344,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     setIsSyncing(true);
 
     try {
-      // 2. Ejecutar syncDrive de forma única y atómica
-      // Usamos GET con action=syncDrive que en Apps Script ejecuta la sincronización
-      // y retorna JSON limpio evitando los bloqueos por redirección 302 de POST en navegadores.
-      let syncExecuted = false;
-      let syncStats: any = null;
-
-      try {
-        const syncUrl = `${activeUrl}${activeUrl.includes('?') ? '&' : '?'}action=syncDrive&email=${encodeURIComponent(currentUserEmail)}&_t=${Date.now()}`;
-        const syncResp = await fetch(syncUrl, {
-          method: 'GET',
-          cache: 'no-store',
-          redirect: 'follow',
-        });
-        if (syncResp.ok) {
-          const syncJson = await syncResp.json();
-          if (syncJson?.status === 'success') {
-            syncExecuted = true;
-            syncStats = syncJson.data;
-          }
-        }
-      } catch (directErr) {
-        console.warn('Invocación directa GET syncDrive falló, intentando vía backend proxy:', directErr);
-      }
-
-      // Si la llamada directa falló (por ejemplo por políticas de red del cliente), recurrir al servidor una sola vez
-      if (!syncExecuted) {
-        try {
-          const srvResp = await fetch('/api/repositorio/syncDrive', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userEmail: currentUserEmail,
-              gasWebAppUrl: activeUrl,
-            }),
-          });
-          if (srvResp.ok) {
-            syncExecuted = true;
-          }
-        } catch (srvErr) {
-          console.warn('Proxy de sincronización falló:', srvErr);
-        }
-      }
-
-      // 3. Ejecutar inmediatamente GET getMonografias con cache-busting
-      // Apps Script lee Google Sheets y devuelve el catálogo actualizado
+      // 2. Consultar directamente a Google Sheets mediante getMonografias (la fuente de verdad manual)
       const getMonoUrl = `${activeUrl}${activeUrl.includes('?') ? '&' : '?'}action=getMonografias&_t=${Date.now()}`;
       const monoResp = await fetch(getMonoUrl, {
         method: 'GET',
@@ -399,13 +355,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       if (monoResp.ok) {
         const monoResult = await monoResp.json();
         if (monoResult?.status === 'success' && Array.isArray(monoResult.data)) {
-          // 4. Reemplazar completamente el catálogo mostrado
+          // Reemplazar completamente el catálogo mostrado con los datos actualizados de Sheets
           updateMonografiasState(monoResult.data);
           setCurrentPage(1);
-          const detalle = syncStats?.nuevosInsertados !== undefined
-            ? ` (${syncStats.nuevosInsertados} nuevos documentos insertados, ${syncStats.omitidosYaExistian || 0} omitidos por ya existir)`
-            : '';
-          showToast(`¡Sincronización con Drive y Sheets completada con éxito!${detalle}`);
+          showToast(`¡Sincronización con Google Sheets completada con éxito! Se cargaron ${monoResult.data.length} monografías.`);
           setIsSyncing(false);
           return;
         }
@@ -427,10 +380,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         // Continue
       }
 
-      showToast('Sincronización ejecutada en Google Apps Script. Actualizando datos...');
+      showToast('Actualizando datos desde Google Sheets...');
       await fetchMonografias();
     } catch (err: any) {
-      showToast(`Error al sincronizar con Google: ${err.message || 'Verifica la URL de la Web App'}`);
+      showToast(`Error al consultar Google Sheets: ${err.message || 'Verifica la URL de la Web App'}`);
       setIsGasUrlModalOpen(true);
     } finally {
       setIsSyncing(false);
@@ -912,7 +865,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                   title="Sincronizar en vivo con Google Drive y Sheets"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span>{isSyncing ? 'Sincronizando con Google...' : 'Sincronizar Drive & Sheets'}</span>
+                  <span>{isSyncing ? 'Sincronizando con Google...' : 'Sincronizar Sheets'}</span>
                 </button>
 
                 {/* Botón Importar / Pegar Datos */}
