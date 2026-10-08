@@ -52,6 +52,23 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   const [isRevalidating, setIsRevalidating] = useState<boolean>(false);
 
   const [usuarios, setUsuarios] = useState<UsuarioItem[]>([]);
+  const [userActionError, setUserActionError] = useState<string | null>(null);
+
+  const isAllowedDomain = useMemo(() => {
+    const clean = (currentUserEmail || '').trim().toLowerCase();
+    return clean.endsWith('@cem.edu.co') || clean.endsWith('@est.cem.edu.co');
+  }, [currentUserEmail]);
+
+  const isAdmin = useMemo(() => {
+    return isAdminLoggedIn || (currentUserEmail || '').trim().toLowerCase() === 'mebolanos@cem.edu.co';
+  }, [isAdminLoggedIn, currentUserEmail]);
+
+  const userRole = useMemo(() => {
+    if (isAdmin) return 'Administrador';
+    const clean = (currentUserEmail || '').trim().toLowerCase();
+    if (clean.endsWith('@est.cem.edu.co')) return 'Estudiante';
+    return 'Docente';
+  }, [isAdmin, currentUserEmail]);
 
   // Filtros
   const [searchQuery, setSearchQuery] = useState('');

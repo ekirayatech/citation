@@ -634,7 +634,7 @@ export default function App() {
 
           {/* Fila 2 (Desktop & Tablet): Pestañas de Navegación limpias, espaciosas y centradas/distribuidas */}
           <div className="hidden md:flex items-center justify-between py-2">
-            <nav aria-label="Navegación principal" className="flex items-center gap-2 flex-wrap">
+            <nav aria-label="Navegación principal" className="flex items-center gap-2 overflow-x-auto whitespace-nowrap py-1 scrollbar-none">
               {navItems.map((item) => {
                 const isActive = activeTab === item.id;
                 return (
