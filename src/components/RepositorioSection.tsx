@@ -46,8 +46,19 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   currentUserEmail = '',
   isAdminLoggedIn = false,
 }) => {
-  // Estado principal sin dependencias de localStorage
-  const [monografias, setMonografias] = useState<MonografiaItem[]>([]);
+  // Estado principal con inicialización robusta en localStorage o DEFAULT_REPO_ROWS para garantizar carga en Vercel y todos los dispositivos
+  const [monografias, setMonografias] = useState<MonografiaItem[]>(() => {
+    try {
+      const cached = localStorage.getItem('ekiraya_cached_monografias');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return DEFAULT_REPO_ROWS as MonografiaItem[];
+  });
   const [isLoadingMonografias, setIsLoadingMonografias] = useState<boolean>(true);
   const [isRevalidating, setIsRevalidating] = useState<boolean>(false);
 
@@ -145,10 +156,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
    * Consulta GET a la URL de Apps Script con _t=${Date.now()} para evitar caché,
    * asignando los resultados directamente al estado sin comparativas.
    */
-  const fetchMonografias = async () => {
+    const fetchMonografias = async () => {
     setIsLoadingMonografias(true);
     let resolvedUrl = (gasWebAppUrl || getCentralGasUrl()).trim();
-
     if (!resolvedUrl || !resolvedUrl.includes('script.google.com')) {
       try {
         const cfgResp = await fetch('/api/repositorio/config', { cache: 'no-store' });
@@ -163,7 +173,6 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         // Ignorar
       }
     }
-
     if (resolvedUrl && resolvedUrl.includes('script.google.com')) {
       try {
         const getMonoUrl = `${resolvedUrl}${resolvedUrl.includes('?') ? '&' : '?'}action=getMonografias&_t=${Date.now()}`;
@@ -174,8 +183,11 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         });
         if (monoResp.ok) {
           const result = await monoResp.json();
-          if (result?.status === 'success' && Array.isArray(result.data)) {
+          if (result?.status === 'success' && Array.isArray(result.data) && result.data.length > 0) {
             setMonografias(result.data);
+            try {
+              localStorage.setItem('ekiraya_cached_monografias', JSON.stringify(result.data));
+            } catch {}
             setIsLoadingMonografias(false);
             return;
           }
@@ -184,22 +196,40 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         console.warn('Advertencia consultando Google Apps Script directamente:', err);
       }
     }
-
-    // Fallback técnico si Apps Script no está disponible
+    // Fallback técnico si Apps Script no está disponible o da CORS en estático (Vercel)
     try {
       const activeGasUrl = (gasWebAppUrl || getCentralGasUrl()).trim();
       const resp = await fetch(`/api/repositorio/monografias?_t=${Date.now()}&gasWebAppUrl=${encodeURIComponent(activeGasUrl)}`, { cache: 'no-store' });
       if (resp.ok) {
         const result = await resp.json();
-        if (result?.status === 'success' && Array.isArray(result.data)) {
+        if (result?.status === 'success' && Array.isArray(result.data) && result.data.length > 0) {
           setMonografias(result.data);
+          try {
+            localStorage.setItem('ekiraya_cached_monografias', JSON.stringify(result.data));
+          } catch {}
+          setIsLoadingMonografias(false);
+          return;
         }
       }
     } catch {
       // Ignorar
-    } finally {
-      setIsLoadingMonografias(false);
     }
+
+    // Último recurso de respaldo si la red falló: mantener caché previa o DEFAULT_REPO_ROWS
+    try {
+      const cached = localStorage.getItem('ekiraya_cached_monografias');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMonografias(parsed);
+          setIsLoadingMonografias(false);
+          return;
+        }
+      }
+    } catch {}
+
+    setMonografias((prev) => (prev.length > 0 ? prev : (DEFAULT_REPO_ROWS as MonografiaItem[])));
+    setIsLoadingMonografias(false);
   };
 
   const fetchUsuarios = async () => {
