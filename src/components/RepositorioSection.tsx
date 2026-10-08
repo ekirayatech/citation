@@ -27,6 +27,8 @@ import {
   ArrowRight,
   Maximize2,
   SlidersHorizontal,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { MonografiaItem, UsuarioItem, RepositorioStats, UserPerfilRole } from '../types/repositorio';
 import { GOOGLE_APPS_SCRIPT_CODE } from '../data/gasScriptCode';
@@ -44,11 +46,43 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   currentUserEmail = 'mebolanos@cem.edu.co',
   isAdminLoggedIn = false,
 }) => {
-  // Estado principal de datos: Google Sheets es la fuente central y única de verdad
+  // Clave de almacenamiento en sessionStorage para Stale-While-Revalidate
+  const SESSION_CACHE_KEY_MONOGRAFIAS = 'ekiraya_monografias_session_cache_v1';
+
+  // Helper para leer datos previamente almacenados en la sesión (Stale data)
+  const getInitialStaleData = (): MonografiaItem[] | null => {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        const stored = window.sessionStorage.getItem(SESSION_CACHE_KEY_MONOGRAFIAS);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      }
+    } catch {
+      // Ignorar excepciones de lectura en sessionStorage
+    }
+    return null;
+  };
+
+  const initialStaleItems = getInitialStaleData();
+
+  // Estado principal con 'Stale-While-Revalidate':
+  // 1. Mostrar de inmediato los datos de la sesión anterior (0ms de tiempo percibido)
+  // 2. Revalidar en segundo plano consultando en vivo a Google Apps Script -> Google Sheets
   const [monografias, setMonografias] = useState<MonografiaItem[]>(() => {
-    return (DEFAULT_REPO_ROWS as unknown as MonografiaItem[]) || [];
+    return initialStaleItems || (DEFAULT_REPO_ROWS as unknown as MonografiaItem[]) || [];
   });
-  const [isLoadingMonografias, setIsLoadingMonografias] = useState<boolean>(true);
+
+  // Solo bloqueamos con pantalla de carga si NO había datos previos en sessionStorage
+  const [isLoadingMonografias, setIsLoadingMonografias] = useState<boolean>(() => {
+    return initialStaleItems === null;
+  });
+
+  // Indicador de revalidación activa en segundo plano (SWR)
+  const [isRevalidating, setIsRevalidating] = useState<boolean>(true);
 
   const [usuarios, setUsuarios] = useState<UsuarioItem[]>(() => {
     return (DEFAULT_AUTHORIZED_USERS as unknown as UsuarioItem[]) || [];
@@ -88,9 +122,21 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     Perfil: 'Estudiante',
   });
 
-  // Actualiza el catálogo en memoria y notifica pestañas del mismo navegador (sin persistir caché local como verdad)
+  // Persistir en sessionStorage para próximas visitas en la misma sesión (SWR)
+  const saveToSessionCache = (data: MonografiaItem[]) => {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage && Array.isArray(data) && data.length > 0) {
+        window.sessionStorage.setItem(SESSION_CACHE_KEY_MONOGRAFIAS, JSON.stringify(data));
+      }
+    } catch {
+      // Ignorar restricciones de cuota de sessionStorage
+    }
+  };
+
+  // Actualiza el catálogo en memoria, persiste en sessionStorage y notifica pestañas del mismo navegador
   const updateMonografiasState = (newData: MonografiaItem[]) => {
     setMonografias(newData);
+    saveToSessionCache(newData);
     try {
       if (typeof BroadcastChannel !== 'undefined') {
         const bc = new BroadcastChannel('ekiraya_repo_channel');
@@ -144,6 +190,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         bc.onmessage = (msg) => {
           if (msg.data?.type === 'UPDATE_MONOGRAFIAS' && Array.isArray(msg.data.data)) {
             setMonografias(msg.data.data);
+            saveToSessionCache(msg.data.data);
           }
         };
       }
@@ -162,12 +209,14 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   }, []);
 
   /**
-   * Consulta centralizada de monografías:
-   * 1. Google Apps Script -> Google Sheets (FUENTE CENTRAL Y ÚNICA DE VERDAD con cache busting)
-   * 2. Únicamente si Apps Script no está configurado o falla, usar /api/repositorio/monografias como fallback técnico.
+   * Consulta centralizada de monografías con 'Stale-While-Revalidate':
+   * 1. Si existen datos en sessionStorage se mostraron de inmediato (sin espera).
+   * 2. Revalida en segundo plano consultando en vivo a Google Apps Script -> Google Sheets con cache-busting.
+   * 3. Al recibir datos frescos, actualiza el estado y persiste en sessionStorage.
+   * 4. Si Apps Script no responde o falla, recurre al backend como fallback técnico.
    */
   const fetchMonografias = async () => {
-    setIsLoadingMonografias(true);
+    setIsRevalidating(true);
     let resolvedUrl = (gasWebAppUrl || getCentralGasUrl()).trim();
 
     // Si aún no tenemos la URL en memoria o localStorage, consultar al servidor si existe una configurada
@@ -198,9 +247,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         if (monoResp.ok) {
           const result = await monoResp.json();
           if (result?.status === 'success' && Array.isArray(result.data)) {
-            // Google Sheets tiene prioridad absoluta: reemplazar inmediatamente el catálogo
-            setMonografias(result.data);
+            // Revalidación completada: actualizar catálogo en memoria y en sessionStorage
+            updateMonografiasState(result.data);
             setIsLoadingMonografias(false);
+            setIsRevalidating(false);
             return;
           }
         }
@@ -215,13 +265,14 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       if (resp.ok) {
         const result = await resp.json();
         if (result?.status === 'success' && Array.isArray(result.data)) {
-          setMonografias(result.data);
+          updateMonografiasState(result.data);
         }
       }
     } catch {
-      // Mantener catálogo estático de fallback
+      // Mantener catálogo previo o de sesión
     } finally {
       setIsLoadingMonografias(false);
+      setIsRevalidating(false);
     }
   };
 
@@ -269,6 +320,11 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
    * 4. Apps Script lee Sheets -> setMonografias(datos_actualizados)
    */
   const handleSyncDrive = async (overrideUrl?: string) => {
+    // 0. Evitar ejecuciones simultáneas accidentales
+    if (isSyncing) {
+      return;
+    }
+
     // 1. Verificar que el usuario tenga permisos
     if (!isAdmin) {
       showToast('Acceso denegado: Solo el Administrador puede solicitar sincronización con Drive.');
@@ -288,26 +344,34 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     setIsSyncing(true);
 
     try {
-      // 2. Ejecutar syncDrive mediante POST con JSON a Google Apps Script
-      const postPayload = {
-        action: 'syncDrive',
-        userEmail: currentUserEmail,
-      };
+      // 2. Ejecutar syncDrive de forma única y atómica
+      // Usamos GET con action=syncDrive que en Apps Script ejecuta la sincronización
+      // y retorna JSON limpio evitando los bloqueos por redirección 302 de POST en navegadores.
+      let syncExecuted = false;
+      let syncStats: any = null;
 
       try {
-        await fetch(activeUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'text/plain;charset=utf-8',
-          },
-          body: JSON.stringify(postPayload),
+        const syncUrl = `${activeUrl}${activeUrl.includes('?') ? '&' : '?'}action=syncDrive&email=${encodeURIComponent(currentUserEmail)}&_t=${Date.now()}`;
+        const syncResp = await fetch(syncUrl, {
+          method: 'GET',
+          cache: 'no-store',
           redirect: 'follow',
         });
-      } catch (postErr) {
-        console.warn('Advertencia en POST syncDrive directo a Google Apps Script:', postErr);
-        // Fallback técnico en entorno de desarrollo local
+        if (syncResp.ok) {
+          const syncJson = await syncResp.json();
+          if (syncJson?.status === 'success') {
+            syncExecuted = true;
+            syncStats = syncJson.data;
+          }
+        }
+      } catch (directErr) {
+        console.warn('Invocación directa GET syncDrive falló, intentando vía backend proxy:', directErr);
+      }
+
+      // Si la llamada directa falló (por ejemplo por políticas de red del cliente), recurrir al servidor una sola vez
+      if (!syncExecuted) {
         try {
-          await fetch('/api/repositorio/syncDrive', {
+          const srvResp = await fetch('/api/repositorio/syncDrive', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -315,8 +379,11 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               gasWebAppUrl: activeUrl,
             }),
           });
-        } catch {
-          // Continuar al paso siguiente
+          if (srvResp.ok) {
+            syncExecuted = true;
+          }
+        } catch (srvErr) {
+          console.warn('Proxy de sincronización falló:', srvErr);
         }
       }
 
@@ -334,7 +401,11 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         if (monoResult?.status === 'success' && Array.isArray(monoResult.data)) {
           // 4. Reemplazar completamente el catálogo mostrado
           updateMonografiasState(monoResult.data);
-          showToast(`¡Sincronización con Drive y Sheets completada con éxito! Se actualizaron ${monoResult.data.length} monografías directamente desde Google Sheets.`);
+          setCurrentPage(1);
+          const detalle = syncStats?.nuevosInsertados !== undefined
+            ? ` (${syncStats.nuevosInsertados} nuevos documentos insertados, ${syncStats.omitidosYaExistian || 0} omitidos por ya existir)`
+            : '';
+          showToast(`¡Sincronización con Drive y Sheets completada con éxito!${detalle}`);
           setIsSyncing(false);
           return;
         }
@@ -661,7 +732,44 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     selectedAnio !== 'TODOS' ||
     selectedGrado !== 'TODOS';
 
-  const displayedMonografias = filteredMonografias;
+  // Paginación estricta de 12 monografías por página
+  const ITEMS_PER_PAGE = 12;
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  // Total de páginas calculado sobre el catálogo filtrado completo
+  const totalPages = Math.max(1, Math.ceil(filteredMonografias.length / ITEMS_PER_PAGE));
+
+  // Volver a la página 1 cuando cambia la búsqueda o cualquiera de los filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedUnidad, selectedAnio, selectedGrado]);
+
+  // Restablecer a una página válida si la cantidad de resultados se reduce o tras sincronizar
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  // Selección exclusiva de las monografías de la página actual
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const displayedMonografias = useMemo(() => {
+    return filteredMonografias.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredMonografias, startIndex]);
+
+  // Generador de números de página para navegación con elipsis limpia
+  const getPageNumbers = () => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (currentPage <= 4) {
+      return [1, 2, 3, 4, 5, '...', totalPages];
+    }
+    if (currentPage >= totalPages - 3) {
+      return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    }
+    return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+  };
 
   // Si el usuario no pertenece a la comunidad educativa
   if (!isAllowedDomain) {
@@ -996,7 +1104,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       {/* 3. Cuadrícula de Columnas con Tarjetas de Monografía */}
       <div className="bg-gradient-to-r from-violet-50 via-purple-50 to-indigo-50 border border-violet-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-violet-900 shadow-xs">
         <div className="flex items-center gap-2.5">
-          {isLoadingMonografias ? (
+          {isRevalidating ? (
             <RefreshCw className="w-5 h-5 text-[#664d88] shrink-0 animate-spin" />
           ) : (
             <Sparkles className="w-5 h-5 text-[#664d88] shrink-0" />
@@ -1005,9 +1113,17 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             <span className="font-bold">
               {isLoadingMonografias
                 ? 'Consultando Google Sheets en tiempo real...'
-                : `Mostrando ${displayedMonografias.length} de ${monografias.length} monografías registradas`}
+                : filteredMonografias.length === 0
+                ? 'No se encontraron monografías'
+                : `Mostrando ${startIndex + 1}–${Math.min(startIndex + ITEMS_PER_PAGE, filteredMonografias.length)} de ${filteredMonografias.length} monografías registradas (Página ${currentPage} de ${totalPages})`}
             </span>
-            {!isLoadingMonografias && isFiltering && ' (según filtros seleccionados)'}.
+            {isRevalidating && !isLoadingMonografias && (
+              <span className="ml-2 text-[11px] text-[#664d88] font-semibold bg-violet-100/90 border border-violet-200/80 px-2 py-0.5 rounded-full inline-flex items-center gap-1.5 shadow-2xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#664d88] animate-ping" />
+                Actualizando en segundo plano desde Google Sheets...
+              </span>
+            )}
+            {!isLoadingMonografias && !isRevalidating && isFiltering && ' (según filtros seleccionados)'}.
           </div>
         </div>
         {isFiltering && (
@@ -1018,6 +1134,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               setSelectedAnio('TODOS');
               setSelectedGrado('TODOS');
               setSearchQuery('');
+              setCurrentPage(1);
             }}
             className="px-3 py-1.5 rounded-xl bg-[#664d88] text-white font-bold hover:bg-[#533e6f] transition-colors cursor-pointer shrink-0"
           >
@@ -1049,8 +1166,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {displayedMonografias.map((doc, idx) => {
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {displayedMonografias.map((doc, idx) => {
             const docId = doc.documento_id || `doc_${idx}`;
             const isExpanded = Boolean(expandedAbstracts[docId]);
             const unidad = doc['Unidad Académica'] || doc['unidad_academica'] || 'General';
@@ -1191,7 +1309,80 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             );
           })}
         </div>
-      )}
+
+        {/* 4. Barra de Paginación */}
+        {filteredMonografias.length > 0 && totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 pb-2 border-t border-slate-200">
+            <div className="text-xs text-slate-500 font-medium order-2 sm:order-1">
+              Mostrando monografías{' '}
+              <strong className="text-slate-800">
+                {startIndex + 1}–{Math.min(startIndex + ITEMS_PER_PAGE, filteredMonografias.length)}
+              </strong>{' '}
+              de <strong className="text-slate-800">{filteredMonografias.length}</strong> (Página{' '}
+              <strong className="text-[#664d88]">{currentPage}</strong> de {totalPages})
+            </div>
+
+            <div className="flex items-center gap-1.5 order-1 sm:order-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentPage((p) => Math.max(1, p - 1));
+                  window.scrollTo({ top: 380, behavior: 'smooth' });
+                }}
+                disabled={currentPage === 1}
+                className="px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all border cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-2xs"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>Anterior</span>
+              </button>
+
+              <div className="flex items-center gap-1">
+                {getPageNumbers().map((pageItem, pIdx) => {
+                  if (typeof pageItem === 'string') {
+                    return (
+                      <span key={`dots-${pIdx}`} className="px-2 text-xs text-slate-400 font-bold select-none">
+                        ...
+                      </span>
+                    );
+                  }
+                  const isActive = pageItem === currentPage;
+                  return (
+                    <button
+                      key={`page-${pageItem}`}
+                      type="button"
+                      onClick={() => {
+                        setCurrentPage(pageItem);
+                        window.scrollTo({ top: 380, behavior: 'smooth' });
+                      }}
+                      className={`w-9 h-9 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
+                        isActive
+                          ? 'bg-[#664d88] text-white shadow-xs'
+                          : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                      }`}
+                    >
+                      {pageItem}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentPage((p) => Math.min(totalPages, p + 1));
+                  window.scrollTo({ top: 380, behavior: 'smooth' });
+                }}
+                disabled={currentPage === totalPages}
+                className="px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all border cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-2xs"
+              >
+                <span>Siguiente</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    )}
 
       {/* 4. Modal de Previsualización de Documento PDF */}
       {previewDoc && (

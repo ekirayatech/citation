@@ -2353,6 +2353,12 @@ async function startServer() {
               headers = Object.keys(firstItem);
               rows = data.items;
             }
+          } else if (Array.isArray(data?.data) && data.data.length > 0) {
+            const firstItem = data.data[0];
+            if (firstItem && typeof firstItem === 'object') {
+              headers = Object.keys(firstItem);
+              rows = data.data;
+            }
           }
         }
       } catch {

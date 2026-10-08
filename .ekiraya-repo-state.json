@@ -1,10 +1,10 @@
 {
-  "appsScriptExecUrl": "",
+  "appsScriptExecUrl": "https://script.google.com/macros/s/AKfycbyXv5xr3CJ1oQ7o88P34EJH3tm6ltJhXhH7UAtZZHd_0l7Jjvp5m9U9nM1rl1OtXkRD/exec",
   "connectionUrl": "https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit",
   "repoTabName": "repositorio",
   "accessToken": "EKIRAYA-2026",
-  "lastSyncDate": "8/10/2026, 11:56:41 a. m.",
-  "lastSyncTimestamp": 1791460601672,
+  "lastSyncDate": "8/10/2026, 5:38:42 p. m.",
+  "lastSyncTimestamp": 1791481122235,
   "rawHeaders": [
     "documento_id",
     "titulo",
