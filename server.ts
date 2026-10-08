@@ -1848,16 +1848,47 @@ async function startServer() {
   // ENDPOINTS REST API DE CONTRATO (TAREAS 2 Y 4: getMonografias, checkUserRole, syncDrive, manageUser)
   // ============================================================================
 
-  // Endpoint: GET /api/repo/getMonografias (y alias /api/repo/monografias)
-  const handleGetMonografias = (_req: express.Request, res: express.Response) => {
+  // Endpoint: GET /api/repo/getMonografias (y alias /api/repo/monografias) con consulta en tiempo real a Google Sheets/Apps Script
+  const handleGetMonografias = async (_req: express.Request, res: express.Response) => {
     try {
       const state = loadPersistedState();
+      const scriptUrl = extractValidAppsScriptUrl(state.appsScriptExecUrl);
+      if (scriptUrl) {
+        try {
+          const sep = scriptUrl.includes('?') ? '&' : '?';
+          const liveUrl = `${scriptUrl}${sep}action=getMonografias&_t=${Date.now()}`;
+          const resp = await fetch(liveUrl, {
+            method: 'GET',
+            redirect: 'follow',
+            signal: AbortSignal.timeout(5000),
+          });
+          const text = await resp.text();
+          if (text && !isHtmlContent(text)) {
+            const json = JSON.parse(text);
+            if (json?.status === 'success' && Array.isArray(json.data)) {
+              res.json({
+                status: 'success',
+                total: json.data.length,
+                headers: json.headers || state.rawHeaders,
+                data: json.data,
+                timestamp: new Date().toISOString(),
+                source: 'live_google_sheets',
+              });
+              return;
+            }
+          }
+        } catch {
+          // Fallback a estado local si la red falla
+        }
+      }
+
       res.json({
         status: 'success',
         total: state.rawRows.length,
         headers: state.rawHeaders,
         data: state.rawRows,
         timestamp: new Date().toISOString(),
+        source: 'local_state',
       });
     } catch (err) {
       res.status(500).json({
