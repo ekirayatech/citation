@@ -121,11 +121,11 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
     window.addEventListener('ekiraya_repo_update', handleRepoUpdate);
 
-    // Polling cada 8 segundos para asegurar tiempo real en todos los navegadores y dispositivos (infraestructura distribuida/Vercel)
+    // Polling cada 10 segundos para asegurar tiempo real en todos los navegadores y dispositivos (infraestructura distribuida/Vercel)
     const intervalId = setInterval(() => {
       fetchMonografias();
       fetchUsuarios();
-    }, 8000);
+    }, 10000);
 
     // Refrescar al enfocar la pestaña o ventana
     const handleFocus = () => {
