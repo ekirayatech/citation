@@ -104,7 +104,7 @@ export default function App() {
 
   // Autenticación Institucional (@cem.edu.co / @est.cem.edu.co)
   const [currentUserEmail, setCurrentUserEmail] = useState<string>(() => {
-    return localStorage.getItem('ekiraya_user_email') || 'mebolanos@cem.edu.co';
+    return localStorage.getItem('ekiraya_user_email') || '';
   });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [loginEmailInput, setLoginEmailInput] = useState<string>('');
@@ -162,7 +162,7 @@ export default function App() {
 
   const handleOpenCmsModal = async () => {
     const savedToken = cmsAdminToken || localStorage.getItem('ekiraya_cms_admin_token') || '';
-    const savedEmail = currentUserEmail || localStorage.getItem('ekiraya_user_email') || 'mebolanos@cem.edu.co';
+    const savedEmail = currentUserEmail || localStorage.getItem('ekiraya_user_email') || '';
 
     if (!savedToken || !isCmsAdminLoggedIn) {
       setIsCmsAdminLoggedIn(false);

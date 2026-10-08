@@ -43,7 +43,7 @@ interface RepositorioSectionProps {
 
 export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   showToast,
-  currentUserEmail = 'mebolanos@cem.edu.co',
+  currentUserEmail = '',
   isAdminLoggedIn = false,
 }) => {
   // Estado principal sin dependencias de localStorage
