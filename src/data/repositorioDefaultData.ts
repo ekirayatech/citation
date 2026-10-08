@@ -25,6 +25,7 @@ export interface AuthorizedSchoolUser {
   nombres: string;
   correo: string;
   perfil: string;
+  pass?: string;
   isAdmin: boolean;
   createdInApp?: boolean;
   syncedToSheet?: boolean;

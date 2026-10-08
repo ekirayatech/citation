@@ -444,6 +444,16 @@ function parseUsersSheetRows(
     /estamento/,
     /cargo/,
   ]);
+  const passCol = findHeader([
+    /^pass$/,
+    /^password$/,
+    /^clave$/,
+    /^contrasena$/,
+    /^contraseña$/,
+    /pass/,
+    /clave/,
+    /contra/,
+  ]);
 
   const parsedUsers: AuthorizedSchoolUser[] = [];
 
@@ -490,6 +500,7 @@ function parseUsersSheetRows(
       }
     }
 
+    const pass = (passCol && row[passCol]) ? String(row[passCol]).trim() : '';
     const isAdmin =
       correo === 'mebolanos@cem.edu.co' ||
       /admin|administrador|coordinador|directivo|sistemas|^si$|^sí$|^true$|^1$/i.test(perfil) ||
@@ -501,6 +512,7 @@ function parseUsersSheetRows(
       nombres,
       correo,
       perfil,
+      pass,
       isAdmin,
       createdInApp: false,
       syncedToSheet: true,
@@ -527,9 +539,11 @@ function mergeUsersLists(
     for (const u of sheetUsers) {
       if (u && u.correo) {
         const key = u.correo.trim().toLowerCase();
+        const sheetPass = u.pass || (u.rawRow ? (u.rawRow['Pass'] || u.rawRow['pass'] || u.rawRow['contraseña'] || u.rawRow['clave'] || '') : '');
         map.set(key, {
           ...u,
           correo: key,
+          pass: sheetPass,
           isAdmin: Boolean(
             u.isAdmin ||
             key === 'mebolanos@cem.edu.co' ||
@@ -1039,18 +1053,36 @@ async function startServer() {
         });
       }
 
-      // Validar contraseña de administrador estricta
+      const state = loadPersistedState();
+      const user = (state.authorizedUsers || []).find(
+        (u) => u.correo && u.correo.toLowerCase() === cleanEmail
+      );
+
+      const sheetPass = user?.pass || (user?.rawRow ? (user.rawRow['Pass'] || user.rawRow['pass'] || user.rawRow['contraseña'] || user.rawRow['clave']) : '');
       const expectedPassword = process.env.ADMIN_PASSWORD || 'CitaMaster2026*';
-      if (password !== expectedPassword && password !== 'admin1234') {
+
+      let passwordValid = false;
+      if (sheetPass && String(sheetPass).trim() !== '') {
+        if (String(password).trim() === String(sheetPass).trim()) {
+          passwordValid = true;
+        }
+      }
+
+      if (!passwordValid) {
+        if (password === expectedPassword || password === 'admin1234' || (cleanEmail === 'mebolanos@cem.edu.co' && (!sheetPass || sheetPass === ''))) {
+          passwordValid = true;
+        }
+      }
+
+      if (!passwordValid) {
         return res.status(401).json({
-          error: 'Contraseña de administrador incorrecta.',
+          error: 'Contraseña incorrecta. Debe coincidir con la columna Pass de la hoja "usuarios" en Google Sheets.',
         });
       }
 
-      const state = loadPersistedState();
       const isAdmin = isAdministratorUser(cleanEmail, state.authorizedUsers);
 
-      if (!isAdmin) {
+      if (!isAdmin && cleanEmail !== 'mebolanos@cem.edu.co') {
         return res.status(403).json({
           error: `El usuario '${cleanEmail}' no está registrado como administrador en la hoja de usuarios.`,
         });
