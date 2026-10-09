@@ -60,35 +60,35 @@ export const Apa2026Section: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Encabezado Principal de la Pestaña Normas APA 2026 */}
-      <div className="bg-gradient-to-r from-[#533e6f] via-[#664d88] to-[#735697] rounded-2xl p-6 sm:p-8 text-white shadow-sm">
+      {/* Encabezado Principal de la Pestaña Normas APA 7 — Propuesta 1 */}
+      <div className="bg-white rounded-2xl p-6 sm:p-8 text-slate-900 border border-slate-200 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-2 max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-violet-100 text-xs font-semibold">
-              <span>Manual Oficial APA 7.ª Edición · Vigencia Académica 2026</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#315BA3]/10 text-[#315BA3] text-xs font-bold border border-[#315BA3]/20">
+              <span>Manual Oficial APA 7.ª Edición · Vigencia Académica</span>
               <span aria-hidden="true">·</span>
               <span>Síntesis Centro de Escritura Javeriano</span>
             </div>
-            <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight">
-              Normas APA 2026 — Formato General, Tablas, Figuras y Adaptación al Español
+            <h1 className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-950">
+              Normas APA 7 — Formato General, Tablas, Figuras y Adaptación al Español
             </h1>
-            <p className="text-violet-100 text-sm sm:text-base leading-relaxed">
+            <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
               Consulta las pautas formales para la presentación de trabajos académicos: configuración
               de página, portada estudiantil, los cinco niveles de títulos, diseño de tablas y
               figuras, y las adaptaciones oficiales del estilo APA al español.
             </p>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-xs border border-white/20 rounded-xl p-4 text-xs space-y-1.5 shrink-0">
-            <div className="font-semibold text-white">Contenido de esta sección:</div>
-            <div className="text-violet-100">• 1. Formato general, portada y niveles de títulos</div>
-            <div className="text-violet-100">• 2. Tablas, figuras y lista de chequeo interactiva</div>
-            <div className="text-violet-100">• 3. Adaptaciones oficiales al español</div>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs space-y-1.5 shrink-0">
+            <div className="font-bold text-slate-900">Contenido de esta sección:</div>
+            <div className="text-slate-600">• 1. Formato general, portada y niveles de títulos</div>
+            <div className="text-slate-600">• 2. Tablas, figuras y lista de chequeo interactiva</div>
+            <div className="text-slate-600">• 3. Adaptaciones oficiales al español</div>
           </div>
         </div>
 
         {/* Sub-navegación de los Apartados 1, 2 y 3 */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-6 pt-5 border-t border-white/15">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-6 pt-5 border-t border-slate-200">
           {[
             {
               id: 'formato' as SubModuleId,
@@ -116,23 +116,23 @@ export const Apa2026Section: React.FC = () => {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveSubModule(tab.id)}
-                className={`p-3.5 rounded-xl text-left transition-all flex items-center justify-between gap-2 border ${
+                className={`p-3.5 rounded-xl text-left transition-all flex items-center justify-between gap-2 border cursor-pointer ${
                   active
-                    ? 'bg-white text-violet-950 border-white shadow-sm font-semibold'
-                    : 'bg-violet-900/40 text-violet-100 border-violet-700/60 hover:bg-violet-800/60'
+                    ? 'bg-[#315BA3] text-white border-[#315BA3] shadow-xs font-bold'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-[#315BA3]/40 hover:bg-slate-100'
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <Icon
                     className={`w-4 h-4 shrink-0 ${
-                      active ? 'text-violet-700' : 'text-violet-300'
+                      active ? 'text-[#f8c62e]' : 'text-[#315BA3]'
                     }`}
                   />
                   <div className="truncate">
-                    <div className="text-xs sm:text-sm truncate">{tab.label}</div>
+                    <div className="text-xs sm:text-sm truncate font-semibold">{tab.label}</div>
                     <div
                       className={`text-[11px] truncate ${
-                        active ? 'text-violet-700' : 'text-violet-300'
+                        active ? 'text-blue-100' : 'text-slate-500'
                       }`}
                     >
                       {tab.sub}

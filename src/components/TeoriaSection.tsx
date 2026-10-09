@@ -397,35 +397,35 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
 
   return (
     <div className="space-y-8">
-      {/* Banner Institucional de Presentación */}
-      <div className="bg-gradient-to-br from-[#44345c] via-[#664d88] to-[#533e6f] text-white rounded-2xl p-6 sm:p-8 border border-violet-800/40 shadow-sm relative overflow-hidden">
+      {/* Banner Institucional de Presentación — Propuesta 1 con base blanca e institucional */}
+      <div className="bg-white text-slate-900 rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-xs relative overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
           <div className="max-w-3xl space-y-3">
-            <div className="flex items-center gap-2 text-xs text-violet-200 font-medium">
+            <div className="flex items-center gap-2 text-xs text-[#315BA3] font-bold">
               <span>Colegio Ekirayá Educación Montessori</span>
               <span aria-hidden="true">·</span>
               <span>Guía Teórica Interactiva en 6 Slides</span>
             </div>
             <h2
-              className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight leading-tight"
+              className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight text-slate-950 font-display"
               style={{ textWrap: 'balance' }}
             >
               Fundamentos de Citación, Probidad Académica y Referencias
             </h2>
-            <p className="text-violet-100/90 text-sm sm:text-base leading-relaxed">
+            <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
               Explora en modo presentación cada módulo temático: probidad académica, qué es una cita
               y sus tipos, clasificación y casos especiales, qué es una referencia y su catálogo
               oficial, las partes de la referencia y la tabla de identificadores digitales (
-              <strong>DOI, ISBN, ISSN y URL/URI</strong>).
+              <strong className="text-slate-900">DOI, ISBN, ISSN y URL/URI</strong>).
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 shrink-0">
             <button
               type="button"
               onClick={() => onNavigateToGestor()}
-              className="px-4 py-2.5 bg-white text-violet-950 hover:bg-violet-50 font-semibold text-xs sm:text-sm rounded-xl transition-colors flex items-center gap-2 shadow-sm whitespace-nowrap"
+              className="px-4 py-2.5 bg-[#315BA3] hover:bg-[#254680] text-white font-bold text-xs sm:text-sm rounded-xl transition-colors flex items-center gap-2 shadow-xs whitespace-nowrap cursor-pointer"
             >
-              <Sparkles className="w-4 h-4 text-violet-700" />
+              <Sparkles className="w-4 h-4 text-[#f8c62e]" />
               Abrir Gestor Cita Master
             </button>
           </div>
@@ -451,9 +451,9 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
             <button
               type="button"
               onClick={() => setViewMode('slides')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                 viewMode === 'slides'
-                  ? 'bg-violet-700 text-white shadow-xs'
+                  ? 'bg-[#315BA3] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -463,9 +463,9 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
             <button
               type="button"
               onClick={() => setViewMode('list')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                 viewMode === 'list'
-                  ? 'bg-violet-700 text-white shadow-xs'
+                  ? 'bg-[#315BA3] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -482,7 +482,7 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
               {/* Barra Superior con Indicador y Flechas de Retroceso y Avance */}
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="px-3 py-1 rounded-lg bg-violet-100 text-violet-900 font-semibold text-xs">
+                  <span className="px-3 py-1 rounded-lg bg-[#315BA3]/10 text-[#315BA3] font-bold text-xs border border-[#315BA3]/20">
                     {SLIDE_METADATA[currentSlide].badge}
                   </span>
                   <span className="hidden sm:inline text-xs text-slate-500">
@@ -494,17 +494,17 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
                   <button
                     type="button"
                     onClick={handlePrevSlide}
-                    className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-violet-50 text-slate-800 hover:text-violet-900 border border-slate-200 hover:border-violet-300 text-xs font-semibold transition-all flex items-center gap-1 shadow-2xs active:scale-95"
+                    className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 hover:border-[#315BA3]/40 text-xs font-semibold transition-all flex items-center gap-1 shadow-2xs active:scale-95 cursor-pointer"
                     aria-label="Diapositiva anterior"
                     title="Retroceder a la diapositiva anterior"
                   >
-                    <ChevronLeft className="w-4 h-4 text-violet-700" />
+                    <ChevronLeft className="w-4 h-4 text-[#315BA3]" />
                     <span>Anterior</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleNextSlide}
-                    className="px-3.5 py-1.5 rounded-xl bg-violet-700 hover:bg-violet-800 text-white border border-violet-700 text-xs font-semibold transition-all flex items-center gap-1 shadow-2xs active:scale-95"
+                    className="px-3.5 py-1.5 rounded-xl bg-[#315BA3] hover:bg-[#254680] text-white border border-[#315BA3] text-xs font-semibold transition-all flex items-center gap-1 shadow-2xs active:scale-95 cursor-pointer"
                     aria-label="Siguiente diapositiva"
                     title="Avanzar a la siguiente diapositiva"
                   >
@@ -523,16 +523,16 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
                       key={slide.index}
                       type="button"
                       onClick={() => setCurrentSlide(slide.index)}
-                      className={`px-3 py-2.5 rounded-xl text-left text-xs font-medium transition-all border flex items-center justify-between gap-1.5 ${
+                      className={`px-3 py-2.5 rounded-xl text-left text-xs font-medium transition-all border flex items-center justify-between gap-1.5 cursor-pointer ${
                         isActive
-                          ? 'bg-violet-900 text-white border-violet-900 shadow-xs font-semibold'
-                          : 'bg-white text-slate-700 border-slate-200 hover:border-violet-300 hover:text-slate-900'
+                          ? 'bg-[#315BA3] text-white border-[#315BA3] shadow-xs font-bold'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-[#315BA3]/40 hover:text-slate-900'
                       }`}
                     >
                       <span className="truncate">{slide.shortTitle}</span>
                       <span
                         className={`w-2 h-2 rounded-full shrink-0 ${
-                          isActive ? 'bg-violet-300' : 'bg-slate-200'
+                          isActive ? 'bg-[#f8c62e]' : 'bg-slate-200'
                         }`}
                       />
                     </button>

@@ -5,6 +5,10 @@
   --color-brand-purple-dark: #533e6f;
   --color-brand-purple-light: #7e63a3;
 
+  --color-brand-blue: #315ba3;
+  --color-brand-blue-hover: #254680;
+  --color-brand-blue-light: #e8f0fe;
+
   --color-violet-50: #f7f5fa;
   --color-violet-100: #eee9f3;
   --color-violet-200: #ddd4e7;
@@ -62,7 +66,7 @@
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    background-color: #F8FAFC;
+    background-color: #FFFFFF;
     color: #0F172A;
   }
 
@@ -86,6 +90,18 @@
 
 .border-ekiraya {
   border-color: #664d88;
+}
+
+.bg-ekiraya-blue {
+  background-color: #315ba3;
+}
+
+.text-ekiraya-blue {
+  color: #315ba3;
+}
+
+.border-ekiraya-blue {
+  border-color: #315ba3;
 }
 
 .bg-ekiraya-yellow {

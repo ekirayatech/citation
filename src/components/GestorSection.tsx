@@ -1479,7 +1479,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
               <button
                 type="button"
                 onClick={() => setIsTutorOpen(true)}
-                className="px-3 py-2 bg-[#f8c62e] hover:bg-[#e5b320] text-slate-950 font-bold text-xs sm:text-sm rounded-xl transition-colors flex items-center gap-1.5 shadow-xs whitespace-nowrap"
+                className="px-3 py-2 bg-[#f8c62e] hover:bg-[#e5b320] text-slate-950 font-bold text-xs sm:text-sm rounded-xl transition-colors flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer"
                 title="Consultar al Tutor Socrático IA si tienes dudas sobre esta cita o referencia"
               >
                 <Bot className="w-4 h-4 text-slate-950" />
@@ -1489,7 +1489,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                 type="button"
                 onClick={handleSaveToBibliography}
                 disabled={!generated.requiresReferenceList}
-                className="px-4 py-2 bg-violet-700 hover:bg-violet-800 disabled:bg-slate-300 text-white text-xs sm:text-sm font-semibold rounded-xl transition-colors flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+                className="px-4 py-2 bg-[#315BA3] hover:bg-[#254680] disabled:bg-slate-300 text-white text-xs sm:text-sm font-bold rounded-xl transition-colors flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 Guardar en mi Bibliografía
@@ -1585,12 +1585,12 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                     'Referencia bibliográfica'
                   )
                 }
-                className="px-2.5 py-1 bg-white hover:bg-violet-100 text-violet-900 border border-violet-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
+                className="px-3 py-1.5 bg-[#664d88] hover:bg-[#533e6f] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
               >
                 {copiedField === 'ref' ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <Check className="w-3.5 h-3.5 text-emerald-300" />
                 ) : (
-                  <Copy className="w-3.5 h-3.5" />
+                  <Copy className="w-3.5 h-3.5 text-[#f8c62e]" />
                 )}
                 Copiar Referencia
               </button>

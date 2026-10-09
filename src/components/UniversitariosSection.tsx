@@ -87,7 +87,7 @@ export const UniversitariosSection: React.FC = () => {
             href="https://www.mendeley.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full py-2.5 px-4 bg-violet-700 hover:bg-violet-800 text-white text-xs sm:text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm"
+            className="w-full py-2.5 px-4 bg-[#315BA3] hover:bg-[#254680] text-white text-xs sm:text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer"
           >
             Acceder al sitio oficial de Mendeley
             <ExternalLink className="w-4 h-4" />

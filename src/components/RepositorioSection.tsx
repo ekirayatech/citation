@@ -648,10 +648,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   // Todos los usuarios pueden ver el repositorio (las herramientas administrativas están protegidas por isAdmin)
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
-      {/* 1. Header Principal del Repositorio */}
-      <div className="bg-gradient-to-r from-[#664d88] via-[#533e6f] to-[#3f2e55] rounded-3xl text-white p-6 sm:p-8 shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 translate-x-12 -translate-y-8 opacity-10 pointer-events-none">
-          <BookOpen className="w-96 h-96 text-white" />
+      {/* 1. Header Principal del Repositorio — Propuesta 1 con base blanca e institucional */}
+      <div className="bg-white rounded-3xl text-slate-900 p-6 sm:p-8 border border-slate-200 shadow-xs relative overflow-hidden">
+        <div className="absolute right-0 top-0 translate-x-12 -translate-y-8 opacity-5 pointer-events-none">
+          <BookOpen className="w-96 h-96 text-[#315BA3]" />
         </div>
 
         <div className="relative z-10">
@@ -660,54 +660,54 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               <span className="px-3 py-1 rounded-xl bg-[#f8c62e] text-slate-950 text-xs font-black uppercase tracking-wider shadow-xs">
                 Repositorio PV
               </span>
-              <span className="px-3 py-1 rounded-xl bg-white/15 border border-white/20 text-xs font-semibold text-violet-100">
+              <span className="px-3 py-1 rounded-xl bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700">
                 Google Workspace &middot; Drive &amp; Sheets
               </span>
             </div>
 
             {/* Badge de Usuario y Rol */}
-            <div className="flex items-center gap-2 bg-white/10 px-3.5 py-1.5 rounded-2xl border border-white/15 text-xs">
-              <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
-              <span className="font-semibold text-white truncate max-w-[180px]">{currentUserEmail}</span>
-              <span className="px-2 py-0.5 rounded-md bg-white/20 text-[#f8c62e] font-black text-[10px] uppercase">
+            <div className="flex items-center gap-2 bg-slate-50 px-3.5 py-1.5 rounded-2xl border border-slate-200 text-xs">
+              <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+              <span className="font-semibold text-slate-800 truncate max-w-[180px]">{currentUserEmail}</span>
+              <span className="px-2 py-0.5 rounded-md bg-[#315BA3]/10 text-[#315BA3] font-black text-[10px] uppercase">
                 {userRole}
               </span>
             </div>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white mb-2">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-slate-950 mb-2 font-display">
             Repositorio de Monografías y Proyectos de Vida
           </h1>
-          <p className="text-violet-200 text-xs sm:text-sm max-w-3xl leading-relaxed">
+          <p className="text-slate-600 text-xs sm:text-sm max-w-3xl leading-relaxed">
             Consulta oficial de trabajos de grado, monografías académicas y proyectos de vida del Colegio Ekirayá.
             Indexado dinámicamente mediante Google Sheets y Google Drive por unidades académicas y años.
           </p>
 
           {/* Estadísticas en Tarjetas */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
-            <div className="p-3.5 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/15">
-              <span className="text-[11px] text-violet-200 uppercase font-bold tracking-wider block">
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+              <span className="text-[11px] text-slate-500 uppercase font-bold tracking-wider block">
                 Total Monografías
               </span>
-              <span className="text-2xl sm:text-3xl font-black text-[#f8c62e]">{monografias.length}</span>
+              <span className="text-2xl sm:text-3xl font-black text-[#315BA3]">{monografias.length}</span>
             </div>
-            <div className="p-3.5 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/15">
-              <span className="text-[11px] text-violet-200 uppercase font-bold tracking-wider block">
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+              <span className="text-[11px] text-slate-500 uppercase font-bold tracking-wider block">
                 Unidades Académicas
               </span>
-              <span className="text-2xl sm:text-3xl font-black text-white">{unidadesList.length}</span>
+              <span className="text-2xl sm:text-3xl font-black text-slate-900">{unidadesList.length}</span>
             </div>
-            <div className="p-3.5 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/15">
-              <span className="text-[11px] text-violet-200 uppercase font-bold tracking-wider block">
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+              <span className="text-[11px] text-slate-500 uppercase font-bold tracking-wider block">
                 Años Indexados
               </span>
-              <span className="text-2xl sm:text-3xl font-black text-white">{aniosList.length}</span>
+              <span className="text-2xl sm:text-3xl font-black text-slate-900">{aniosList.length}</span>
             </div>
-            <div className="p-3.5 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/15">
-              <span className="text-[11px] text-violet-200 uppercase font-bold tracking-wider block">
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+              <span className="text-[11px] text-slate-500 uppercase font-bold tracking-wider block">
                 Resultados Filtro
               </span>
-              <span className="text-2xl sm:text-3xl font-black text-emerald-300">
+              <span className="text-2xl sm:text-3xl font-black text-emerald-600">
                 {filteredMonografias.length}
               </span>
             </div>
@@ -715,10 +715,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
           {/* Barra de Acciones Administrativas (Solo visible para Administradores) */}
           {isAdmin && (
-            <div className="mt-6 pt-5 border-t border-white/15 flex flex-wrap items-center justify-between gap-3">
+            <div className="mt-6 pt-5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-violet-100">
-                  <ShieldCheck className="w-4 h-4 text-[#f8c62e]" />
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                  <ShieldCheck className="w-4 h-4 text-[#315BA3]" />
                   <span>Admin:</span>
                 </div>
 
@@ -757,30 +757,30 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
-                {/* Botón Sincronizar en Vivo */}
+                {/* Botón Sincronizar en Vivo (Amarillo para acción rápida) */}
                 <button
                   type="button"
                   onClick={() => handleSyncDrive()}
                   disabled={isSyncing}
-                  className="px-3.5 py-2 rounded-xl bg-[#f8c62e] hover:bg-[#eab308] text-slate-950 font-bold text-xs transition-all flex items-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl bg-[#f8c62e] hover:bg-[#eab308] text-slate-950 font-bold text-xs transition-all flex items-center gap-2 shadow-xs disabled:opacity-50 cursor-pointer"
                   title="Sincronizar en vivo con Google Drive y Sheets"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                   <span>{isSyncing ? 'Sincronizando con Google...' : 'Sincronizar Sheets'}</span>
                 </button>
 
-                {/* Botón Importar / Pegar Datos */}
+                {/* Botón Importar / Pegar Datos (Morado #664D88) */}
                 <button
                   type="button"
                   onClick={() => setIsImportCsvModalOpen(true)}
-                  className="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-2 rounded-xl bg-[#664d88] hover:bg-[#533e6f] text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
                   title="Pegar filas copiadas directamente de Google Sheets"
                 >
                   <FileText className="w-3.5 h-3.5 text-violet-200" />
                   <span>Pegar de Sheets</span>
                 </button>
 
-                {/* Botón Configurar Web App */}
+                {/* Botón Configurar Web App (Azul #315BA3) */}
                 <button
                   type="button"
                   onClick={() => {
@@ -789,7 +789,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                     setTestConnectionMessage('');
                     setIsGasUrlModalOpen(true);
                   }}
-                  className="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-2 rounded-xl bg-[#315BA3] hover:bg-[#254680] text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
                   title="Configurar URL de Google Apps Script"
                 >
                   <Globe className="w-3.5 h-3.5 text-[#f8c62e]" />
@@ -800,9 +800,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsUserManagementOpen(true)}
-                  className="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
                 >
-                  <Users className="w-3.5 h-3.5" />
+                  <Users className="w-3.5 h-3.5 text-[#315BA3]" />
                   <span>Usuarios</span>
                 </button>
 
@@ -810,9 +810,9 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsGasCodeModalOpen(true)}
-                  className="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
                 >
-                  <FileCode className="w-3.5 h-3.5 text-[#f8c62e]" />
+                  <FileCode className="w-3.5 h-3.5 text-[#315BA3]" />
                   <span>Code.gs</span>
                 </button>
               </div>
