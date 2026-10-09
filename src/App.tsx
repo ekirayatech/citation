@@ -544,10 +544,10 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col bg-[#FFFFFF] text-[#0F172A]">
       {/* Top Navigation Bar — Propuesta 1: Fondo Blanco Puro, Azul #315BA3 y Botones Morado / Amarillo */}
-      <header className="sticky top-0 z-40 bg-white text-slate-900 border-b border-slate-200 shadow-xs transition-all">
+      <header className="sticky top-0 z-40 bg-white text-slate-900 border-b-2 border-slate-300 shadow-xs transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Fila 1: Marca Institucional + Acciones de Usuario / CMS */}
-          <div className="py-2.5 sm:py-3 flex items-center justify-between gap-3 border-b border-slate-100">
+          <div className="py-2.5 sm:py-3 flex items-center justify-between gap-3 border-b-2 border-slate-200">
             {/* Logotipo y Título Principal */}
             <button
               type="button"
@@ -556,7 +556,7 @@ export default function App() {
               title="Ir al inicio - Colegio Ekirayá Cita Master"
             >
               {!logoFailed ? (
-                <div className="bg-slate-50 p-1.5 sm:p-2 rounded-xl border border-slate-200 shadow-xs shrink-0 transition-transform group-hover:scale-105">
+                <div className="bg-slate-50 p-1.5 sm:p-2 rounded-xl border-2 border-slate-200 shadow-xs shrink-0 transition-transform group-hover:scale-105">
                   <img
                     src="https://colegioekiraya.edu.co/wp-content/uploads/2024/09/LOGO-CEM-COLOR-02.png"
                     alt="Logo Colegio Ekirayá"
@@ -587,7 +587,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={handleOpenCmsModal}
-                className={`px-3 sm:px-3.5 py-1.5 rounded-xl border text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs ${
+                className={`px-3 sm:px-3.5 py-1.5 rounded-xl border-2 text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs ${
                   isCmsAdminLoggedIn
                     ? 'bg-[#f8c62e] text-slate-950 border-[#e5b320] hover:bg-[#eab308] hover:shadow-md'
                     : 'bg-[#664d88] hover:bg-[#533e6f] border-[#533e6f] text-white hover:shadow-sm'
@@ -797,7 +797,7 @@ export default function App() {
       </main>
 
       {/* Quiet Institutional Footer */}
-      <footer className="bg-white border-t border-slate-200 py-5 mt-auto">
+      <footer className="bg-white border-t-2 border-slate-300 py-5 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left text-xs text-slate-500">
           <p className="font-medium text-slate-700">
             Colegio Ekirayá Educación Montessori · Cita Master — Gestor Bibliográfico y Portal Académico

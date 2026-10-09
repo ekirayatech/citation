@@ -61,7 +61,7 @@ export const Apa2026Section: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Encabezado Principal de la Pestaña Normas APA 7 — Propuesta 1 */}
-      <div className="bg-white rounded-2xl p-6 sm:p-8 text-slate-900 border border-slate-200 shadow-xs">
+      <div className="bg-white rounded-2xl p-6 sm:p-8 text-slate-900 border-2 border-slate-300 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-2 max-w-3xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#315BA3]/10 text-[#315BA3] text-xs font-bold border border-[#315BA3]/20">
@@ -79,7 +79,7 @@ export const Apa2026Section: React.FC = () => {
             </p>
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs space-y-1.5 shrink-0">
+          <div className="bg-slate-50 border-2 border-slate-200 rounded-xl p-4 text-xs space-y-1.5 shrink-0">
             <div className="font-bold text-slate-900">Contenido de esta sección:</div>
             <div className="text-slate-600">• 1. Formato general, portada y niveles de títulos</div>
             <div className="text-slate-600">• 2. Tablas, figuras y lista de chequeo interactiva</div>
@@ -88,7 +88,7 @@ export const Apa2026Section: React.FC = () => {
         </div>
 
         {/* Sub-navegación de los Apartados 1, 2 y 3 */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-6 pt-5 border-t border-slate-200">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-6 pt-5 border-t-2 border-slate-200">
           {[
             {
               id: 'formato' as SubModuleId,

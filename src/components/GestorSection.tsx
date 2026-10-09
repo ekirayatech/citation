@@ -262,13 +262,13 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       {/* COLUMNA IZQUIERDA: FORMULARIO DINÁMICO ROBUSTECIDO (PÁGS. 20–36) */}
-      <section className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+      <section className="lg:col-span-7 bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 space-y-5 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-slate-200 pb-4">
           <div>
-            <div className="text-xs font-medium text-violet-700">
+            <div className="text-xs font-bold text-[#315BA3]">
               Generador Inteligente Multi-Norma · Normas APA 7.ª Edición
             </div>
-            <h2 className="text-lg sm:text-xl font-semibold text-slate-900">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900">
               Cita Master — Datos de la Fuente
             </h2>
           </div>
@@ -1604,14 +1604,14 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
       </section>
 
       {/* COLUMNA DERECHA: GESTOR DE BIBLIOGRAFÍA GUARDADA EN TARJETAS LIMPIAS */}
-      <section className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 flex flex-col justify-between space-y-5">
+      <section className="lg:col-span-5 bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 flex flex-col justify-between space-y-5 shadow-xs">
         <div className="space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+          <div className="flex items-center justify-between border-b-2 border-slate-200 pb-4">
             <div>
-              <div className="text-xs font-medium text-violet-700">
+              <div className="text-xs font-bold text-[#315BA3]">
                 Repositorio Personal del Estudiante
               </div>
-              <h3 className="text-lg font-semibold text-slate-900">
+              <h3 className="text-lg font-bold text-slate-900">
                 Referencias Guardadas ({savedReferences.length})
               </h3>
             </div>

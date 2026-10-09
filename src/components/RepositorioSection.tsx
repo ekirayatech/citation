@@ -649,7 +649,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
       {/* 1. Header Principal del Repositorio — Propuesta 1 con base blanca e institucional */}
-      <div className="bg-white rounded-3xl text-slate-900 p-6 sm:p-8 border border-slate-200 shadow-xs relative overflow-hidden">
+      <div className="bg-white rounded-3xl text-slate-900 p-6 sm:p-8 border-2 border-slate-300 shadow-xs relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-12 -translate-y-8 opacity-5 pointer-events-none">
           <BookOpen className="w-96 h-96 text-[#315BA3]" />
         </div>
@@ -715,7 +715,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
           {/* Barra de Acciones Administrativas (Solo visible para Administradores) */}
           {isAdmin && (
-            <div className="mt-6 pt-5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+            <div className="mt-6 pt-5 border-t-2 border-slate-200 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
                   <ShieldCheck className="w-4 h-4 text-[#315BA3]" />
@@ -822,7 +822,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       </div>
 
       {/* 2. Barra de Filtros y Búsqueda Avanzada */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200 space-y-4">
+      <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-xs border-2 border-slate-300 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           {/* Campo de Búsqueda */}
           <div className="relative flex-1">

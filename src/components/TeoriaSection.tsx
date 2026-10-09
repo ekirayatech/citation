@@ -398,7 +398,7 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
   return (
     <div className="space-y-8">
       {/* Banner Institucional de Presentación — Propuesta 1 con base blanca e institucional */}
-      <div className="bg-white text-slate-900 rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-xs relative overflow-hidden">
+      <div className="bg-white text-slate-900 rounded-2xl p-6 sm:p-8 border-2 border-slate-300 shadow-xs relative overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
           <div className="max-w-3xl space-y-3">
             <div className="flex items-center gap-2 text-xs text-[#315BA3] font-bold">
@@ -433,10 +433,10 @@ export const TeoriaSection: React.FC<TeoriaSectionProps> = ({
       </div>
 
       {/* CONTENEDOR DE SLIDES A PANTALLA COMPLETA (6 PESTAÑAS INTEGRADAS) */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 md:p-8 space-y-6 shadow-xs">
-        <div className="border-b border-slate-200 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white rounded-2xl border-2 border-slate-300 p-4 sm:p-6 md:p-8 space-y-6 shadow-xs">
+        <div className="border-b-2 border-slate-200 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="text-xs font-semibold text-violet-700 uppercase tracking-wider mb-1">
+            <div className="text-xs font-bold text-[#315BA3] uppercase tracking-wider mb-1">
               Presentación Interactiva · Guía Teórica Completa
             </div>
             <h3 className="text-xl sm:text-2xl font-bold text-slate-900">
