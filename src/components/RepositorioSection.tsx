@@ -125,90 +125,105 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
     window.addEventListener('ekiraya_repo_update', handleRepoUpdate);
 
-    // Polling cada 10 segundos para asegurar tiempo real en todos los navegadores y dispositivos (infraestructura distribuida/Vercel)
+    // Polling cada 3 segundos para asegurar tiempo real en todos los navegadores y dispositivos
     const intervalId = setInterval(() => {
-      fetchMonografias();
+      fetchMonografias(true);
       fetchUsuarios();
-    }, 10000);
+    }, 3000);
 
-    // Refrescar al enfocar la pestaña o ventana
-    const handleFocus = () => {
-      fetchMonografias();
+    // Refrescar al enfocar la pestaña, ventana o al cambiar la visibilidad de la página
+    const handleFocusOrVisible = () => {
+      fetchMonografias(true);
       fetchUsuarios();
     };
-    window.addEventListener('focus', handleFocus);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        handleFocusOrVisible();
+      }
+    };
+
+    window.addEventListener('focus', handleFocusOrVisible);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       window.removeEventListener('ekiraya_repo_update', handleRepoUpdate);
       clearInterval(intervalId);
-      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('focus', handleFocusOrVisible);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
   /**
    * Consulta GET a la URL de Apps Script con _t=${Date.now()} para evitar caché,
    * asignando los resultados directamente al estado sin comparativas.
+   * Soporta recarga silenciosa en segundo plano (silent: true) para no parpadear la interfaz.
    */
-    const fetchMonografias = async () => {
-    setIsLoadingMonografias(true);
-    let resolvedUrl = (gasWebAppUrl || getCentralGasUrl()).trim();
-    if (!resolvedUrl || !resolvedUrl.includes('script.google.com')) {
+  const fetchMonografias = async (silent = false) => {
+    if (!silent) {
+      setIsLoadingMonografias(true);
+    } else {
+      setIsRevalidating(true);
+    }
+
+    try {
+      let resolvedUrl = (gasWebAppUrl || getCentralGasUrl()).trim();
+      if (!resolvedUrl || !resolvedUrl.includes('script.google.com')) {
+        try {
+          const cfgResp = await fetch('/api/repositorio/config', { cache: 'no-store' });
+          if (cfgResp.ok) {
+            const cfgData = await cfgResp.json();
+            if (cfgData?.appsScriptExecUrl && cfgData.appsScriptExecUrl.includes('script.google.com')) {
+              resolvedUrl = cfgData.appsScriptExecUrl.trim();
+              setGasWebAppUrl(resolvedUrl);
+            }
+          }
+        } catch {
+          // Ignorar
+        }
+      }
+      if (resolvedUrl && resolvedUrl.includes('script.google.com')) {
+        try {
+          const getMonoUrl = `${resolvedUrl}${resolvedUrl.includes('?') ? '&' : '?'}action=getMonografias&_t=${Date.now()}`;
+          const monoResp = await fetch(getMonoUrl, {
+            method: 'GET',
+            cache: 'no-store',
+            redirect: 'follow',
+          });
+          if (monoResp.ok) {
+            const result = await monoResp.json();
+            if (result?.status === 'success' && Array.isArray(result.data)) {
+              setMonografias(result.data);
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('Advertencia consultando Google Apps Script directamente:', err);
+        }
+      }
+
+      // Fallback secundario a través del endpoint de servidor / Vercel Serverless
       try {
-        const cfgResp = await fetch('/api/repositorio/config', { cache: 'no-store' });
-        if (cfgResp.ok) {
-          const cfgData = await cfgResp.json();
-          if (cfgData?.appsScriptExecUrl && cfgData.appsScriptExecUrl.includes('script.google.com')) {
-            resolvedUrl = cfgData.appsScriptExecUrl.trim();
-            setGasWebAppUrl(resolvedUrl);
+        const activeGasUrl = (gasWebAppUrl || getCentralGasUrl()).trim();
+        const resp = await fetch(`/api/repositorio/monografias?_t=${Date.now()}&gasWebAppUrl=${encodeURIComponent(activeGasUrl)}`, { cache: 'no-store' });
+        if (resp.ok) {
+          const result = await resp.json();
+          const incomingRows = Array.isArray(result?.monografias)
+            ? result.monografias
+            : Array.isArray(result?.data)
+            ? result.data
+            : [];
+          if (result?.status === 'success' && Array.isArray(incomingRows)) {
+            setMonografias(incomingRows);
+            return;
           }
         }
       } catch {
         // Ignorar
       }
+    } finally {
+      setIsLoadingMonografias(false);
+      setIsRevalidating(false);
     }
-    if (resolvedUrl && resolvedUrl.includes('script.google.com')) {
-      try {
-        const getMonoUrl = `${resolvedUrl}${resolvedUrl.includes('?') ? '&' : '?'}action=getMonografias&_t=${Date.now()}`;
-        const monoResp = await fetch(getMonoUrl, {
-          method: 'GET',
-          cache: 'no-store',
-          redirect: 'follow',
-        });
-        if (monoResp.ok) {
-          const result = await monoResp.json();
-          if (result?.status === 'success' && Array.isArray(result.data)) {
-            setMonografias(result.data);
-            setIsLoadingMonografias(false);
-            return;
-          }
-        }
-      } catch (err) {
-        console.warn('Advertencia consultando Google Apps Script directamente:', err);
-      }
-    }
-
-    // Fallback secundario a través del endpoint de servidor / Vercel Serverless
-    try {
-      const activeGasUrl = (gasWebAppUrl || getCentralGasUrl()).trim();
-      const resp = await fetch(`/api/repositorio/monografias?_t=${Date.now()}&gasWebAppUrl=${encodeURIComponent(activeGasUrl)}`, { cache: 'no-store' });
-      if (resp.ok) {
-        const result = await resp.json();
-        const incomingRows = Array.isArray(result?.monografias)
-          ? result.monografias
-          : Array.isArray(result?.data)
-          ? result.data
-          : [];
-        if (result?.status === 'success' && Array.isArray(incomingRows)) {
-          setMonografias(incomingRows);
-          setIsLoadingMonografias(false);
-          return;
-        }
-      }
-    } catch {
-      // Ignorar
-    }
-
-    setIsLoadingMonografias(false);
   };
 
   const fetchUsuarios = async () => {

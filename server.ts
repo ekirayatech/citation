@@ -2941,7 +2941,7 @@ Cuéntame: ¿con cuál de estos 4 elementos tienes dudas y qué datos has encont
   });
 
   // Polling automático en segundo plano para verificar si hay cambios directos en Google Sheets
-  // Sincroniza cada 15 segundos con bloqueo de concurrencia para evitar solapamientos
+  // Sincroniza cada 3 segundos con bloqueo de concurrencia para evitar solapamientos
   let isBackgroundSyncRunning = false;
   setInterval(async () => {
     if (isBackgroundSyncRunning) return;
@@ -2956,7 +2956,7 @@ Cuéntame: ¿con cuál de estos 4 elementos tienes dudas y qué datos has encont
     } finally {
       isBackgroundSyncRunning = false;
     }
-  }, 15000);
+  }, 3000);
 
   // Disparo inicial inmediato (a los 1.5s) para precargar los usuarios de Sheets en cuanto arranca el servidor
   setTimeout(async () => {
