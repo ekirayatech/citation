@@ -16,7 +16,7 @@
 export const CENTRAL_APPS_SCRIPT_URL: string =
   (import.meta.env.VITE_APPS_SCRIPT_URL as string) ||
   (import.meta.env.VITE_GAS_WEBAPP_URL as string) ||
-  '';
+  'https://script.google.com/macros/s/AKfycbyXv5xr3CJ1oQ7o88P34EJH3tm6ltJhXhH7UAtZZHd_0l7Jjvp5m9U9nM1rl1OtXkRD/exec';
 
 /**
  * Obtiene la URL activa y válida de Google Apps Script Web App

@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { MonografiaItem, UsuarioItem, RepositorioStats, UserPerfilRole } from '../types/repositorio';
 import { GOOGLE_APPS_SCRIPT_CODE } from '../data/gasScriptCode';
-import { DEFAULT_REPO_ROWS, DEFAULT_AUTHORIZED_USERS } from '../data/repositorioDefaultData';
+import { DEFAULT_AUTHORIZED_USERS } from '../data/repositorioDefaultData';
 import { getCentralGasUrl } from '../data/gasConfig';
 
 interface RepositorioSectionProps {
@@ -46,19 +46,8 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
   currentUserEmail = '',
   isAdminLoggedIn = false,
 }) => {
-  // Estado principal con inicialización robusta en localStorage o DEFAULT_REPO_ROWS para garantizar carga en Vercel y todos los dispositivos
-  const [monografias, setMonografias] = useState<MonografiaItem[]>(() => {
-    try {
-      const cached = localStorage.getItem('ekiraya_cached_monografias');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch {}
-    return DEFAULT_REPO_ROWS as MonografiaItem[];
-  });
+  // Estado principal: Google Sheets es la única fuente de verdad
+  const [monografias, setMonografias] = useState<MonografiaItem[]>([]);
   const [isLoadingMonografias, setIsLoadingMonografias] = useState<boolean>(true);
   const [isRevalidating, setIsRevalidating] = useState<boolean>(false);
 
@@ -120,6 +109,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
   // Cargar datos al montar y sincronización en tiempo real (polling + eventos + focus)
   useEffect(() => {
+    try {
+      localStorage.removeItem('ekiraya_cached_monografias');
+    } catch {}
+
     fetchMonografias();
     fetchUsuarios();
 
@@ -183,11 +176,8 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         });
         if (monoResp.ok) {
           const result = await monoResp.json();
-          if (result?.status === 'success' && Array.isArray(result.data) && result.data.length > 0) {
+          if (result?.status === 'success' && Array.isArray(result.data)) {
             setMonografias(result.data);
-            try {
-              localStorage.setItem('ekiraya_cached_monografias', JSON.stringify(result.data));
-            } catch {}
             setIsLoadingMonografias(false);
             return;
           }
@@ -196,19 +186,20 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
         console.warn('Advertencia consultando Google Apps Script directamente:', err);
       }
     }
-    // Fallback técnico si Apps Script no está disponible o da CORS en estático (Vercel)
+
+    // Fallback secundario a través del endpoint de servidor / Vercel Serverless
     try {
       const activeGasUrl = (gasWebAppUrl || getCentralGasUrl()).trim();
       const resp = await fetch(`/api/repositorio/monografias?_t=${Date.now()}&gasWebAppUrl=${encodeURIComponent(activeGasUrl)}`, { cache: 'no-store' });
       if (resp.ok) {
         const result = await resp.json();
-        console.log('[DIAGNÓSTICO REPOSITORIO]', { source: result?.source, rows: result?.rows, count: result?.monografias?.length || result?.data?.length });
-        const incomingRows = Array.isArray(result?.monografias) ? result.monografias : Array.isArray(result?.data) ? result.data : [];
-        if (result?.status === 'success' && incomingRows.length > 0) {
+        const incomingRows = Array.isArray(result?.monografias)
+          ? result.monografias
+          : Array.isArray(result?.data)
+          ? result.data
+          : [];
+        if (result?.status === 'success' && Array.isArray(incomingRows)) {
           setMonografias(incomingRows);
-          try {
-            localStorage.setItem('ekiraya_cached_monografias', JSON.stringify(result.data));
-          } catch {}
           setIsLoadingMonografias(false);
           return;
         }
@@ -217,20 +208,6 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       // Ignorar
     }
 
-    // Último recurso de respaldo si la red falló: mantener caché previa o DEFAULT_REPO_ROWS
-    try {
-      const cached = localStorage.getItem('ekiraya_cached_monografias');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setMonografias(parsed);
-          setIsLoadingMonografias(false);
-          return;
-        }
-      }
-    } catch {}
-
-    setMonografias((prev) => (prev.length > 0 ? prev : (DEFAULT_REPO_ROWS as MonografiaItem[])));
     setIsLoadingMonografias(false);
   };
 
