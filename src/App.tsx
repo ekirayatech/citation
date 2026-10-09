@@ -518,7 +518,7 @@ export default function App() {
 
   const navItems: { id: string; label: string; icon: React.ReactNode; count?: number }[] = [
     { id: 'teoria', label: 'Guía Teórica', icon: <BookOpen className="w-4 h-4 shrink-0" /> },
-    { id: 'apa2026', label: 'Normas APA 2026', icon: <FileCheck2 className="w-4 h-4 shrink-0" /> },
+    { id: 'apa2026', label: 'Normas APA 7', icon: <FileCheck2 className="w-4 h-4 shrink-0" /> },
     {
       id: 'gestor',
       label: 'Gestor',
