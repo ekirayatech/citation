@@ -1848,47 +1848,80 @@ async function startServer() {
   // ENDPOINTS REST API DE CONTRATO (TAREAS 2 Y 4: getMonografias, checkUserRole, syncDrive, manageUser)
   // ============================================================================
 
-  // Endpoint: GET /api/repo/getMonografias (y alias /api/repo/monografias) con consulta en tiempo real a Google Sheets/Apps Script
+  // Endpoint: GET /api/repo/getMonografias (y alias /api/repo/monografias, /api/repositorio/monografias) con diagnóstico estricto
   const handleGetMonografias = async (req: express.Request, res: express.Response) => {
     try {
       const clientGasUrl = String(req.query.gasWebAppUrl || req.headers['x-gas-url'] || '').trim();
-      
-      // Intentar obtener datos frescos mediante la lógica unificada de sincronización con Google Sheets / Apps Script
-      const syncResult = await executeServerSyncLogic({
-        appsScriptExecUrl: clientGasUrl,
-        triggerDriveScan: false,
-      });
+      const state = loadPersistedState();
+      const isValidGasUrl = (url: unknown): url is string =>
+        typeof url === 'string' && url.trim().includes('script.google.com');
 
-      if (syncResult && syncResult.ok && Array.isArray(syncResult.rows) && syncResult.rows.length > 0) {
-        res.json({
-          status: 'success',
-          total: syncResult.rows.length,
-          headers: syncResult.headers || DEFAULT_REPO_HEADERS,
-          data: syncResult.rows,
-          timestamp: new Date().toISOString(),
-          source: 'live_google_sheets_sync',
-        });
-        return;
+      const candidates = [
+        clientGasUrl,
+        process.env.VITE_APPS_SCRIPT_URL,
+        process.env.APPS_SCRIPT_URL,
+        process.env.GOOGLE_APPS_SCRIPT_URL,
+        state.appsScriptExecUrl,
+        'https://script.google.com/macros/s/AKfycbyXv5xr3CJ1oQ7o88P34EJH3tm6ltJhXhH7UAtZZHd_0l7Jjvp5m9U9nM1rl1OtXkRD/exec',
+      ];
+      const effectiveScriptUrl = (candidates.find(isValidGasUrl) || '').trim();
+
+      let fetchedRows: Record<string, string>[] = [];
+      let fetchError: string | null = null;
+
+      if (effectiveScriptUrl && effectiveScriptUrl.includes('script.google.com')) {
+        try {
+          const sep = effectiveScriptUrl.includes('?') ? '&' : '?';
+          const targetUrl = `${effectiveScriptUrl}${sep}action=getMonografias&_t=${Date.now()}`;
+          const gasResp = await fetch(targetUrl, {
+            method: 'GET',
+            redirect: 'follow',
+            signal: AbortSignal.timeout(8000),
+            headers: {
+              Accept: 'application/json, text/plain, */*',
+              'Cache-Control': 'no-cache',
+            },
+          });
+          const text = await gasResp.text();
+          if (text && !isHtmlContent(text)) {
+            const parsed = JSON.parse(text);
+            if (Array.isArray(parsed?.data)) {
+              fetchedRows = parsed.data;
+            } else if (Array.isArray(parsed?.rows)) {
+              fetchedRows = parsed.rows;
+            }
+          } else {
+            fetchError = 'Respuesta no válida o HTML de Google Apps Script';
+          }
+        } catch (err) {
+          fetchError = err instanceof Error ? err.message : 'Error conectando con Google Apps Script';
+        }
+      } else {
+        fetchError = 'No se encontró URL de Google Apps Script configurada';
       }
 
-      const state = loadPersistedState();
+      // DIAGNÓSTICO ESTRICTO TEMPORAL:
+      // 1. Lee directamente los datos actuales de Google Sheets sin usar rawRows ni DEFAULT_REPO_ROWS
+      // 2. No concatena con datos en memoria ni depende de caché
+      // 3. Devuelve exactamente los registros obtenidos con los campos de diagnóstico requeridos
       res.json({
-        status: 'success',
-        total: state.rawRows.length,
-        headers: state.rawHeaders,
-        data: state.rawRows,
+        status: fetchedRows.length > 0 ? 'success' : 'empty_or_error',
+        source: 'google_sheets',
+        rows: fetchedRows.length,
+        monografias: fetchedRows,
+        data: fetchedRows,
+        error: fetchError || undefined,
         timestamp: new Date().toISOString(),
-        source: 'local_state',
       });
     } catch (err) {
-      const state = loadPersistedState();
-      res.json({
-        status: 'success',
-        total: state.rawRows.length,
-        headers: state.rawHeaders,
-        data: state.rawRows,
+      res.status(500).json({
+        status: 'error',
+        source: 'google_sheets',
+        rows: 0,
+        monografias: [],
+        data: [],
+        error: err instanceof Error ? err.message : 'Error inesperado',
         timestamp: new Date().toISOString(),
-        source: 'fallback_state',
       });
     }
   };

@@ -202,8 +202,10 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       const resp = await fetch(`/api/repositorio/monografias?_t=${Date.now()}&gasWebAppUrl=${encodeURIComponent(activeGasUrl)}`, { cache: 'no-store' });
       if (resp.ok) {
         const result = await resp.json();
-        if (result?.status === 'success' && Array.isArray(result.data) && result.data.length > 0) {
-          setMonografias(result.data);
+        console.log('[DIAGNÓSTICO REPOSITORIO]', { source: result?.source, rows: result?.rows, count: result?.monografias?.length || result?.data?.length });
+        const incomingRows = Array.isArray(result?.monografias) ? result.monografias : Array.isArray(result?.data) ? result.data : [];
+        if (result?.status === 'success' && incomingRows.length > 0) {
+          setMonografias(incomingRows);
           try {
             localStorage.setItem('ekiraya_cached_monografias', JSON.stringify(result.data));
           } catch {}
