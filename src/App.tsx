@@ -545,37 +545,35 @@ export default function App() {
     <div className="min-h-screen flex flex-col bg-[#FFFFFF] text-[#0F172A]">
       {/* Top Navigation Bar — Propuesta 1: Fondo Blanco Puro, Azul #315BA3 y Botones Morado / Amarillo */}
       <header className="sticky top-0 z-40 bg-white text-slate-900 border-b-2 border-slate-300 shadow-xs transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           {/* Fila 1: Marca Institucional + Acciones de Usuario / CMS */}
-          <div className="py-2.5 sm:py-3 flex items-center justify-between gap-3 border-b-2 border-slate-200">
+          <div className="py-2 sm:py-3 flex items-center justify-between gap-2 sm:gap-3 border-b-2 border-slate-200">
             {/* Logotipo y Título Principal */}
             <button
               type="button"
               onClick={() => handleSwitchTab('teoria')}
-              className="flex items-center gap-3 text-left focus:outline-none group select-none cursor-pointer"
+              className="flex items-center gap-2 sm:gap-3 text-left focus:outline-none group select-none cursor-pointer shrink-0 min-w-0"
               title="Ir al inicio - Colegio Ekirayá Cita Master"
             >
               {!logoFailed ? (
-                <div className="bg-slate-50 p-1.5 sm:p-2 rounded-xl border-2 border-slate-200 shadow-xs shrink-0 transition-transform group-hover:scale-105">
+                <div className="bg-slate-50 p-1 sm:p-2 rounded-xl border-2 border-slate-200 shadow-xs shrink-0 transition-transform group-hover:scale-105">
                   <img
                     src="https://colegioekiraya.edu.co/wp-content/uploads/2024/09/LOGO-CEM-COLOR-02.png"
                     alt="Logo Colegio Ekirayá"
                     referrerPolicy="no-referrer"
                     onError={() => setLogoFailed(true)}
-                    className="h-8 sm:h-10 w-auto object-contain"
+                    className="h-7 sm:h-10 w-auto object-contain"
                   />
                 </div>
               ) : (
-                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-[#315BA3] text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs shrink-0">
+                <div className="h-7 w-7 sm:h-10 sm:w-10 rounded-xl bg-[#315BA3] text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs shrink-0">
                   CEM
                 </div>
               )}
               <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-display text-base sm:text-lg lg:text-xl font-extrabold tracking-tight text-[#315BA3] leading-tight group-hover:text-[#254680] transition-colors">
-                    Cita Master
-                  </span>
-                </div>
+                <span className="font-display text-sm sm:text-lg lg:text-xl font-extrabold tracking-tight text-[#315BA3] leading-tight group-hover:text-[#254680] transition-colors whitespace-nowrap block">
+                  Cita Master
+                </span>
                 <span className="hidden sm:block text-[11px] text-slate-500 font-medium tracking-normal truncate mt-0.5">
                   Portal Académico &amp; Gestor Bibliográfico
                 </span>
@@ -583,19 +581,20 @@ export default function App() {
             </button>
 
             {/* Acciones de Administración CMS / Menú Móvil */}
-            <div className="flex items-center gap-2.5 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
               <button
                 type="button"
                 onClick={handleOpenCmsModal}
-                className={`px-3 sm:px-3.5 py-1.5 rounded-xl border-2 text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs ${
+                className={`px-2.5 sm:px-3.5 py-1.5 rounded-xl border-2 text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer shadow-xs ${
                   isCmsAdminLoggedIn
                     ? 'bg-[#f8c62e] text-slate-950 border-[#e5b320] hover:bg-[#eab308] hover:shadow-md'
                     : 'bg-[#664d88] hover:bg-[#533e6f] border-[#533e6f] text-white hover:shadow-sm'
                 }`}
                 title="Administración CMS - Panel y Login"
               >
-                <ShieldCheck className={`w-4 h-4 shrink-0 ${isCmsAdminLoggedIn ? 'text-slate-950' : 'text-[#f8c62e]'}`} />
-                <span>Administración CMS</span>
+                <ShieldCheck className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${isCmsAdminLoggedIn ? 'text-slate-950' : 'text-[#f8c62e]'}`} />
+                <span className="hidden sm:inline">Administración </span>
+                <span>CMS</span>
                 {isCmsAdminLoggedIn && (
                   <span className="hidden xl:inline text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-slate-900/15 text-slate-900">
                     Activo
@@ -619,7 +618,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="p-1.5 sm:p-2 rounded-xl text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#315BA3]/40 transition-colors cursor-pointer md:hidden"
+                className="p-1.5 sm:p-2 rounded-xl text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#315BA3]/40 transition-colors cursor-pointer md:hidden shrink-0"
                 aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
                 aria-expanded={mobileMenuOpen}
               >
