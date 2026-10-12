@@ -125,11 +125,11 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
     window.addEventListener('ekiraya_repo_update', handleRepoUpdate);
 
-    // Polling cada 3 segundos para asegurar tiempo real en todos los navegadores y dispositivos
+    // Polling cada 120 segundos para asegurar sincronización en segundo plano en todos los navegadores y dispositivos
     const intervalId = setInterval(() => {
       fetchMonografias(true);
       fetchUsuarios();
-    }, 3000);
+    }, 120000);
 
     // Refrescar al enfocar la pestaña, ventana o al cambiar la visibilidad de la página
     const handleFocusOrVisible = () => {
@@ -621,12 +621,15 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     selectedAnio !== 'TODOS' ||
     selectedGrado !== 'TODOS';
 
-  // Paginación estricta de 12 monografías por página
+  // Paginación: 12 monografías por página al filtrar; 3 en pantalla inicial sin filtros
+  const INITIAL_PREVIEW_COUNT = 3;
   const ITEMS_PER_PAGE = 12;
   const [currentPage, setCurrentPage] = useState<number>(1);
 
-  // Total de páginas calculado sobre el catálogo filtrado completo
-  const totalPages = Math.max(1, Math.ceil(filteredMonografias.length / ITEMS_PER_PAGE));
+  // Total de páginas: si no hay filtros activos se muestran únicamente los 3 iniciales
+  const totalPages = isFiltering
+    ? Math.max(1, Math.ceil(filteredMonografias.length / ITEMS_PER_PAGE))
+    : 1;
 
   // Volver a la página 1 cuando cambia la búsqueda o cualquiera de los filtros
   useEffect(() => {
@@ -640,11 +643,14 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
     }
   }, [totalPages, currentPage]);
 
-  // Selección exclusiva de las monografías de la página actual
+  // Selección de monografías: si no hay filtro activo, previsualizar únicamente tres documentos
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const displayedMonografias = useMemo(() => {
+    if (!isFiltering) {
+      return filteredMonografias.slice(0, INITIAL_PREVIEW_COUNT);
+    }
     return filteredMonografias.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredMonografias, startIndex]);
+  }, [filteredMonografias, isFiltering, startIndex]);
 
   // Generador de números de página para navegación con elipsis limpia
   const getPageNumbers = () => {
@@ -984,6 +990,8 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 ? 'Consultando Google Sheets en tiempo real...'
                 : filteredMonografias.length === 0
                 ? 'No se encontraron monografías'
+                : !isFiltering
+                ? `Vista previa inicial: Mostrando 3 de ${monografias.length} monografías registradas. Aplica un filtro o búsqueda para explorar el catálogo completo.`
                 : `Mostrando ${startIndex + 1}–${Math.min(startIndex + ITEMS_PER_PAGE, filteredMonografias.length)} de ${filteredMonografias.length} monografías registradas (Página ${currentPage} de ${totalPages})`}
             </span>
             {isRevalidating && !isLoadingMonografias && (
@@ -1015,7 +1023,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
       {isLoadingMonografias ? (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((n) => (
+            {(isFiltering ? [1, 2, 3, 4, 5, 6] : [1, 2, 3]).map((n) => (
               <div
                 key={n}
                 className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs animate-pulse flex flex-col justify-between"
@@ -1225,6 +1233,21 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             );
           })}
         </div>
+
+        {/* Mensaje informativo en pantalla inicial (sin filtros) indicando cómo ver los demás documentos */}
+        {!isFiltering && monografias.length > INITIAL_PREVIEW_COUNT && (
+          <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-3xl p-6 sm:p-8 text-center space-y-3">
+            <div className="inline-flex p-3 rounded-2xl bg-violet-100 text-[#664d88]">
+              <Filter className="w-5 h-5" />
+            </div>
+            <h4 className="text-sm sm:text-base font-bold text-slate-800">
+              ¿Deseas ver las demás monografías ({monografias.length - INITIAL_PREVIEW_COUNT} restantes)?
+            </h4>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              Esta es una vista previa de 3 documentos iniciales. Utiliza la barra de búsqueda o selecciona una Unidad Académica, Año o Grado arriba para visualizar todos los documentos correspondientes.
+            </p>
+          </div>
+        )}
 
         {/* 4. Barra de Paginación */}
         {filteredMonografias.length > 0 && totalPages > 1 && (
