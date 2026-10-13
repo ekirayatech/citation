@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { CitationFormData } from '../types/citation';
 import { SOURCE_TYPE_LABELS, STYLE_LABELS } from '../utils/citationEngine';
+import { generateSocraticFallbackGuidance } from '../utils/socraticEngine';
 
 interface ChatMessage {
   id: string;
@@ -114,36 +115,58 @@ export const SocraticAiTutor: React.FC<SocraticAiTutorProps> = ({
           content: m.content,
         }));
 
-      const response = await fetch('/api/gestor/ai-tutor', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: query,
-          history: historyPayload,
-          context: {
-            style: formData.style,
-            sourceType: formData.sourceType,
-            title: formData.title,
-            authors: formData.authors,
-            isInstitutionalAuthor: formData.isInstitutionalAuthor,
-            institutionalName: formData.institutionalName,
-            year: formData.year,
-            publisher: formData.publisher,
-            url: formData.url,
-            doi: formData.doi,
+      let botReply = '';
+
+      try {
+        const response = await fetch('/api/gestor/ai-tutor', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
-        }),
-      });
+          body: JSON.stringify({
+            message: query,
+            history: historyPayload,
+            context: {
+              style: formData.style,
+              sourceType: formData.sourceType,
+              title: formData.title,
+              authors: formData.authors,
+              isInstitutionalAuthor: formData.isInstitutionalAuthor,
+              institutionalName: formData.institutionalName,
+              year: formData.year,
+              publisher: formData.publisher,
+              url: formData.url,
+              doi: formData.doi,
+            },
+          }),
+        });
 
-      const data = await response.json();
-
-      if (!response.ok && !data.fallbackReply) {
-        throw new Error(data.error || 'Error al comunicarse con el Tutor');
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await response.json();
+          if (data && (data.reply || data.fallbackReply)) {
+            botReply = data.reply || data.fallbackReply;
+          }
+        }
+      } catch (fetchErr) {
+        console.warn('Backend tutor fetch error, activating local pedagogical engine:', fetchErr);
       }
 
-      const botReply = data.reply || data.fallbackReply || 'No pude procesar la respuesta en este momento.';
+      // Si el servidor devolvió HTML (404/500), falló la red o no hay respuesta:
+      if (!botReply) {
+        botReply = generateSocraticFallbackGuidance(query, {
+          style: formData.style,
+          sourceType: formData.sourceType,
+          title: formData.title,
+          authors: formData.authors,
+          isInstitutionalAuthor: formData.isInstitutionalAuthor,
+          institutionalName: formData.institutionalName,
+          year: formData.year,
+          publisher: formData.publisher,
+          url: formData.url,
+          doi: formData.doi,
+        });
+      }
 
       const botMsg: ChatMessage = {
         id: `bot-${Date.now()}`,
@@ -155,9 +178,16 @@ export const SocraticAiTutor: React.FC<SocraticAiTutorProps> = ({
       setMessages((prev) => [...prev, botMsg]);
     } catch (err: any) {
       console.error('Error in Socratic Tutor:', err);
-      setErrorMessage(
-        err.message || 'No fue posible conectar con el Tutor IA. Por favor intenta de nuevo.'
-      );
+      const fallbackReply = generateSocraticFallbackGuidance(query, formData);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `bot-${Date.now()}`,
+          role: 'model',
+          content: fallbackReply,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }

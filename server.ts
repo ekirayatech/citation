@@ -6,14 +6,14 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { OAuth2Client } from 'google-auth-library';
+import type { AuthorizedSchoolUser } from './src/data/repositorioDefaultData.ts';
 import {
-  AuthorizedSchoolUser,
   DEFAULT_AUTHORIZED_USERS,
   DEFAULT_REPO_HEADERS,
   DEFAULT_REPO_ROWS,
   DEFAULT_USUARIOS_HEADERS,
 } from './src/data/repositorioDefaultData.ts';
-import { CmsPage } from './src/types/cms.ts';
+import type { CmsPage } from './src/types/cms.ts';
 import { DEFAULT_CMS_PAGES } from './src/data/defaultCmsPages.ts';
 
 const googleOAuthClient = new OAuth2Client();
@@ -197,7 +197,7 @@ REGLA DE ORO PEDAGÓGICA (OBLIGATORIA Y ESTRICTA):
      • Explícale la lógica de la regla (por ejemplo: ¿qué pasa si son 3 o más autores en APA 7? Pregúntale si conoce la locución "et al.").
   5. Mantén respuestas concisas, pedagógicas, cálidas y motivadoras (máximo 2 a 3 párrafos cortos o listas con viñetas claras), finalizando SIEMPRE con una pregunta reflexiva para que el estudiante dé el siguiente paso.`;
 
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const STATE_FILE_PATH = path.join(__dirname, '.ekiraya-repo-state.json');
 
 interface PersistedRepoState {
