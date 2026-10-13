@@ -697,7 +697,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           </div>
 
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-slate-950 mb-2 font-display">
-            Repositorio de Monografías y Proyectos de Vida
+            Repositorio de Proyectos de Vida
           </h1>
           <p className="text-slate-600 text-xs sm:text-sm max-w-3xl leading-relaxed">
             Consulta oficial de trabajos de grado, monografías académicas y proyectos de vida del Colegio Ekirayá.

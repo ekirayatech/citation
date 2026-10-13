@@ -262,7 +262,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start w-full">
       {/* COLUMNA IZQUIERDA: FORMULARIO DINÁMICO ROBUSTECIDO (PÁGS. 20–36) */}
-      <section className="lg:col-span-7 min-w-0 max-w-full bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 space-y-5 shadow-xs">
+      <section className="lg:col-span-7 min-w-0 max-w-full w-full bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 space-y-5 shadow-xs overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-slate-200 pb-4">
           <div className="min-w-0">
             <div className="text-xs font-bold text-[#315BA3] truncate">
@@ -302,7 +302,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
         </div>
 
         {/* Barra Rápida: Catálogo de 23 Ejemplos Reales del Documento APA (Págs. 20 a 35) */}
-        <div className="p-3.5 rounded-xl bg-[#FAF5FF] border border-violet-200/90 space-y-2.5 max-w-full overflow-hidden">
+        <div className="p-3.5 sm:p-4 rounded-xl bg-[#FAF5FF] border border-violet-200/90 space-y-2.5 w-full max-w-full overflow-hidden">
           <div className="flex items-center justify-between gap-2 min-w-0">
             <label
               htmlFor="docExampleSelect"
@@ -313,26 +313,29 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
             </label>
             <span className="text-[11px] font-medium text-violet-700 shrink-0">23 casos oficiales</span>
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-full min-w-0">
-            <select
-              id="docExampleSelect"
-              value={selectedDocExampleId}
-              onChange={(e) => {
-                setSelectedDocExampleId(e.target.value);
-                loadOfficialDocumentExample(e.target.value);
-              }}
-              className="flex-1 min-w-0 max-w-full w-full rounded-lg border border-violet-300 bg-white py-2 px-3 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600 truncate"
-            >
-              {APA_DOCUMENT_EXAMPLES.map((ex) => (
-                <option key={ex.id} value={ex.id}>
-                  {ex.categoryLabel} — {ex.title}
-                </option>
-              ))}
-            </select>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full min-w-0">
+            <div className="flex-1 min-w-0 w-full overflow-hidden">
+              <select
+                id="docExampleSelect"
+                value={selectedDocExampleId}
+                onChange={(e) => {
+                  setSelectedDocExampleId(e.target.value);
+                  loadOfficialDocumentExample(e.target.value);
+                }}
+                className="w-full min-w-0 max-w-full rounded-lg border border-violet-300 bg-white py-2 px-3 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600 truncate block"
+                style={{ width: '100%', maxWidth: '100%', minWidth: 0 }}
+              >
+                {APA_DOCUMENT_EXAMPLES.map((ex) => (
+                  <option key={ex.id} value={ex.id} title={`${ex.categoryLabel} — ${ex.title}`}>
+                    {ex.categoryLabel} — {ex.title}
+                  </option>
+                ))}
+              </select>
+            </div>
             <button
               type="button"
               onClick={() => loadOfficialDocumentExample(selectedDocExampleId)}
-              className="px-3 py-2 rounded-lg bg-violet-700 hover:bg-violet-800 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="px-3.5 py-2 rounded-lg bg-violet-700 hover:bg-violet-800 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer text-center"
             >
               Aplicar plantilla
             </button>
@@ -1604,7 +1607,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
       </section>
 
       {/* COLUMNA DERECHA: GESTOR DE BIBLIOGRAFÍA GUARDADA EN TARJETAS LIMPIAS */}
-      <section className="lg:col-span-5 min-w-0 max-w-full bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 flex flex-col justify-between space-y-5 shadow-xs">
+      <section className="lg:col-span-5 min-w-0 max-w-full w-full bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 flex flex-col justify-between space-y-5 shadow-xs overflow-hidden">
         <div className="space-y-4">
           <div className="flex items-center justify-between border-b-2 border-slate-200 pb-4">
             <div>
