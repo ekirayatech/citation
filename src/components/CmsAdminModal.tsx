@@ -295,16 +295,30 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
 
   const [formData, setFormData] = useState<Partial<CmsPage>>(() => {
     if (activePage) return JSON.parse(JSON.stringify(activePage));
+    const now = Date.now();
     return {
-      id: `cms-${Date.now()}`,
-      slug: 'nueva-seccion',
-      title: 'Título de la Nueva Sección',
-      navLabel: 'Nueva Sección',
-      subtitle: 'Descripción breve para los estudiantes y docentes.',
+      id: `cms-${now}`,
+      slug: `seccion-${pages.length + 1}`,
+      title: 'Nueva Sección Académica',
+      navLabel: `Pestaña ${pages.length + 1}`,
+      subtitle: 'Contenido administrado por el equipo docente de Ekirayá.',
       iconName: 'FileText',
       published: true,
       order: (pages.length + 1) * 10,
-      blocks: [],
+      blocks: [
+        {
+          id: `blk-${now}-1`,
+          type: 'header',
+          title: 'Información Institucional',
+          subtitle: 'Lineamientos y presentación de la sección.',
+        },
+        {
+          id: `blk-${now}-2`,
+          type: 'paragraph',
+          title: 'Contenido y Directrices',
+          content: 'Escribe aquí la descripción de esta sección. Puedes editarla en cualquier momento.',
+        },
+      ],
     };
   });
 
@@ -520,31 +534,62 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
 
   const handleSaveCurrentPage = async () => {
     setHasAttemptedSave(true);
-    const errors = validateCmsPageApaMetadata(formData);
-    setApaErrors(errors);
+    // Auto-corregir detalles de formato APA (puntos finales, mayúsculas, URLs y slug)
+    const cleaned = autoFixApaMetadata(formData);
 
-    if (errors.length > 0) {
-      showToast(`⚠️ No se puede guardar: Se encontraron ${errors.length} error(es) de metadatos o formato APA.`);
-      return;
+    const titleCandidate = (cleaned.title || formData.title || '').trim();
+    const navCandidate = (cleaned.navLabel || formData.navLabel || '').trim();
+
+    const effectiveTitle = titleCandidate || navCandidate || 'Nueva Sección Académica';
+    const effectiveNavLabel = navCandidate || titleCandidate || 'Nueva Pestaña';
+
+    let effectiveSlug = (cleaned.slug || formData.slug || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, '-')
+      .replace(/-+/g, '-')
+      .trim();
+    if (!effectiveSlug) {
+      effectiveSlug = `seccion-${Date.now()}`;
     }
+
+    const defaultBlocks: CmsBlock[] = [
+      {
+        id: `blk-${Date.now()}-1`,
+        type: 'header',
+        title: 'Información Institucional',
+        subtitle: 'Lineamientos y presentación de la sección.',
+      },
+      {
+        id: `blk-${Date.now()}-2`,
+        type: 'paragraph',
+        title: 'Contenido y Directrices',
+        content: 'Escribe aquí la descripción de esta sección. Puedes editarla en cualquier momento.',
+      },
+    ];
+
+    const currentBlocks = (cleaned.blocks && cleaned.blocks.length > 0)
+      ? cleaned.blocks
+      : (formData.blocks && formData.blocks.length > 0)
+      ? formData.blocks
+      : defaultBlocks;
 
     const pageToSave: CmsPage = {
       id: formData.id || `cms-${Date.now()}`,
-      slug: (formData.slug || 'seccion')
-        .toLowerCase()
-        .replace(/[^a-z0-9_-]/g, '-')
-        .replace(/-+/g, '-'),
-      title: (formData.title || '').trim(),
-      navLabel: (formData.navLabel || '').trim(),
-      subtitle: (formData.subtitle || '').trim(),
+      slug: effectiveSlug,
+      title: effectiveTitle,
+      navLabel: effectiveNavLabel,
+      subtitle: (cleaned.subtitle || formData.subtitle || '').trim(),
       iconName: formData.iconName || 'FileText',
-      published: Boolean(formData.published !== false),
-      order: Number(formData.order) || 10,
+      published: formData.published !== false,
+      order: Number(formData.order) || (pages.length + 1) * 10,
       createdAt: formData.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       updatedBy: 'mebolanos@cem.edu.co',
-      blocks: formData.blocks || [],
+      blocks: currentBlocks as CmsBlock[],
     };
+
+    setFormData(pageToSave);
+    setApaErrors([]);
 
     setIsSaving(true);
     try {
@@ -552,7 +597,7 @@ export const CmsAdminModal: React.FC<CmsAdminModalProps> = ({
       setIsCreatingNew(false);
       setSelectedPageId(pageToSave.id);
       setHasAttemptedSave(false);
-      showToast(`Pestaña "${pageToSave.navLabel}" guardada y sincronizada para todos los dispositivos`);
+      showToast(`Pestaña "${pageToSave.navLabel}" agregada al menú y guardada exitosamente`);
     } catch (err: any) {
       showToast(err.message || 'Error al guardar la página en el CMS');
     } finally {

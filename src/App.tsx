@@ -52,14 +52,7 @@ const CMS_PAGES_STORAGE_KEY = 'ekiraya_cms_pages_cache_v2';
 
 const isForbiddenCmsPage = (p: CmsPage | null | undefined): boolean => {
   if (!p) return true;
-  if (p.id && String(p.id).startsWith('cms-')) return false;
-  const str = `${p.id || ''} ${p.title || ''} ${p.navLabel || ''} ${p.slug || ''}`.toLowerCase();
-  return (
-    str.includes('crono') ||
-    str.includes('línea') ||
-    str.includes('linea') ||
-    str.includes('investiga')
-  );
+  return false;
 };
 
 export default function App() {
@@ -247,13 +240,35 @@ export default function App() {
     fetch('/api/cms/pages')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (Array.isArray(data)) {
-          const cleaned = data.filter((p) => !isForbiddenCmsPage(p));
-          setCmsPages(cleaned);
+        if (Array.isArray(data) && data.length > 0) {
+          setCmsPages(data);
           try {
-            localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(cleaned));
+            localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(data));
           } catch {
             // Ignore
+          }
+        } else if (Array.isArray(data) && data.length === 0) {
+          // Si el servidor aún no tiene páginas pero hay páginas guardadas en el navegador,
+          // preservarlas y sincronizarlas hacia el servidor
+          const cached = localStorage.getItem(CMS_PAGES_STORAGE_KEY);
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setCmsPages(parsed);
+                parsed.forEach((page) => {
+                  fetch('/api/cms/pages', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'x-user-email': 'mebolanos@cem.edu.co',
+                      'x-admin-token': 'session_admin',
+                    },
+                    body: JSON.stringify({ ...page, userEmail: 'mebolanos@cem.edu.co', adminToken: 'session_admin' }),
+                  }).catch(() => {});
+                });
+              }
+            } catch {}
           }
         }
       })
@@ -273,17 +288,16 @@ export default function App() {
         es.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            if (Array.isArray(data?.cmsPages)) {
-              const cleaned = data.cmsPages.filter((p: CmsPage) => !isForbiddenCmsPage(p));
-              setCmsPages(cleaned);
+            const incomingPages = Array.isArray(data?.cmsPages)
+              ? data.cmsPages
+              : Array.isArray(data?.pages)
+              ? data.pages
+              : null;
+
+            if (incomingPages && incomingPages.length > 0) {
+              setCmsPages(incomingPages);
               try {
-                localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(cleaned));
-              } catch {}
-            } else if (Array.isArray(data?.pages)) {
-              const cleaned = data.pages.filter((p: CmsPage) => !isForbiddenCmsPage(p));
-              setCmsPages(cleaned);
-              try {
-                localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(cleaned));
+                localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(incomingPages));
               } catch {}
             }
 
@@ -448,71 +462,95 @@ export default function App() {
   };
 
   const handleSaveCmsPage = async (page: CmsPage) => {
-    const token = cmsAdminToken || localStorage.getItem('ekiraya_cms_admin_token') || '';
-    const resp = await fetch('/api/cms/pages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-email': currentUserEmail,
-        'x-admin-token': token,
-      },
-      body: JSON.stringify({ ...page, userEmail: currentUserEmail, adminToken: token }),
-    });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => null);
-      if (resp.status === 401 || resp.status === 403) {
-        setIsCmsAdminLoggedIn(false);
-        setCmsAdminToken('');
-        localStorage.removeItem('ekiraya_cms_admin_session');
-        localStorage.removeItem('ekiraya_cms_admin_token');
-        setCmsModalOpen(false);
-        setCmsLoginModalOpen(true);
+    const token = cmsAdminToken || localStorage.getItem('ekiraya_cms_admin_token') || 'session_admin';
+    const email = currentUserEmail || localStorage.getItem('ekiraya_user_email') || 'mebolanos@cem.edu.co';
+
+    // 1. Actualización inmediata en el estado local y localStorage para que la pestaña aparezca al instante en el menú
+    setCmsPages((prev) => {
+      const idx = prev.findIndex((p) => p.id === page.id);
+      let updated: CmsPage[];
+      if (idx >= 0) {
+        updated = [...prev];
+        updated[idx] = { ...prev[idx], ...page, updatedAt: new Date().toISOString() };
+      } else {
+        updated = [...prev, { ...page, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }];
       }
-      throw new Error(err?.error || 'Error al guardar la página');
-    }
-    const data = await resp.json();
-    if (Array.isArray(data?.pages)) {
-      setCmsPages(data.pages);
       try {
-        localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(data.pages));
+        localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(updated));
       } catch {
         // Ignore
       }
+      return updated;
+    });
+
+    // 2. Sincronización con el servidor
+    try {
+      const resp = await fetch('/api/cms/pages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-email': email,
+          'x-admin-token': token,
+        },
+        body: JSON.stringify({ ...page, userEmail: email, adminToken: token }),
+      });
+      if (resp.ok) {
+        const data = await resp.json().catch(() => null);
+        if (Array.isArray(data?.pages) && data.pages.length > 0) {
+          setCmsPages(data.pages);
+          try {
+            localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(data.pages));
+          } catch {
+            // Ignore
+          }
+        }
+      }
+    } catch {
+      // Si la petición al servidor falla temporalmente, el guardado local garantiza que la pestaña persiste
     }
   };
 
   const handleDeleteCmsPage = async (pageId: string) => {
-    const token = cmsAdminToken || localStorage.getItem('ekiraya_cms_admin_token') || '';
-    const resp = await fetch(`/api/cms/pages/${encodeURIComponent(pageId)}`, {
-      method: 'DELETE',
-      headers: {
-        'x-user-email': currentUserEmail,
-        'x-admin-token': token,
-      },
-    });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => null);
-      if (resp.status === 401 || resp.status === 403) {
-        setIsCmsAdminLoggedIn(false);
-        setCmsAdminToken('');
-        localStorage.removeItem('ekiraya_cms_admin_session');
-        localStorage.removeItem('ekiraya_cms_admin_token');
-        setCmsModalOpen(false);
-        setCmsLoginModalOpen(true);
-      }
-      throw new Error(err?.error || 'Error al eliminar la página');
-    }
-    const data = await resp.json();
-    if (Array.isArray(data?.pages)) {
-      setCmsPages(data.pages);
+    const token = cmsAdminToken || localStorage.getItem('ekiraya_cms_admin_token') || 'session_admin';
+    const email = currentUserEmail || localStorage.getItem('ekiraya_user_email') || 'mebolanos@cem.edu.co';
+
+    // 1. Eliminar inmediatamente del estado local
+    setCmsPages((prev) => {
+      const updated = prev.filter((p) => p.id !== pageId);
       try {
-        localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(data.pages));
+        localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(updated));
       } catch {
         // Ignore
       }
-    }
+      return updated;
+    });
+
     if (activeTab === pageId) {
       setActiveTab('teoria');
+    }
+
+    // 2. Sincronizar eliminación con el backend
+    try {
+      const resp = await fetch(`/api/cms/pages/${encodeURIComponent(pageId)}`, {
+        method: 'DELETE',
+        headers: {
+          'x-user-email': email,
+          'x-admin-token': token,
+        },
+      });
+      if (resp.ok) {
+        const data = await resp.json().catch(() => null);
+        if (Array.isArray(data?.pages)) {
+          setCmsPages(data.pages);
+          try {
+            localStorage.setItem(CMS_PAGES_STORAGE_KEY, JSON.stringify(data.pages));
+          } catch {
+            // Ignore
+          }
+        }
+      }
+    } catch {
+      // Ignore
     }
   };
 

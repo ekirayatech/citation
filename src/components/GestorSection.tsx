@@ -260,19 +260,19 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
     formData.authorMode || (formData.isInstitutionalAuthor ? 'institutional' : 'personal');
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start w-full">
       {/* COLUMNA IZQUIERDA: FORMULARIO DINÁMICO ROBUSTECIDO (PÁGS. 20–36) */}
-      <section className="lg:col-span-7 bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 space-y-5 shadow-xs">
+      <section className="lg:col-span-7 min-w-0 max-w-full bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 space-y-5 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-slate-200 pb-4">
-          <div>
-            <div className="text-xs font-bold text-[#315BA3]">
+          <div className="min-w-0">
+            <div className="text-xs font-bold text-[#315BA3] truncate">
               Generador Inteligente Multi-Norma · Normas APA 7.ª Edición
             </div>
-            <h2 className="text-lg sm:text-xl font-bold text-slate-900">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 truncate">
               Cita Master — Datos de la Fuente
             </h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
             <button
               type="button"
               onClick={() => setIsTutorOpen(true)}
@@ -302,18 +302,18 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
         </div>
 
         {/* Barra Rápida: Catálogo de 23 Ejemplos Reales del Documento APA (Págs. 20 a 35) */}
-        <div className="p-3.5 rounded-xl bg-[#FAF5FF] border border-violet-200/90 space-y-2">
-          <div className="flex items-center justify-between gap-2">
+        <div className="p-3.5 rounded-xl bg-[#FAF5FF] border border-violet-200/90 space-y-2.5 max-w-full overflow-hidden">
+          <div className="flex items-center justify-between gap-2 min-w-0">
             <label
               htmlFor="docExampleSelect"
-              className="text-xs font-semibold text-violet-950 flex items-center gap-1.5"
+              className="text-xs font-semibold text-violet-950 flex items-center gap-1.5 min-w-0 truncate"
             >
               <BookOpen className="w-3.5 h-3.5 text-violet-700 shrink-0" />
-              <span>Plantillas y Ejemplos Reales del Manual APA:</span>
+              <span className="truncate">Plantillas y Ejemplos Reales del Manual APA:</span>
             </label>
-            <span className="text-[11px] font-medium text-violet-700">23 casos oficiales</span>
+            <span className="text-[11px] font-medium text-violet-700 shrink-0">23 casos oficiales</span>
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-full min-w-0">
             <select
               id="docExampleSelect"
               value={selectedDocExampleId}
@@ -321,7 +321,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
                 setSelectedDocExampleId(e.target.value);
                 loadOfficialDocumentExample(e.target.value);
               }}
-              className="flex-1 rounded-lg border border-violet-300 bg-white py-2 px-3 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600"
+              className="flex-1 min-w-0 max-w-full w-full rounded-lg border border-violet-300 bg-white py-2 px-3 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-600 truncate"
             >
               {APA_DOCUMENT_EXAMPLES.map((ex) => (
                 <option key={ex.id} value={ex.id}>
@@ -332,7 +332,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
             <button
               type="button"
               onClick={() => loadOfficialDocumentExample(selectedDocExampleId)}
-              className="px-3 py-2 rounded-lg bg-violet-700 hover:bg-violet-800 text-white text-xs font-semibold transition-colors whitespace-nowrap"
+              className="px-3 py-2 rounded-lg bg-violet-700 hover:bg-violet-800 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               Aplicar plantilla
             </button>
@@ -1596,7 +1596,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
               </button>
             </div>
             <div
-              className="bg-white p-4 rounded-lg border border-violet-200/80 font-mono text-xs sm:text-sm text-slate-900 hanging-indent leading-relaxed select-all"
+              className="bg-white p-4 rounded-lg border border-violet-200/80 font-mono text-xs sm:text-sm text-slate-900 hanging-indent leading-relaxed select-all break-words overflow-hidden"
               dangerouslySetInnerHTML={{ __html: generated.referenceHtml }}
             />
           </div>
@@ -1604,7 +1604,7 @@ export const GestorSection: React.FC<GestorSectionProps> = ({
       </section>
 
       {/* COLUMNA DERECHA: GESTOR DE BIBLIOGRAFÍA GUARDADA EN TARJETAS LIMPIAS */}
-      <section className="lg:col-span-5 bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 flex flex-col justify-between space-y-5 shadow-xs">
+      <section className="lg:col-span-5 min-w-0 max-w-full bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 flex flex-col justify-between space-y-5 shadow-xs">
         <div className="space-y-4">
           <div className="flex items-center justify-between border-b-2 border-slate-200 pb-4">
             <div>
