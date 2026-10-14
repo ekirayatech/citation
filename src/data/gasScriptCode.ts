@@ -1,1 +1,726 @@
-export const GOOGLE_APPS_SCRIPT_CODE = "/**\n * =========================================================================\n * COLEGIO EKIRAYÁ - SISTEMA DE REPOSITORIO DE MONOGRAFÍAS (BACKEND GAS)\n * =========================================================================\n * \n * Google Apps Script: Code.gs\n * Hoja de Cálculo ID: 1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow\n * Carpeta Raíz Drive (REPOSITORIO PV) ID: 1U0BfnGyQXzxuKaa95nqGx8iqbdG-eCii\n * \n * Jerarquía en Google Drive:\n * REPOSITORIO PV\n *  └── Unidades Académicas\n *       └── [Nombre de Unidad Académica] (ej. Ciencias, Música, Psicología, etc.)\n *            └── [Año] (ej. 2025, 2026, 2027)\n *                 └── [archivo_monografia.pdf]\n * \n * Estructura de Hojas en Google Sheets:\n * 1. \"Repositorio\" (17 columnas dinámicas):\n *    documento_id | titulo | autor | grado | año | Unidad Académica | Linea de investigación |\n *    tipo | palabras_clave | resumen | Asesor(es) | drive_file_id | url_documento |\n *    visibilidad | estado | fecha_registro | fecha_actualizacion\n * \n * 2. \"Usuarios\" (5 columnas dinámicas):\n *    Nombres | Curso | Correo | Sección | Perfil\n */\n\n// =========================================================================\n// CONSTANTES GLOBALES DE CONFIGURACIÓN\n// =========================================================================\nconst SPREADSHEET_ID = '1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow';\nconst ROOT_FOLDER_ID = '1U0BfnGyQXzxuKaa95nqGx8iqbdG-eCii'; // REPOSITORIO PV\nconst NOMBRE_SUB_CARPETA_UNIDADES = 'Unidades Académicas';\nconst HOJA_REPOSITORIO = 'Repositorio';\nconst HOJA_USUARIOS = 'Usuarios';\n\n/**\n * 17 Encabezados canónicos de la hoja \"Repositorio\"\n */\nconst HEADERS_REPOSITORIO = [\n  'documento_id',\n  'titulo',\n  'autor',\n  'grado',\n  'año',\n  'Unidad Académica',\n  'Linea de investigación',\n  'tipo',\n  'palabras_clave',\n  'resumen',\n  'Asesor(es)',\n  'drive_file_id',\n  'url_documento',\n  'visibilidad',\n  'estado',\n  'fecha_registro',\n  'fecha_actualizacion'\n];\n\n/**\n * 5 Encabezados canónicos de la hoja \"Usuarios\"\n */\nconst HEADERS_USUARIOS = [\n  'Nombres',\n  'Curso',\n  'Correo',\n  'Sección',\n  'Perfil'\n];\n\n// =========================================================================\n// 1. MAPEO DINÁMICO DE COLUMNAS Y UTILIDADES DE IDENTIFICACIÓN DE DRIVE\n// =========================================================================\n\n/**\n * Extrae el ID único de Google Drive a partir de una URL o cadena de ID.\n * Tolera formatos:\n * - ID directo: 1TSZz1EJiLcEgE76f1FAXO49vFnkCx1bY\n * - URL /file/d/ID/view...\n * - URL /open?id=ID\n * - URL /uc?id=ID\n * - URL /d/ID/...\n * \n * @param {string} valor Cadena o URL a analizar\n * @return {string} ID extraído o cadena vacía si no es identificable\n */\nfunction extraerDriveFileId(valor) {\n  if (!valor) return '';\n  const str = String(valor).trim();\n  if (!str) return '';\n\n  // Si ya es un ID de Drive directo (entre 25 y 55 caracteres alfanuméricos con guiones)\n  if (/^[a-zA-Z0-9_-]{25,55}$/.test(str)) {\n    return str;\n  }\n\n  // 1. Extraer de fórmula HYPERLINK si existe: =HYPERLINK(\"https://...\", \"...\")\n  const matchHyperlink = str.match(/=HYPERLINK\\(\\s*[\"']([^\"']+)[\"']/i);\n  if (matchHyperlink && matchHyperlink[1]) {\n    const fromHl = extraerDriveFileId(matchHyperlink[1]);\n    if (fromHl) return fromHl;\n  }\n\n  // 2. Patrón estándar: /file/d/([a-zA-Z0-9_-]+) o con /u/\\d+/\n  const matchFileD = str.match(/\\/file(?:\\/u\\/\\d+)?\\/d\\/([a-zA-Z0-9_-]+)/i);\n  if (matchFileD && matchFileD[1]) return matchFileD[1].trim();\n\n  // 3. Patrón genérico de documentos de Drive: /d/([a-zA-Z0-9_-]+)\n  const matchD = str.match(/\\/d\\/([a-zA-Z0-9_-]+)/i);\n  if (matchD && matchD[1]) return matchD[1].trim();\n\n  // 4. Patrón con parámetro de consulta: id=([a-zA-Z0-9_-]+)\n  const matchIdParam = str.match(/[?&]id=([a-zA-Z0-9_-]+)/i);\n  if (matchIdParam && matchIdParam[1]) return matchIdParam[1].trim();\n\n  return '';\n}\n\n/**\n * Lee dinámicamente los encabezados de la Fila 1 de una hoja y mapea\n * cada nombre de columna a su índice correspondiente (0-indexado).\n * Permite que el código siga funcionando aunque se reordenen columnas\n * o se agreguen nuevas en el Google Sheet.\n * \n * @param {GoogleAppsScript.Spreadsheet.Sheet} hoja - Hoja de cálculo activa.\n * @return {Object.<string, number>} Diccionario { \"nombre_columna\": indice_0_based }\n */\nfunction obtenerMapaColumnas(hoja) {\n  if (!hoja) {\n    throw new Error('obtenerMapaColumnas: No se proporcionó una hoja válida.');\n  }\n\n  const lastCol = hoja.getLastColumn();\n  if (lastCol === 0) {\n    return {};\n  }\n\n  const encabezados = hoja.getRange(1, 1, 1, lastCol).getValues()[0];\n  const mapa = {};\n\n  const normalizar = (txt) => {\n    return String(txt || '')\n      .trim()\n      .normalize('NFD')\n      .replace(/[\\u0300-\\u036f]/g, '')\n      .toLowerCase()\n      .replace(/[^a-z0-9]/g, '');\n  };\n\n  encabezados.forEach((nombre, idx) => {\n    if (nombre !== null && nombre !== undefined) {\n      const limpio = String(nombre).trim();\n      if (limpio.length > 0) {\n        mapa[limpio] = idx;\n        mapa[limpio.toLowerCase()] = idx;\n        mapa[normalizar(limpio)] = idx;\n      }\n    }\n  });\n\n  // Sinónimos comunes para máxima tolerancia ante variaciones manuales de encabezados\n  const sinonimos = {\n    'drive_file_id': [\n      'drive_file_id', 'drivefileid', 'id_drive', 'iddrive', 'file_id', 'fileid',\n      'drive id', 'id drive', 'id de drive', 'id_de_drive', 'id archivo', 'id de archivo',\n      'idarchivo', 'id_archivo', 'google drive id', 'drive_id', 'driveid', 'id_de_archivo', 'archivo_id'\n    ],\n    'url_documento': [\n      'url_documento', 'urldocumento', 'url', 'enlace', 'link', 'enlace_documento',\n      'url documento', 'link drive', 'enlace drive', 'url drive', 'link pdf',\n      'enlace pdf', 'url pdf', 'enlace_archivo', 'link_archivo', 'url_archivo'\n    ],\n    'documento_id': ['documento_id', 'documentoid', 'id_documento', 'iddocumento', 'id', 'codigo', 'código'],\n    'titulo': ['titulo', 'título', 'nombre', 'title', 'tema'],\n    'autor': ['autor', 'autores', 'estudiante', 'estudiantes'],\n    'grado': ['grado', 'curso', 'nivel'],\n    'año': ['año', 'ano', 'anio', 'year'],\n    'Unidad Académica': ['unidad académica', 'unidad academica', 'unidadacademica', 'unidad'],\n    'Linea de investigación': ['linea de investigación', 'linea de investigacion', 'lineadeinvestigacion', 'linea', 'línea'],\n    'resumen': ['resumen', 'abstract', 'descripcion', 'descripción'],\n    'Asesor(es)': ['asesor(es)', 'asesores', 'asesor', 'tutor', 'tutores'],\n    'palabras_clave': ['palabras_clave', 'palabras clave', 'palabrasclave', 'keywords'],\n    'tipo': ['tipo', 'tipo_documento'],\n    'visibilidad': ['visibilidad', 'acceso'],\n    'estado': ['estado', 'status'],\n    'fecha_registro': ['fecha_registro', 'fecharegistro'],\n    'fecha_actualizacion': ['fecha_actualizacion', 'fechaactualizacion']\n  };\n\n  Object.keys(sinonimos).forEach(canonico => {\n    if (mapa[canonico] === undefined) {\n      const lista = sinonimos[canonico];\n      for (let i = 0; i < lista.length; i++) {\n        const s = lista[i];\n        if (mapa[s] !== undefined) {\n          mapa[canonico] = mapa[s];\n          break;\n        }\n        const normS = normalizar(s);\n        if (mapa[normS] !== undefined) {\n          mapa[canonico] = mapa[normS];\n          break;\n        }\n      }\n    }\n  });\n\n  return mapa;\n}\n\n// =========================================================================\n// 2. ESCANEO RECURSIVO DE DRIVE E INSERCIÓN EN SHEETS (IDEMPOTENTE)\n// =========================================================================\n\n/**\n * Recorre la jerarquía exacta en Google Drive:\n * REPOSITORIO PV -> Unidades Académicas -> [Unidad] -> [Año] -> [PDF]\n * y sincroniza las monografías en la hoja 'Repositorio' tratando 'drive_file_id'\n * como clave única absoluta.\n * \n * Reglas obligatorias de integridad:\n * 1. Lee previamente TODOS los drive_file_id existentes en la hoja y los carga en un Set.\n * 2. Si no existe la columna drive_file_id, detiene la ejecución con un error explícito.\n * 3. Si file.getId() ya existe en el Set, omite el archivo sin insertar fila.\n * 4. Si no existe, añade inmediatamente el ID al Set y prepara la nueva fila.\n * 5. Nunca sobrescribe, altera ni borra filas ni metadatos manuales existentes.\n * 6. Protegido con LockService contra ejecuciones simultáneas.\n * \n * @return {Object} Estadísticas de la sincronización.\n */\nfunction sincronizarRepositorioDrive() {\n  const lock = LockService.getScriptLock();\n  const hasLock = lock.tryLock(30000); // Esperar hasta 30 segundos\n  if (!hasLock) {\n    Logger.log('Sincronización abortada: Otra sincronización está en ejecución.');\n    return {\n      status: 'error',\n      message: 'Hay otra sincronización en ejecución. Intenta de nuevo en unos momentos.'\n    };\n  }\n\n  try {\n    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);\n    let hojaRepo = ss.getSheetByName(HOJA_REPOSITORIO);\n\n    // Búsqueda tolerante del nombre de la hoja Repositorio\n    if (!hojaRepo) {\n      const todasHojas = ss.getSheets();\n      for (let h = 0; h < todasHojas.length; h++) {\n        const nHoja = todasHojas[h].getName().trim().toLowerCase();\n        if (nHoja === HOJA_REPOSITORIO.toLowerCase() || nHoja === 'monografias' || nHoja === 'monografías') {\n          hojaRepo = todasHojas[h];\n          break;\n        }\n      }\n    }\n\n    if (!hojaRepo) {\n      throw new Error('No se encontró la hoja \"' + HOJA_REPOSITORIO + '\" en la hoja de cálculo de Google Sheets.');\n    }\n\n    const lastCol = hojaRepo.getLastColumn();\n    if (lastCol === 0) {\n      throw new Error('La hoja \"' + HOJA_REPOSITORIO + '\" no contiene columnas ni fila de encabezados.');\n    }\n\n    // 1. Localizar la columna exacta 'drive_file_id' en la Fila 1 de encabezados\n    const encabezados = hojaRepo.getRange(1, 1, 1, lastCol).getValues()[0];\n    let colDriveFileId = -1; // 0-based\n    let colUrlDocumento = -1; // 0-based\n    const mapaCols = {};\n\n    const normalizarEncabezado = (txt) => {\n      return String(txt || '')\n        .trim()\n        .toLowerCase()\n        .normalize('NFD')\n        .replace(/[\\u0300-\\u036f]/g, '')\n        .replace(/[^a-z0-9]/g, '');\n    };\n\n    for (let c = 0; c < encabezados.length; c++) {\n      const hRaw = String(encabezados[c] || '').trim();\n      const hNorm = normalizarEncabezado(hRaw);\n      if (hRaw) {\n        mapaCols[hRaw] = c;\n        mapaCols[hRaw.toLowerCase()] = c;\n        mapaCols[hNorm] = c;\n      }\n      if (\n        hNorm === 'drivefileid' ||\n        hNorm === 'iddrive' ||\n        hNorm === 'idarchivo' ||\n        hNorm === 'fileid' ||\n        hNorm === 'driveid'\n      ) {\n        colDriveFileId = c;\n      }\n      if (\n        hNorm === 'urldocumento' ||\n        hNorm === 'url' ||\n        hNorm === 'link' ||\n        hNorm === 'enlace' ||\n        hNorm === 'linkdocumento' ||\n        hNorm === 'urldrive'\n      ) {\n        colUrlDocumento = c;\n      }\n    }\n\n    if (colUrlDocumento === -1 && mapaCols['url_documento'] !== undefined) {\n      colUrlDocumento = mapaCols['url_documento'];\n    }\n\n    // Requisito 8: Si no se encuentra la columna drive_file_id, detener la sincronización con un error claro. No asumir que la columna existe.\n    if (colDriveFileId === -1) {\n      throw new Error('Error crítico: No se encontró la columna \"drive_file_id\" en la fila de encabezados de la hoja \"' + HOJA_REPOSITORIO + '\". La sincronización se detuvo para proteger los datos.');\n    }\n\n    // 2. Requisitos 1, 2, 3 y 12: Leer TODOS los drive_file_id existentes en la hoja ANTES de recorrer Drive\n    const lastRow = hojaRepo.getLastRow();\n    const existingDriveIds = new Set();\n    let filasSinDriveFileIdConUrl = 0;\n\n    if (lastRow > 1) {\n      // Lectura directa de la columna drive_file_id (1-based: colDriveFileId + 1) para todas las filas de datos\n      const valoresDriveCol = hojaRepo.getRange(2, colDriveFileId + 1, lastRow - 1, 1).getValues();\n      let valoresUrlCol = null;\n      if (colUrlDocumento !== -1) {\n        valoresUrlCol = hojaRepo.getRange(2, colUrlDocumento + 1, lastRow - 1, 1).getValues();\n      }\n\n      for (let r = 0; r < valoresDriveCol.length; r++) {\n        const celdaDrive = valoresDriveCol[r][0];\n        const idLimpio = celdaDrive !== null && celdaDrive !== undefined ? String(celdaDrive).trim() : '';\n\n        // Excluir valores vacíos\n        if (idLimpio.length > 0) {\n          existingDriveIds.add(idLimpio);\n          existingDriveIds.add(idLimpio.toLowerCase());\n          // Si la celda contiene una URL de Drive pegada por el usuario, indexar también el ID limpio extraído\n          const idExtraido = extraerDriveFileId(idLimpio);\n          if (idExtraido && idExtraido.length > 0) {\n            existingDriveIds.add(idExtraido);\n            existingDriveIds.add(idExtraido.toLowerCase());\n          }\n        } else if (valoresUrlCol) {\n          // Requisito 12: Si drive_file_id está vacío, comprobar si url_documento contiene un ID de Drive\n          const celdaUrl = valoresUrlCol[r][0];\n          const urlLimpia = celdaUrl !== null && celdaUrl !== undefined ? String(celdaUrl).trim() : '';\n          const idDeUrl = extraerDriveFileId(urlLimpia);\n          if (idDeUrl && idDeUrl.length > 0) {\n            filasSinDriveFileIdConUrl++;\n            // Nota: NO modificamos la fila en Sheets (Requisito 12).\n            // Pero indexamos su ID en existingDriveIds para evitar que la sincronización inserte una fila duplicada.\n            existingDriveIds.add(idDeUrl);\n            existingDriveIds.add(idDeUrl.toLowerCase());\n          }\n        }\n      }\n      Logger.log('Se cargaron ' + existingDriveIds.size + ' IDs de Drive existentes en la hoja \"' + HOJA_REPOSITORIO + '\". Filas con url pero sin drive_file_id: ' + filasSinDriveFileIdConUrl);\n    }\n\n    // 3. Abrir la Carpeta Raíz: 'REPOSITORIO PV'\n    let carpetaRaiz;\n    try {\n      carpetaRaiz = DriveApp.getFolderById(ROOT_FOLDER_ID);\n    } catch (e) {\n      throw new Error('No se pudo abrir la carpeta raíz REPOSITORIO PV (' + ROOT_FOLDER_ID + '): ' + e.message);\n    }\n\n    // 4. Ubicar la Subcarpeta Nivel 1: 'Unidades Académicas'\n    let carpetaUnidades = null;\n    const subCarpetasN1 = carpetaRaiz.getFoldersByName(NOMBRE_SUB_CARPETA_UNIDADES);\n\n    if (subCarpetasN1.hasNext()) {\n      carpetaUnidades = subCarpetasN1.next();\n    } else {\n      const iteradorCarpetas = carpetaRaiz.getFolders();\n      while (iteradorCarpetas.hasNext()) {\n        const f = iteradorCarpetas.next();\n        const n = f.getName().trim().toLowerCase();\n        if (n.includes('unidades') && n.includes('academicas')) {\n          carpetaUnidades = f;\n          break;\n        }\n      }\n    }\n\n    if (!carpetaUnidades) {\n      carpetaUnidades = carpetaRaiz;\n    }\n\n    let totalPdfsEncontrados = 0;\n    let nuevosInsertados = 0;\n    let omitidosYaExistian = 0;\n    let totalErrores = 0;\n    const nuevasFilas = [];\n    const timeZone = Session.getScriptTimeZone() || 'America/Bogota';\n    const fechaHoy = Utilities.formatDate(new Date(), timeZone, 'yyyy-MM-dd HH:mm:ss');\n\n    // 5. Nivel 2: Recorrer subcarpetas de cada Unidad Académica\n    const iteradorUnidades = carpetaUnidades.getFolders();\n\n    while (iteradorUnidades.hasNext()) {\n      const carpetaUnidad = iteradorUnidades.next();\n      const nombreUnidad = carpetaUnidad.getName().trim();\n\n      // 6. Nivel 3: Recorrer subcarpetas por Año\n      const iteradorAnios = carpetaUnidad.getFolders();\n\n      while (iteradorAnios.hasNext()) {\n        const carpetaAnio = iteradorAnios.next();\n        const anioStr = carpetaAnio.getName().trim();\n\n        // 7. Nivel 4: Leer los archivos PDF de monografías\n        const iteradorArchivos = carpetaAnio.getFiles();\n\n        while (iteradorArchivos.hasNext()) {\n          let archivo;\n          try {\n            archivo = iteradorArchivos.next();\n          } catch (eArch) {\n            totalErrores++;\n            continue;\n          }\n\n          const nombreArchivo = archivo.getName();\n          const mimeType = archivo.getMimeType();\n\n          // Filtrar archivos PDF\n          if (mimeType === 'application/pdf' || nombreArchivo.toLowerCase().endsWith('.pdf')) {\n            totalPdfsEncontrados++;\n\n            // Requisito 4: Obtener file.getId() y normalizarlo con String(valor).trim()\n            let rawFileId = '';\n            try {\n              rawFileId = archivo.getId();\n            } catch (eId) {\n              totalErrores++;\n              continue;\n            }\n\n            const fileId = String(rawFileId || '').trim();\n            // Requisito 4: Si por cualquier motivo una fila nueva no tiene fileId, NO la insertes y regístrala como error\n            if (!fileId) {\n              totalErrores++;\n              continue;\n            }\n\n            // Requisito 5: Comprobar si ya está en el Set\n            if (existingDriveIds.has(fileId) || existingDriveIds.has(fileId.toLowerCase())) {\n              // Si ya existe, NO insertar ninguna fila\n              omitidosYaExistian++;\n              continue;\n            }\n\n            // Requisito 6.a: Cuando un archivo sea nuevo, añade inmediatamente su ID al Set\n            existingDriveIds.add(fileId);\n            existingDriveIds.add(fileId.toLowerCase());\n\n            const fileUrl = archivo.getUrl();\n            const tituloLimpio = nombreArchivo\n              .replace(/\\.pdf$/i, '')\n              .replace(/_/g, ' ')\n              .trim();\n\n            const docIdSuffix = fileId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8);\n            const documentoId = 'DOC_' + anioStr + '_' + docIdSuffix;\n\n            const numCols = Math.max(lastCol, HEADERS_REPOSITORIO.length);\n            const fila = new Array(numCols).fill('');\n\n            const asignarValor = (nombreCol, valor) => {\n              const idx = mapaCols[nombreCol] !== undefined\n                ? mapaCols[nombreCol]\n                : mapaCols[nombreCol.toLowerCase()];\n              if (idx !== undefined && idx < numCols) {\n                fila[idx] = valor;\n              }\n            };\n\n            asignarValor('documento_id', documentoId);\n            asignarValor('titulo', tituloLimpio);\n            asignarValor('autor', ''); // Metadato académico editable en Sheets\n            asignarValor('grado', '11');\n            asignarValor('año', anioStr);\n            asignarValor('Unidad Académica', nombreUnidad);\n            asignarValor('Linea de investigación', '');\n            asignarValor('tipo', 'Monografía');\n            asignarValor('palabras_clave', '');\n            asignarValor('resumen', '');\n            asignarValor('Asesor(es)', '');\n            // NOTA: NO dependemos de mapaCols['drive_file_id'] para escribir el ID.\n            asignarValor('url_documento', fileUrl);\n            asignarValor('visibilidad', 'Público Institucional');\n            asignarValor('estado', 'Finalizado');\n            asignarValor('fecha_registro', fechaHoy);\n            asignarValor('fecha_actualizacion', fechaHoy);\n\n            // Requisito 2 y 6.b: Escribe el ID directamente utilizando el índice que ya fue identificado:\n            // fila[colDriveFileId] = fileId; (No depender de mapaCols['drive_file_id'])\n            fila[colDriveFileId] = fileId;\n\n            // Requisito 3 y 4: Verificar que la fila nueva tenga un drive_file_id no vacío exactamente en colDriveFileId\n            const idEnFila = String(fila[colDriveFileId] || '').trim();\n            if (!idEnFila || idEnFila !== fileId) {\n              totalErrores++;\n              continue; // NO insertar y registrar como error\n            }\n\n            // Requisito 6.c: Agregar la fila a nuevasFilas (después de escribir y verificar fila[colDriveFileId])\n            nuevasFilas.push(fila);\n            nuevosInsertados++;\n          }\n        }\n      }\n    }\n\n    // Requisito 3: Antes de insertar las filas, verificar que cada fila nueva tenga un drive_file_id no vacío exactamente en colDriveFileId\n    const filasParaInsertar = [];\n    for (let i = 0; i < nuevasFilas.length; i++) {\n      const f = nuevasFilas[i];\n      const idEnColumna = String(f[colDriveFileId] || '').trim();\n      if (idEnColumna.length > 0) {\n        filasParaInsertar.push(f);\n      } else {\n        totalErrores++;\n        nuevosInsertados--;\n        Logger.log('Fila omitida antes de inserción por carecer de drive_file_id en colDriveFileId: ' + JSON.stringify(f));\n      }\n    }\n\n    // 8. Requisitos 5 y 6: NUNCA sobrescribir ni modificar una fila existente.\n    // Solo insertar en lote las filas nuevas al final de la hoja.\n    if (filasParaInsertar.length > 0) {\n      const filaInicio = hojaRepo.getLastRow() + 1;\n      hojaRepo.getRange(filaInicio, 1, filasParaInsertar.length, filasParaInsertar[0].length).setValues(filasParaInsertar);\n      SpreadsheetApp.flush(); // Asegurar persistencia inmediata en Google Sheets\n      Logger.log('Se insertaron ' + filasParaInsertar.length + ' filas nuevas en la hoja Repositorio.');\n    }\n\n    // 9. Requisito 10: Devolver estadísticas separadas\n    const resultado = {\n      status: 'success',\n      totalArchivosEncontrados: totalPdfsEncontrados,\n      nuevosInsertados: nuevosInsertados,\n      omitidosYaExistian: omitidosYaExistian,\n      duplicadosOmitidos: omitidosYaExistian, // Compatibilidad con interfaz actual\n      errores: totalErrores,\n      casosRevision: filasSinDriveFileIdConUrl,\n      filasSinDriveFileIdConUrl: filasSinDriveFileIdConUrl,\n      fechaSincronizacion: fechaHoy,\n      message: 'Sincronización con Google Drive completada: ' + nuevosInsertados + ' documentos nuevos insertados. ' + omitidosYaExistian + ' omitidos porque drive_file_id ya existía en Sheets.' + (filasSinDriveFileIdConUrl > 0 ? ' (' + filasSinDriveFileIdConUrl + ' filas existentes en Sheets tienen drive_file_id vacío pero URL válida).' : '')\n    };\n\n    Logger.log(JSON.stringify(resultado));\n    return resultado;\n  } finally {\n    lock.releaseLock();\n  }\n}\n\n// =========================================================================\n// 3. DISPARADOR AUTOMÁTICO (TIME-DRIVEN TRIGGER - CADA 24 HORAS)\n// =========================================================================\n\n/**\n * Crea o renueva un disparador temporizado diario (cada 24 horas a las 2:00 AM)\n * para sincronizar automáticamente el repositorio de Drive con Sheets.\n */\nfunction crearTriggerDiario() {\n  const triggers = ScriptApp.getProjectTriggers();\n  triggers.forEach(t => {\n    if (t.getHandlerFunction() === 'sincronizarRepositorioDrive') {\n      ScriptApp.deleteTrigger(t);\n    }\n  });\n\n  ScriptApp.newTrigger('sincronizarRepositorioDrive')\n    .timeBased()\n    .everyDays(1)\n    .atHour(2)\n    .create();\n\n  Logger.log('Trigger diario programado exitosamente para sincronizarRepositorioDrive a las 2:00 AM.');\n}\n\n// =========================================================================\n// 4. ENDPOINTS API WEB APP (doGet & doPost)\n// =========================================================================\n\n/**\n * Maneja solicitudes GET de la Web App\n */\nfunction doGet(e) {\n  try {\n    const action = (e && e.parameter && e.parameter.action) ? e.parameter.action : 'getMonografias';\n\n    if (action === 'getMonografias') {\n      return responderMonografias();\n    }\n\n    if (action === 'checkUserRole') {\n      const email = (e && e.parameter && e.parameter.email) ? e.parameter.email : '';\n      return responderVerificarRol(email);\n    }\n\n    if (action === 'getUsers') {\n      return responderListaUsuarios();\n    }\n\n    if (action === 'syncDrive' || action === 'syncDriveAndSheets' || action === 'sync') {\n      const stats = sincronizarRepositorioDrive();\n      return crearSalidaJson({ status: 'success', message: 'Sincronización completada', data: stats });\n    }\n\n    return crearSalidaJson({ status: 'error', message: 'Acción GET desconocida: ' + action }, 400);\n  } catch (err) {\n    return crearSalidaJson({ status: 'error', message: err.toString() }, 500);\n  }\n}\n\n/**\n * Maneja solicitudes POST de la Web App\n */\nfunction doPost(e) {\n  try {\n    let payload = {};\n    if (e && e.postData && e.postData.contents) {\n      try {\n        payload = JSON.parse(e.postData.contents);\n      } catch (ex) {\n        payload = e.parameter || {};\n      }\n    } else {\n      payload = (e && e.parameter) ? e.parameter : {};\n    }\n\n    const action = payload.action || (e && e.parameter && e.parameter.action);\n    const userEmail = payload.userEmail || payload.email || payload.adminEmail || '';\n\n    // Sincronización Manual de Drive (solo Administrador)\n    if (action === 'syncDrive' || action === 'syncDriveAndSheets' || action === 'sync') {\n      const rol = verificarRol(userEmail);\n      if (!rol.isAdmin && userEmail.toLowerCase() !== 'mebolanos@cem.edu.co') {\n        return crearSalidaJson({\n          status: 'error',\n          message: 'Acceso denegado: Solo el Administrador puede solicitar sincronización de Drive.'\n        }, 403);\n      }\n\n      const stats = sincronizarRepositorioDrive();\n      return crearSalidaJson({\n        status: 'success',\n        message: 'Sincronización con Drive completada con éxito.',\n        data: stats\n      });\n    }\n\n    // Gestión de Usuarios en la hoja Usuarios\n    if (action === 'manageUser') {\n      return procesarGestionUsuario(payload);\n    }\n\n    return crearSalidaJson({ status: 'error', message: 'Acción POST no reconocida: ' + action }, 400);\n  } catch (err) {\n    return crearSalidaJson({ status: 'error', message: err.toString() }, 500);\n  }\n}\n\n// =========================================================================\n// 5. FUNCIONES AUXILIARES DE ENDPOINTS Y SANITIZACIÓN\n// =========================================================================\n\nfunction responderMonografias() {\n  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);\n  const hoja = ss.getSheetByName(HOJA_REPOSITORIO);\n\n  if (!hoja || hoja.getLastRow() <= 1) {\n    return crearSalidaJson({ status: 'success', message: 'No hay monografías registradas', data: [], count: 0 });\n  }\n\n  const mapa = obtenerMapaColumnas(hoja);\n  const headers = hoja.getRange(1, 1, 1, hoja.getLastColumn()).getValues()[0];\n  const rows = hoja.getRange(2, 1, hoja.getLastRow() - 1, hoja.getLastColumn()).getValues();\n\n  const data = rows.map(r => {\n    const item = {};\n    headers.forEach((h, idx) => {\n      if (h) {\n        item[String(h).trim()] = sanitizar(r[idx]);\n      }\n    });\n    // Garantizar campos canónicos\n    HEADERS_REPOSITORIO.forEach(h => {\n      if (item[h] === undefined) {\n        const colIdx = mapa[h] !== undefined ? mapa[h] : mapa[h.toLowerCase()];\n        item[h] = (colIdx !== undefined && r[colIdx] !== undefined) ? sanitizar(r[colIdx]) : '';\n      }\n    });\n    return item;\n  });\n\n  return crearSalidaJson({ status: 'success', data: data, count: data.length });\n}\n\nfunction responderVerificarRol(email) {\n  const res = verificarRol(email);\n  return crearSalidaJson({ status: 'success', data: res });\n}\n\nfunction verificarRol(email) {\n  const clean = String(email || '').trim().toLowerCase();\n  if (!clean) {\n    return { registered: false, perfil: 'Estudiante', isAdmin: false };\n  }\n\n  if (clean === 'mebolanos@cem.edu.co') {\n    return { registered: true, perfil: 'Administrador', isAdmin: true, nombres: 'Esteban Bolaños R' };\n  }\n\n  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);\n  const hoja = ss.getSheetByName(HOJA_USUARIOS);\n\n  if (!hoja || hoja.getLastRow() <= 1) {\n    const isDoc = clean.endsWith('@cem.edu.co');\n    return {\n      registered: isDoc || clean.endsWith('@est.cem.edu.co'),\n      perfil: isDoc ? 'Docente' : 'Estudiante',\n      isAdmin: false\n    };\n  }\n\n  const mapa = obtenerMapaColumnas(hoja);\n  const cCorreo = mapa['correo'];\n  const cPerfil = mapa['perfil'];\n  const cNombres = mapa['nombres'];\n  const rows = hoja.getRange(2, 1, hoja.getLastRow() - 1, hoja.getLastColumn()).getValues();\n\n  for (let i = 0; i < rows.length; i++) {\n    const rMail = cCorreo !== undefined ? String(rows[i][cCorreo]).trim().toLowerCase() : '';\n    if (rMail === clean) {\n      const perfil = cPerfil !== undefined ? String(rows[i][cPerfil]).trim() : 'Estudiante';\n      const nombres = cNombres !== undefined ? String(rows[i][cNombres]).trim() : '';\n      const isAdmin = /admin|administrador|coordinador/i.test(perfil);\n      return { registered: true, perfil, isAdmin, nombres };\n    }\n  }\n\n  const isDoc = clean.endsWith('@cem.edu.co');\n  return {\n    registered: isDoc || clean.endsWith('@est.cem.edu.co'),\n    perfil: isDoc ? 'Docente' : 'Estudiante',\n    isAdmin: false\n  };\n}\n\nfunction responderListaUsuarios() {\n  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);\n  const hoja = ss.getSheetByName(HOJA_USUARIOS);\n\n  if (!hoja || hoja.getLastRow() <= 1) {\n    return crearSalidaJson({ status: 'success', data: [] });\n  }\n\n  const headers = hoja.getRange(1, 1, 1, hoja.getLastColumn()).getValues()[0];\n  const rows = hoja.getRange(2, 1, hoja.getLastRow() - 1, hoja.getLastColumn()).getValues();\n\n  const users = rows.map(r => {\n    const u = {};\n    headers.forEach((h, idx) => {\n      if (h) u[String(h).trim()] = sanitizar(r[idx]);\n    });\n    return u;\n  });\n\n  return crearSalidaJson({ status: 'success', data: users });\n}\n\nfunction procesarGestionUsuario(payload) {\n  const adminEmail = payload.adminEmail || payload.userEmail || '';\n  const rol = verificarRol(adminEmail);\n\n  if (!rol.isAdmin && adminEmail.toLowerCase() !== 'mebolanos@cem.edu.co') {\n    return crearSalidaJson({ status: 'error', message: 'Acceso denegado: Se requiere perfil Administrador.' }, 403);\n  }\n\n  const subAction = payload.subAction || 'add';\n  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);\n  let hoja = ss.getSheetByName(HOJA_USUARIOS);\n\n  if (!hoja) {\n    hoja = ss.insertSheet(HOJA_USUARIOS);\n    hoja.appendRow(HEADERS_USUARIOS);\n  }\n\n  const mapa = obtenerMapaColumnas(hoja);\n\n  if (subAction === 'add') {\n    const correo = String(payload.Correo || payload.correo || '').trim().toLowerCase();\n    if (!correo) return crearSalidaJson({ status: 'error', message: 'El correo es obligatorio.' }, 400);\n\n    const numCols = Math.max(hoja.getLastColumn(), HEADERS_USUARIOS.length);\n    const fila = new Array(numCols).fill('');\n\n    const setVal = (h, val) => {\n      const idx = mapa[h] !== undefined ? mapa[h] : mapa[h.toLowerCase()];\n      if (idx !== undefined && idx < numCols) fila[idx] = val;\n    };\n\n    setVal('Nombres', payload.Nombres || payload.nombres || '');\n    setVal('Curso', payload.Curso || payload.curso || '11');\n    setVal('Correo', correo);\n    setVal('Sección', payload.Sección || payload.seccion || 'Bachillerato');\n    setVal('Perfil', payload.Perfil || payload.perfil || 'Estudiante');\n\n    hoja.appendRow(fila);\n    return crearSalidaJson({ status: 'success', message: 'Usuario registrado exitosamente.' });\n  }\n\n  if (subAction === 'delete') {\n    const target = String(payload.Correo || payload.correo || '').trim().toLowerCase();\n    const lastRow = hoja.getLastRow();\n    if (lastRow > 1) {\n      const cCorreo = mapa['correo'];\n      const data = hoja.getRange(2, 1, lastRow - 1, hoja.getLastColumn()).getValues();\n      for (let i = 0; i < data.length; i++) {\n        if (cCorreo !== undefined && String(data[i][cCorreo]).trim().toLowerCase() === target) {\n          hoja.deleteRow(i + 2);\n          return crearSalidaJson({ status: 'success', message: 'Usuario eliminado exitosamente.' });\n        }\n      }\n    }\n    return crearSalidaJson({ status: 'error', message: 'Usuario no encontrado para eliminar.' }, 404);\n  }\n\n  return crearSalidaJson({ status: 'error', message: 'Acción no reconocida: ' + subAction }, 400);\n}\n\nfunction sanitizar(val) {\n  if (val === null || val === undefined) return '';\n  if (val instanceof Date) {\n    return Utilities.formatDate(val, Session.getScriptTimeZone() || 'America/Bogota', 'yyyy-MM-dd HH:mm');\n  }\n  return String(val)\n    .replace(/<script\\b[^<]*(?:(?!<\\/script>)<[^<]*)*<\\/script>/gi, '')\n    .trim();\n}\n\nfunction crearSalidaJson(data, statusCode) {\n  const output = ContentService.createTextOutput(JSON.stringify(data));\n  output.setMimeType(ContentService.MimeType.JSON);\n  return output;\n}\n";
+export const GOOGLE_APPS_SCRIPT_CODE = `/**
+ * =========================================================================
+ * COLEGIO EKIRAYÁ - SISTEMA DE REPOSITORIO DE PROYECTOS DE VIDA (BACKEND GAS)
+ * =========================================================================
+ * 
+ * Google Apps Script: Code.gs
+ * Hoja de Cálculo ID: 1_Te5Czkvtjue-49-foSBU3tWSTMg1-tucAPAzWIjJSw
+ * Carpeta Raíz Drive (Unidades Académicas) ID: 1BLBoX4Y7k3V_z8-Xy1VwPF199Ith9BOM
+ * 
+ * Jerarquía en Google Drive:
+ * Unidades Académicas (Raíz)
+ *  └── [Nombre de Unidad Académica] (ej. Ciencias, Música, Psicología, etc.)
+ *       └── [Año] (ej. 2025, 2026, 2027)
+ *            └── [archivo_proyecto.pdf]
+ * 
+ * Estructura de Hojas en Google Sheets:
+ * 1. "Repositorio" (17 columnas dinámicas):
+ *    documento_id | titulo | autor | grado | año | Unidad Académica | Linea de investigación |
+ *    tipo | palabras_clave | resumen | Asesor(es) | drive_file_id | url_documento |
+ *    visibilidad | estado | fecha_registro | fecha_actualizacion
+ * 
+ * 2. "Usuarios" (5 columnas dinámicas):
+ *    Nombres | Curso | Correo | Sección | Perfil
+ */
+
+// =========================================================================
+// CONSTANTES GLOBALES DE CONFIGURACIÓN
+// =========================================================================
+const SPREADSHEET_ID = '1_Te5Czkvtjue-49-foSBU3tWSTMg1-tucAPAzWIjJSw';
+const ROOT_FOLDER_ID = '1BLBoX4Y7k3V_z8-Xy1VwPF199Ith9BOM'; // Unidades Académicas
+const HOJA_REPOSITORIO = 'Repositorio';
+const HOJA_USUARIOS = 'Usuarios';
+
+/**
+ * 17 Encabezados canónicos de la hoja "Repositorio"
+ */
+const HEADERS_REPOSITORIO = [
+  'documento_id',
+  'titulo',
+  'autor',
+  'grado',
+  'año',
+  'Unidad Académica',
+  'Linea de investigación',
+  'tipo',
+  'palabras_clave',
+  'resumen',
+  'Asesor(es)',
+  'drive_file_id',
+  'url_documento',
+  'visibilidad',
+  'estado',
+  'fecha_registro',
+  'fecha_actualizacion'
+];
+
+/**
+ * 5 Encabezados canónicos de la hoja "Usuarios"
+ */
+const HEADERS_USUARIOS = [
+  'Nombres',
+  'Curso',
+  'Correo',
+  'Sección',
+  'Perfil'
+];
+
+// =========================================================================
+// 1. MAPEO DINÁMICO DE COLUMNAS Y UTILIDADES DE IDENTIFICACIÓN DE DRIVE
+// =========================================================================
+
+function extraerDriveFileId(valor) {
+  if (!valor) return '';
+  const str = String(valor).trim();
+  if (!str) return '';
+
+  if (/^[a-zA-Z0-9_-]{25,55}$/.test(str)) {
+    return str;
+  }
+
+  const matchHyperlink = str.match(/=HYPERLINK\\(\\s*[\"']([^\"']+)[\"']/i);
+  if (matchHyperlink && matchHyperlink[1]) {
+    const fromHl = extraerDriveFileId(matchHyperlink[1]);
+    if (fromHl) return fromHl;
+  }
+
+  const matchFileD = str.match(/\\/file(?:\\/u\\/\\d+)?\\/d\\/([a-zA-Z0-9_-]+)/i);
+  if (matchFileD && matchFileD[1]) return matchFileD[1].trim();
+
+  const matchD = str.match(/\\/d\\/([a-zA-Z0-9_-]+)/i);
+  if (matchD && matchD[1]) return matchD[1].trim();
+
+  const matchIdParam = str.match(/[?&]id=([a-zA-Z0-9_-]+)/i);
+  if (matchIdParam && matchIdParam[1]) return matchIdParam[1].trim();
+
+  return '';
+}
+
+function obtenerMapaColumnas(hoja) {
+  if (!hoja) {
+    throw new Error('obtenerMapaColumnas: No se proporcionó una hoja válida.');
+  }
+
+  const lastCol = hoja.getLastColumn();
+  if (lastCol === 0) {
+    return {};
+  }
+
+  const encabezados = hoja.getRange(1, 1, 1, lastCol).getValues()[0];
+  const mapa = {};
+
+  const normalizar = (txt) => {
+    return String(txt || '')
+      .trim()
+      .normalize('NFD')
+      .replace(/[\\u0300-\\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+  };
+
+  encabezados.forEach((nombre, idx) => {
+    if (nombre !== null && nombre !== undefined) {
+      const limpio = String(nombre).trim();
+      if (limpio.length > 0) {
+        mapa[limpio] = idx;
+        mapa[limpio.toLowerCase()] = idx;
+        mapa[normalizar(limpio)] = idx;
+      }
+    }
+  });
+
+  const sinonimos = {
+    'drive_file_id': [
+      'drive_file_id', 'drivefileid', 'id_drive', 'iddrive', 'file_id', 'fileid',
+      'drive id', 'id drive', 'id de drive', 'id_de_drive', 'id archivo', 'id de archivo',
+      'idarchivo', 'id_archivo', 'google drive id', 'drive_id', 'driveid', 'archivo_id'
+    ],
+    'url_documento': [
+      'url_documento', 'urldocumento', 'url', 'enlace', 'link', 'enlace_documento',
+      'url documento', 'link drive', 'enlace drive', 'url drive', 'link pdf',
+      'enlace pdf', 'url pdf', 'enlace_archivo', 'link_archivo', 'url_archivo'
+    ],
+    'documento_id': ['documento_id', 'documentoid', 'id_documento', 'iddocumento', 'id', 'codigo', 'código'],
+    'titulo': ['titulo', 'título', 'nombre', 'title', 'tema'],
+    'autor': ['autor', 'autores', 'estudiante', 'estudiantes'],
+    'grado': ['grado', 'curso', 'nivel'],
+    'año': ['año', 'ano', 'anio', 'year'],
+    'Unidad Académica': ['unidad académica', 'unidad academica', 'unidadacademica', 'unidad'],
+    'Linea de investigación': ['linea de investigación', 'linea de investigacion', 'lineadeinvestigacion', 'linea', 'línea'],
+    'resumen': ['resumen', 'abstract', 'descripcion', 'descripción'],
+    'Asesor(es)': ['asesor(es)', 'asesores', 'asesor', 'tutor', 'tutores'],
+    'palabras_clave': ['palabras_clave', 'palabras clave', 'palabrasclave', 'keywords'],
+    'tipo': ['tipo', 'tipo_documento'],
+    'visibilidad': ['visibilidad', 'acceso'],
+    'estado': ['estado', 'status'],
+    'fecha_registro': ['fecha_registro', 'fecharegistro'],
+    'fecha_actualizacion': ['fecha_actualizacion', 'fechaactualizacion']
+  };
+
+  Object.keys(sinonimos).forEach(canonico => {
+    if (mapa[canonico] === undefined) {
+      const lista = sinonimos[canonico];
+      for (let i = 0; i < lista.length; i++) {
+        const s = lista[i];
+        if (mapa[s] !== undefined) {
+          mapa[canonico] = mapa[s];
+          break;
+        }
+        const normS = normalizar(s);
+        if (mapa[normS] !== undefined) {
+          mapa[canonico] = mapa[normS];
+          break;
+        }
+      }
+    }
+  });
+
+  return mapa;
+}
+
+// =========================================================================
+// 2. ESCANEO RECURSIVO DE DRIVE E INSERCIÓN EN SHEETS (IDEMPOTENTE)
+// =========================================================================
+
+function sincronizarRepositorioDrive() {
+  const lock = LockService.getScriptLock();
+  const hasLock = lock.tryLock(30000);
+  if (!hasLock) {
+    return {
+      status: 'error',
+      message: 'Hay otra sincronización en ejecución. Intenta de nuevo en unos momentos.'
+    };
+  }
+
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    let hojaRepo = ss.getSheetByName(HOJA_REPOSITORIO);
+
+    if (!hojaRepo) {
+      const todasHojas = ss.getSheets();
+      for (let h = 0; h < todasHojas.length; h++) {
+        const nHoja = todasHojas[h].getName().trim().toLowerCase();
+        if (nHoja === HOJA_REPOSITORIO.toLowerCase() || nHoja === 'monografias' || nHoja === 'monografías') {
+          hojaRepo = todasHojas[h];
+          break;
+        }
+      }
+    }
+
+    if (!hojaRepo) {
+      throw new Error('No se encontró la hoja "' + HOJA_REPOSITORIO + '" en el Google Sheet.');
+    }
+
+    const lastCol = hojaRepo.getLastColumn();
+    if (lastCol === 0) {
+      throw new Error('La hoja "' + HOJA_REPOSITORIO + '" no contiene columnas ni encabezados.');
+    }
+
+    const encabezados = hojaRepo.getRange(1, 1, 1, lastCol).getValues()[0];
+    let colDriveFileId = -1;
+    let colUrlDocumento = -1;
+    const mapaCols = {};
+
+    const normalizarEncabezado = (txt) => {
+      return String(txt || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\\u0300-\\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '');
+    };
+
+    for (let c = 0; c < encabezados.length; c++) {
+      const hRaw = String(encabezados[c] || '').trim();
+      const hNorm = normalizarEncabezado(hRaw);
+      if (hRaw) {
+        mapaCols[hRaw] = c;
+        mapaCols[hRaw.toLowerCase()] = c;
+        mapaCols[hNorm] = c;
+      }
+      if (
+        hNorm === 'drivefileid' ||
+        hNorm === 'iddrive' ||
+        hNorm === 'idarchivo' ||
+        hNorm === 'fileid' ||
+        hNorm === 'driveid'
+      ) {
+        colDriveFileId = c;
+      }
+      if (
+        hNorm === 'urldocumento' ||
+        hNorm === 'url' ||
+        hNorm === 'link' ||
+        hNorm === 'enlace' ||
+        hNorm === 'linkdocumento' ||
+        hNorm === 'urldrive'
+      ) {
+        colUrlDocumento = c;
+      }
+    }
+
+    if (colUrlDocumento === -1 && mapaCols['url_documento'] !== undefined) {
+      colUrlDocumento = mapaCols['url_documento'];
+    }
+
+    if (colDriveFileId === -1) {
+      throw new Error('Error crítico: No se encontró la columna "drive_file_id" en la hoja "' + HOJA_REPOSITORIO + '".');
+    }
+
+    const lastRow = hojaRepo.getLastRow();
+    const existingDriveIds = new Set();
+    let filasSinDriveFileIdConUrl = 0;
+
+    if (lastRow > 1) {
+      const valoresDriveCol = hojaRepo.getRange(2, colDriveFileId + 1, lastRow - 1, 1).getValues();
+      let valoresUrlCol = null;
+      if (colUrlDocumento !== -1) {
+        valoresUrlCol = hojaRepo.getRange(2, colUrlDocumento + 1, lastRow - 1, 1).getValues();
+      }
+
+      for (let r = 0; r < valoresDriveCol.length; r++) {
+        const celdaDrive = valoresDriveCol[r][0];
+        const idLimpio = celdaDrive !== null && celdaDrive !== undefined ? String(celdaDrive).trim() : '';
+
+        if (idLimpio.length > 0) {
+          existingDriveIds.add(idLimpio);
+          existingDriveIds.add(idLimpio.toLowerCase());
+          const idExtraido = extraerDriveFileId(idLimpio);
+          if (idExtraido && idExtraido.length > 0) {
+            existingDriveIds.add(idExtraido);
+            existingDriveIds.add(idExtraido.toLowerCase());
+          }
+        } else if (valoresUrlCol) {
+          const celdaUrl = valoresUrlCol[r][0];
+          const urlLimpia = celdaUrl !== null && celdaUrl !== undefined ? String(celdaUrl).trim() : '';
+          const idDeUrl = extraerDriveFileId(urlLimpia);
+          if (idDeUrl && idDeUrl.length > 0) {
+            filasSinDriveFileIdConUrl++;
+            existingDriveIds.add(idDeUrl);
+            existingDriveIds.add(idDeUrl.toLowerCase());
+          }
+        }
+      }
+    }
+
+    // Abrir la carpeta raíz (Unidades Académicas)
+    let carpetaRaiz;
+    try {
+      carpetaRaiz = DriveApp.getFolderById(ROOT_FOLDER_ID);
+    } catch (e) {
+      throw new Error('No se pudo abrir la carpeta raíz Unidades Académicas (' + ROOT_FOLDER_ID + '): ' + e.message);
+    }
+
+    let totalPdfsEncontrados = 0;
+    let nuevosInsertados = 0;
+    let omitidosYaExistian = 0;
+    let totalErrores = 0;
+    const nuevasFilas = [];
+    const timeZone = Session.getScriptTimeZone() || 'America/Bogota';
+    const fechaHoy = Utilities.formatDate(new Date(), timeZone, 'yyyy-MM-dd HH:mm:ss');
+
+    // Nivel 1: Recorrer subcarpetas de cada Unidad Académica directamente desde la raíz
+    const iteradorUnidades = carpetaRaiz.getFolders();
+
+    while (iteradorUnidades.hasNext()) {
+      const carpetaUnidad = iteradorUnidades.next();
+      const nombreUnidad = carpetaUnidad.getName().trim();
+
+      // Nivel 2: Recorrer subcarpetas por Año
+      const iteradorAnios = carpetaUnidad.getFolders();
+
+      while (iteradorAnios.hasNext()) {
+        const carpetaAnio = iteradorAnios.next();
+        const anioStr = carpetaAnio.getName().trim();
+
+        // Nivel 3: Leer archivos PDF
+        const iteradorArchivos = carpetaAnio.getFiles();
+
+        while (iteradorArchivos.hasNext()) {
+          let archivo;
+          try {
+            archivo = iteradorArchivos.next();
+          } catch (eArch) {
+            totalErrores++;
+            continue;
+          }
+
+          const nombreArchivo = archivo.getName();
+          const mimeType = archivo.getMimeType();
+
+          if (mimeType === 'application/pdf' || nombreArchivo.toLowerCase().endsWith('.pdf')) {
+            totalPdfsEncontrados++;
+
+            let rawFileId = '';
+            try {
+              rawFileId = archivo.getId();
+            } catch (eId) {
+              totalErrores++;
+              continue;
+            }
+
+            const fileId = String(rawFileId || '').trim();
+            if (!fileId) {
+              totalErrores++;
+              continue;
+            }
+
+            if (existingDriveIds.has(fileId) || existingDriveIds.has(fileId.toLowerCase())) {
+              omitidosYaExistian++;
+              continue;
+            }
+
+            existingDriveIds.add(fileId);
+            existingDriveIds.add(fileId.toLowerCase());
+
+            const fileUrl = archivo.getUrl();
+            const tituloLimpio = nombreArchivo
+              .replace(/\\.pdf$/i, '')
+              .replace(/_/g, ' ')
+              .trim();
+
+            const docIdSuffix = fileId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8);
+            const documentoId = 'DOC_' + anioStr + '_' + docIdSuffix;
+
+            const numCols = Math.max(lastCol, HEADERS_REPOSITORIO.length);
+            const fila = new Array(numCols).fill('');
+
+            const asignarValor = (nombreCol, valor) => {
+              const idx = mapaCols[nombreCol] !== undefined
+                ? mapaCols[nombreCol]
+                : mapaCols[nombreCol.toLowerCase()];
+              if (idx !== undefined && idx < numCols) {
+                fila[idx] = valor;
+              }
+            };
+
+            asignarValor('documento_id', documentoId);
+            asignarValor('titulo', tituloLimpio);
+            asignarValor('autor', '');
+            asignarValor('grado', '11');
+            asignarValor('año', anioStr);
+            asignarValor('Unidad Académica', nombreUnidad);
+            asignarValor('Linea de investigación', '');
+            asignarValor('tipo', 'Proyecto de Vida');
+            asignarValor('palabras_clave', '');
+            asignarValor('resumen', '');
+            asignarValor('Asesor(es)', '');
+            asignarValor('url_documento', fileUrl);
+            asignarValor('visibilidad', 'Público Institucional');
+            asignarValor('estado', 'Finalizado');
+            asignarValor('fecha_registro', fechaHoy);
+            asignarValor('fecha_actualizacion', fechaHoy);
+
+            fila[colDriveFileId] = fileId;
+
+            const idEnFila = String(fila[colDriveFileId] || '').trim();
+            if (!idEnFila || idEnFila !== fileId) {
+              totalErrores++;
+              continue;
+            }
+
+            nuevasFilas.push(fila);
+            nuevosInsertados++;
+          }
+        }
+      }
+    }
+
+    const filasParaInsertar = [];
+    for (let i = 0; i < nuevasFilas.length; i++) {
+      const f = nuevasFilas[i];
+      const idEnColumna = String(f[colDriveFileId] || '').trim();
+      if (idEnColumna.length > 0) {
+        filasParaInsertar.push(f);
+      } else {
+        totalErrores++;
+        nuevosInsertados--;
+      }
+    }
+
+    if (filasParaInsertar.length > 0) {
+      const filaInicio = hojaRepo.getLastRow() + 1;
+      hojaRepo.getRange(filaInicio, 1, filasParaInsertar.length, filasParaInsertar[0].length).setValues(filasParaInsertar);
+      SpreadsheetApp.flush();
+    }
+
+    return {
+      status: 'success',
+      totalArchivosEncontrados: totalPdfsEncontrados,
+      nuevosInsertados: nuevosInsertados,
+      omitidosYaExistian: omitidosYaExistian,
+      duplicadosOmitidos: omitidosYaExistian,
+      errores: totalErrores,
+      casosRevision: filasSinDriveFileIdConUrl,
+      filasSinDriveFileIdConUrl: filasSinDriveFileIdConUrl,
+      fechaSincronizacion: fechaHoy,
+      message: 'Sincronización completada: ' + nuevosInsertados + ' documentos nuevos insertados.'
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function crearTriggerDiario() {
+  const triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(t => {
+    if (t.getHandlerFunction() === 'sincronizarRepositorioDrive') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  ScriptApp.newTrigger('sincronizarRepositorioDrive')
+    .timeBased()
+    .everyDays(1)
+    .atHour(2)
+    .create();
+}
+
+function doGet(e) {
+  try {
+    const action = (e && e.parameter && e.parameter.action) ? e.parameter.action : 'getMonografias';
+
+    if (action === 'getMonografias') {
+      return responderMonografias();
+    }
+
+    if (action === 'checkUserRole') {
+      const email = (e && e.parameter && e.parameter.email) ? e.parameter.email : '';
+      return responderVerificarRol(email);
+    }
+
+    if (action === 'getUsers') {
+      return responderListaUsuarios();
+    }
+
+    if (action === 'syncDrive' || action === 'syncDriveAndSheets' || action === 'sync') {
+      const stats = sincronizarRepositorioDrive();
+      return crearSalidaJson({ status: 'success', message: 'Sincronización completada', data: stats });
+    }
+
+    return crearSalidaJson({ status: 'error', message: 'Acción GET desconocida: ' + action }, 400);
+  } catch (err) {
+    return crearSalidaJson({ status: 'error', message: err.toString() }, 500);
+  }
+}
+
+function doPost(e) {
+  try {
+    let payload = {};
+    if (e && e.postData && e.postData.contents) {
+      try {
+        payload = JSON.parse(e.postData.contents);
+      } catch (ex) {
+        payload = e.parameter || {};
+      }
+    } else {
+      payload = (e && e.parameter) ? e.parameter : {};
+    }
+
+    const action = payload.action || (e && e.parameter && e.parameter.action);
+    const userEmail = payload.userEmail || payload.email || payload.adminEmail || '';
+
+    if (action === 'syncDrive' || action === 'syncDriveAndSheets' || action === 'sync') {
+      const rol = verificarRol(userEmail);
+      if (!rol.isAdmin && userEmail.toLowerCase() !== 'mebolanos@cem.edu.co') {
+        return crearSalidaJson({
+          status: 'error',
+          message: 'Acceso denegado: Solo el Administrador puede solicitar sincronización de Drive.'
+        }, 403);
+      }
+
+      const stats = sincronizarRepositorioDrive();
+      return crearSalidaJson({
+        status: 'success',
+        message: 'Sincronización con Drive completada con éxito.',
+        data: stats
+      });
+    }
+
+    if (action === 'manageUser') {
+      return procesarGestionUsuario(payload);
+    }
+
+    return crearSalidaJson({ status: 'error', message: 'Acción POST no reconocida: ' + action }, 400);
+  } catch (err) {
+    return crearSalidaJson({ status: 'error', message: err.toString() }, 500);
+  }
+}
+
+function responderMonografias() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const hoja = ss.getSheetByName(HOJA_REPOSITORIO);
+
+  if (!hoja || hoja.getLastRow() <= 1) {
+    return crearSalidaJson({ status: 'success', message: 'No hay registros', data: [], count: 0 });
+  }
+
+  const mapa = obtenerMapaColumnas(hoja);
+  const headers = hoja.getRange(1, 1, 1, hoja.getLastColumn()).getValues()[0];
+  const rows = hoja.getRange(2, 1, hoja.getLastRow() - 1, hoja.getLastColumn()).getValues();
+
+  const data = rows.map(r => {
+    const item = {};
+    headers.forEach((h, idx) => {
+      if (h) {
+        item[String(h).trim()] = sanitizar(r[idx]);
+      }
+    });
+    HEADERS_REPOSITORIO.forEach(h => {
+      if (item[h] === undefined) {
+        const colIdx = mapa[h] !== undefined ? mapa[h] : mapa[h.toLowerCase()];
+        item[h] = (colIdx !== undefined && r[colIdx] !== undefined) ? sanitizar(r[colIdx]) : '';
+      }
+    });
+    return item;
+  });
+
+  return crearSalidaJson({ status: 'success', data: data, count: data.length });
+}
+
+function responderVerificarRol(email) {
+  const res = verificarRol(email);
+  return crearSalidaJson({ status: 'success', data: res });
+}
+
+function verificarRol(email) {
+  const clean = String(email || '').trim().toLowerCase();
+  if (!clean) {
+    return { registered: false, perfil: 'Estudiante', isAdmin: false };
+  }
+
+  if (clean === 'mebolanos@cem.edu.co') {
+    return { registered: true, perfil: 'Administrador', isAdmin: true, nombres: 'Esteban Bolaños R' };
+  }
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const hoja = ss.getSheetByName(HOJA_USUARIOS);
+
+  if (!hoja || hoja.getLastRow() <= 1) {
+    const isDoc = clean.endsWith('@cem.edu.co');
+    return {
+      registered: isDoc || clean.endsWith('@est.cem.edu.co'),
+      perfil: isDoc ? 'Docente' : 'Estudiante',
+      isAdmin: false
+    };
+  }
+
+  const mapa = obtenerMapaColumnas(hoja);
+  const cCorreo = mapa['correo'];
+  const cPerfil = mapa['perfil'];
+  const cNombres = mapa['nombres'];
+  const rows = hoja.getRange(2, 1, hoja.getLastRow() - 1, hoja.getLastColumn()).getValues();
+
+  for (let i = 0; i < rows.length; i++) {
+    const rMail = cCorreo !== undefined ? String(rows[i][cCorreo]).trim().toLowerCase() : '';
+    if (rMail === clean) {
+      const perfil = cPerfil !== undefined ? String(rows[i][cPerfil]).trim() : 'Estudiante';
+      const nombres = cNombres !== undefined ? String(rows[i][cNombres]).trim() : '';
+      const isAdmin = /admin|administrador|coordinador/i.test(perfil);
+      return { registered: true, perfil, isAdmin, nombres };
+    }
+  }
+
+  const isDoc = clean.endsWith('@cem.edu.co');
+  return {
+    registered: isDoc || clean.endsWith('@est.cem.edu.co'),
+    perfil: isDoc ? 'Docente' : 'Estudiante',
+    isAdmin: false
+  };
+}
+
+function responderListaUsuarios() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const hoja = ss.getSheetByName(HOJA_USUARIOS);
+
+  if (!hoja || hoja.getLastRow() <= 1) {
+    return crearSalidaJson({ status: 'success', data: [] });
+  }
+
+  const headers = hoja.getRange(1, 1, 1, hoja.getLastColumn()).getValues()[0];
+  const rows = hoja.getRange(2, 1, hoja.getLastRow() - 1, hoja.getLastColumn()).getValues();
+
+  const users = rows.map(r => {
+    const u = {};
+    headers.forEach((h, idx) => {
+      if (h) u[String(h).trim()] = sanitizar(r[idx]);
+    });
+    return u;
+  });
+
+  return crearSalidaJson({ status: 'success', data: users });
+}
+
+function procesarGestionUsuario(payload) {
+  const adminEmail = payload.adminEmail || payload.userEmail || '';
+  const rol = verificarRol(adminEmail);
+
+  if (!rol.isAdmin && adminEmail.toLowerCase() !== 'mebolanos@cem.edu.co') {
+    return crearSalidaJson({ status: 'error', message: 'Acceso denegado: Se requiere perfil Administrador.' }, 403);
+  }
+
+  const subAction = payload.subAction || 'add';
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let hoja = ss.getSheetByName(HOJA_USUARIOS);
+
+  if (!hoja) {
+    hoja = ss.insertSheet(HOJA_USUARIOS);
+    hoja.appendRow(HEADERS_USUARIOS);
+  }
+
+  const mapa = obtenerMapaColumnas(hoja);
+
+  if (subAction === 'add') {
+    const correo = String(payload.Correo || payload.correo || '').trim().toLowerCase();
+    if (!correo) return crearSalidaJson({ status: 'error', message: 'El correo es obligatorio.' }, 400);
+
+    const numCols = Math.max(hoja.getLastColumn(), HEADERS_USUARIOS.length);
+    const fila = new Array(numCols).fill('');
+
+    const setVal = (h, val) => {
+      const idx = mapa[h] !== undefined ? mapa[h] : mapa[h.toLowerCase()];
+      if (idx !== undefined && idx < numCols) fila[idx] = val;
+    };
+
+    setVal('Nombres', payload.Nombres || payload.nombres || '');
+    setVal('Curso', payload.Curso || payload.curso || '11');
+    setVal('Correo', correo);
+    setVal('Sección', payload.Sección || payload.seccion || 'Bachillerato');
+    setVal('Perfil', payload.Perfil || payload.perfil || 'Estudiante');
+
+    hoja.appendRow(fila);
+    return crearSalidaJson({ status: 'success', message: 'Usuario registrado exitosamente.' });
+  }
+
+  if (subAction === 'delete') {
+    const target = String(payload.Correo || payload.correo || '').trim().toLowerCase();
+    const lastRow = hoja.getLastRow();
+    if (lastRow > 1)হের
+    const cCorreo = mapa['correo'];
+    const data = hoja.getRange(2, 1, lastRow - 1, hoja.getLastColumn()).getValues();
+    for (let i = 0; i < data.length; i++) {
+      if (cCorreo !== undefined && String(data[i][cCorreo]).trim().toLowerCase() === target) {
+        hoja.deleteRow(i + 2);
+        return crearSalidaJson({ status: 'success', message: 'Usuario eliminado exitosamente.' });
+      }
+    }
+  }
+  return crearSalidaJson({ status: 'error', message: 'Usuario no encontrado para eliminar.' }, 404);
+}
+
+function sanitizar(val) {
+  if (val === null || val === undefined) return '';
+  if (val instanceof Date) {
+    return Utilities.formatDate(val, Session.getScriptTimeZone() || 'America/Bogota', 'yyyy-MM-dd HH:mm');
+  }
+  return String(val)
+    .replace(/<script\\b[^<]*(?:(?!<\\/script>)<[^<]*)*<\\/script>/gi, '')
+    .trim();
+}
+
+function crearSalidaJson(data, statusCode) {
+  const output = ContentService.createTextOutput(JSON.stringify(data));
+  output.setMimeType(ContentService.MimeType.JSON);
+  return output;
+}
+`;

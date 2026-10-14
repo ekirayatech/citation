@@ -1609,7 +1609,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 </div>
                 <ol className="list-decimal list-inside space-y-1 pl-1 text-slate-800">
                   <li>
-                    Abre el Google Sheet de Metadata (ID: <code>1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow</code>).
+                    Abre el Google Sheet de Metadata (ID: <code>1_Te5Czkvtjue-49-foSBU3tWSTMg1-tucAPAzWIjJSw</code>).
                   </li>
                   <li>
                     Ve al menú <strong>Extensiones &rarr; Apps Script</strong>.
@@ -1700,7 +1700,7 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
                 </p>
                 <div className="p-3 bg-violet-50 rounded-2xl border border-violet-100 text-[11px] text-[#664d88]">
                   <strong>ID de tu Google Sheet:</strong>{' '}
-                  <code className="font-mono font-bold">1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow</code>
+                  <code className="font-mono font-bold">1_Te5Czkvtjue-49-foSBU3tWSTMg1-tucAPAzWIjJSw</code>
                 </div>
               </div>
 

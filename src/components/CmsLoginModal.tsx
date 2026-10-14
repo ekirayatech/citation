@@ -40,8 +40,8 @@ async function verifyClientSideAgainstSheets(
   let sheetUsers: Array<{ correo: string; pass: string; isAdmin: boolean }> = [];
   try {
     const urls = [
-      'https://docs.google.com/spreadsheets/d/1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow/pub?output=csv',
-      'https://docs.google.com/spreadsheets/d/1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow/gviz/tq?tqx=out:csv&sheet=usuarios',
+      'https://docs.google.com/spreadsheets/d/1_Te5Czkvtjue-49-foSBU3tWSTMg1-tucAPAzWIjJSw/pub?output=csv',
+      'https://docs.google.com/spreadsheets/d/1_Te5Czkvtjue-49-foSBU3tWSTMg1-tucAPAzWIjJSw/gviz/tq?tqx=out:csv&sheet=usuarios',
     ];
 
     for (const url of urls) {
