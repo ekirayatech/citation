@@ -871,12 +871,12 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
           {/* Selectores de Filtros */}
           <div className="flex items-center gap-2.5 flex-wrap">
             {/* Filtro Unidad Académica */}
-            <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-2xl border border-slate-200">
-              <span className="text-xs font-bold text-slate-500">Unidad:</span>
+            <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-2xl border border-slate-200 max-w-full">
+              <span className="text-xs font-bold text-slate-500 shrink-0">Unidad:</span>
               <select
                 value={selectedUnidad}
                 onChange={(e) => setSelectedUnidad(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer max-w-[160px] sm:max-w-none truncate"
               >
                 <option value="TODAS">Todas las Unidades</option>
                 {unidadesList.map((u) => (
@@ -888,12 +888,12 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
             </div>
 
             {/* Filtro Año */}
-            <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-2xl border border-slate-200">
-              <span className="text-xs font-bold text-slate-500">Año:</span>
+            <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-2xl border border-slate-200 max-w-full">
+              <span className="text-xs font-bold text-slate-500 shrink-0">Año:</span>
               <select
                 value={selectedAnio}
                 onChange={(e) => setSelectedAnio(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer max-w-[120px] sm:max-w-none truncate"
               >
                 <option value="TODOS">Todos los años</option>
                 {aniosList.map((a) => (
@@ -906,12 +906,12 @@ export const RepositorioSection: React.FC<RepositorioSectionProps> = ({
 
             {/* Filtro Grado */}
             {gradosList.length > 0 && (
-              <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-2xl border border-slate-200">
-                <span className="text-xs font-bold text-slate-500">Grado:</span>
+              <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-2xl border border-slate-200 max-w-full">
+                <span className="text-xs font-bold text-slate-500 shrink-0">Grado:</span>
                 <select
                   value={selectedGrado}
                   onChange={(e) => setSelectedGrado(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                  className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer max-w-[100px] sm:max-w-none truncate"
                 >
                   <option value="TODOS">Todos</option>
                   {gradosList.map((g) => (
