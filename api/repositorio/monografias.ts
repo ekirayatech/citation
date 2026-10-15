@@ -1,6 +1,6 @@
 export default async function handler(req: any, res: any) {
   try {
-    const targetUrl = `https://script.google.com/macros/s/AKfycbyXv5xr3CJ1oQ7o88P34EJH3tm6ltJhXhH7UAtZZHd_0l7Jjvp5m9U9nM1rl1OtXkRD/exec?action=getMonografias&_t=${Date.now()}`;
+    const targetUrl = `https://script.google.com/macros/s/AKfycbxSHOyTaX-GhFfUEawLhL6MVpnRgd21ldcAQfYxC7EiJvrQO-IcGUyrDzt-xB3j2rPy/exec?action=getMonografias&_t=${Date.now()}`;
     const gasResp = await fetch(targetUrl, {
       method: 'GET',
       headers: { 'Cache-Control': 'no-cache' },

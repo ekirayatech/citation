@@ -572,6 +572,15 @@ function responderMonografias() {
         item[h] = (colIdx !== undefined && r[colIdx] !== undefined) ? sanitizar(r[colIdx]) : '';
       }
     });
+
+    // Extracción bidireccional de drive_file_id y url_documento
+    if (!item.drive_file_id && item.url_documento) {
+      item.drive_file_id = extraerDriveFileId(item.url_documento);
+    }
+    if (!item.url_documento && item.drive_file_id) {
+      item.url_documento = 'https://drive.google.com/file/d/' + item.drive_file_id + '/view';
+    }
+
     return item;
   });
 
@@ -695,13 +704,14 @@ function procesarGestionUsuario(payload) {
   if (subAction === 'delete') {
     const target = String(payload.Correo || payload.correo || '').trim().toLowerCase();
     const lastRow = hoja.getLastRow();
-    if (lastRow > 1)হের
-    const cCorreo = mapa['correo'];
-    const data = hoja.getRange(2, 1, lastRow - 1, hoja.getLastColumn()).getValues();
-    for (let i = 0; i < data.length; i++) {
-      if (cCorreo !== undefined && String(data[i][cCorreo]).trim().toLowerCase() === target) {
-        hoja.deleteRow(i + 2);
-        return crearSalidaJson({ status: 'success', message: 'Usuario eliminado exitosamente.' });
+    if (lastRow > 1) {
+      const cCorreo = mapa['correo'];
+      const data = hoja.getRange(2, 1, lastRow - 1, hoja.getLastColumn()).getValues();
+      for (let i = 0; i < data.length; i++) {
+        if (cCorreo !== undefined && String(data[i][cCorreo]).trim().toLowerCase() === target) {
+          hoja.deleteRow(i + 2);
+          return crearSalidaJson({ status: 'success', message: 'Usuario eliminado exitosamente.' });
+        }
       }
     }
   }

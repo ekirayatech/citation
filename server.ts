@@ -664,7 +664,7 @@ function loadPersistedState(): PersistedRepoState {
           process.env.GOOGLE_SHEETS_URL ||
           process.env.SHEETS_CONNECTION_URL ||
           process.env.VITE_GOOGLE_SHEETS_URL ||
-          'https://docs.google.com/spreadsheets/d/1EYG2IOUaZV3-v61-i5c9Zxp596s3QbhNQLyFRJujgow/edit',
+          'https://docs.google.com/spreadsheets/d/1_Te5Czkvtjue-49-foSBU3tWSTMg1-tucAPAzWIjJSw/edit',
         repoTabName: parsed.repoTabName || process.env.REPO_TAB_NAME || 'repositorio',
         accessToken: parsed.accessToken || process.env.ACCESS_TOKEN || 'EKIRAYA-2026',
         lastSyncDate: parsed.lastSyncDate || new Date().toLocaleString('es-CO'),
@@ -1862,7 +1862,7 @@ async function startServer() {
         process.env.APPS_SCRIPT_URL,
         process.env.GOOGLE_APPS_SCRIPT_URL,
         state.appsScriptExecUrl,
-        'https://script.google.com/macros/s/AKfycbyXv5xr3CJ1oQ7o88P34EJH3tm6ltJhXhH7UAtZZHd_0l7Jjvp5m9U9nM1rl1OtXkRD/exec',
+        'https://script.google.com/macros/s/AKfycbxSHOyTaX-GhFfUEawLhL6MVpnRgd21ldcAQfYxC7EiJvrQO-IcGUyrDzt-xB3j2rPy/exec',
       ];
       const effectiveScriptUrl = (candidates.find(isValidGasUrl) || '').trim();
 

@@ -16,7 +16,7 @@
 export const CENTRAL_APPS_SCRIPT_URL: string =
   (import.meta.env.VITE_APPS_SCRIPT_URL as string) ||
   (import.meta.env.VITE_GAS_WEBAPP_URL as string) ||
-  'https://script.google.com/macros/s/AKfycbyXv5xr3CJ1oQ7o88P34EJH3tm6ltJhXhH7UAtZZHd_0l7Jjvp5m9U9nM1rl1OtXkRD/exec';
+  'https://script.google.com/macros/s/AKfycbxSHOyTaX-GhFfUEawLhL6MVpnRgd21ldcAQfYxC7EiJvrQO-IcGUyrDzt-xB3j2rPy/exec';
 
 /**
  * Obtiene la URL activa y válida de Google Apps Script Web App
@@ -37,6 +37,11 @@ export function getCentralGasUrl(): string {
     if (typeof window !== 'undefined' && window.localStorage) {
       const stored = (window.localStorage.getItem('ekiraya_gas_webapp_url') || '').trim();
       if (stored && stored.includes('script.google.com')) {
+        // Si el usuario tenía almacenada la URL antigua, migrar inmediatamente a la nueva URL central
+        if (stored.includes('AKfycbyXv5xr3CJ1oQ7o88P34EJH3tm6ltJhXhH7UAtZZHd_0l7Jjvp5m9U9nM1rl1OtXkRD') || stored.includes('AKfycby')) {
+          window.localStorage.setItem('ekiraya_gas_webapp_url', CENTRAL_APPS_SCRIPT_URL);
+          return CENTRAL_APPS_SCRIPT_URL.trim();
+        }
         return stored;
       }
     }

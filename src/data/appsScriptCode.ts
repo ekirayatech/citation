@@ -28,11 +28,11 @@ export const APPS_SCRIPT_CODE = `/**
  */
 
 const CONFIG = {
-  SPREADSHEET_ID: '1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0',
-  SPREADSHEET_URL: 'https://docs.google.com/spreadsheets/d/1_JgI8DRjnvql9sruq54rFbwVBFelokqpIv2NkQKgZi0/edit',
-  DRIVE_FOLDER_ID: '1U0BfnGyQXzxuKaa95nqGx8iqbdG-eCii',
-  REPO_SHEET_NAME: 'repositorio',
-  USUARIOS_SHEET_NAME: 'usuarios',
+  SPREADSHEET_ID: '1_Te5Czkvtjue-49-foSBU3tWSTMg1-tucAPAzWIjJSw',
+  SPREADSHEET_URL: 'https://docs.google.com/spreadsheets/d/1_Te5Czkvtjue-49-foSBU3tWSTMg1-tucAPAzWIjJSw/edit',
+  DRIVE_FOLDER_ID: '1BLBoX4Y7k3V_z8-Xy1VwPF199Ith9BOM',
+  REPO_SHEET_NAME: 'Repositorio',
+  USUARIOS_SHEET_NAME: 'Usuarios',
   ADMIN_EMAIL: 'mebolanos@cem.edu.co',
   INSTITUTIONAL_TOKEN: 'EKIRAYA-2026',
   DOMINIOS_AUTORIZADOS: ['@cem.edu.co', '@est.cem.edu.co']
